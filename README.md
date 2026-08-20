@@ -136,6 +136,16 @@ For testers, two things to know:
   patch is generated against that ref; picking another ref via the dispatch
   inputs may need it regenerated (the patch step fails loud, never silently).
 
+### Cutting a release
+
+Releases are cut by **dispatching the `capture-windows` workflow** with a
+`release_version` (e.g. `0.2.0`) — Actions → capture-windows → Run workflow.
+It records the version in `package.json` on `main`, builds the installer, and
+publishes the GitHub Release, creating the tag itself via the release API. No
+tag push is involved, which is deliberate: it keeps the whole flow inside
+Actions (and this project's git proxy cannot push tags at all). A hand-pushed
+`v*` tag still works and takes the same path.
+
 **Licence gate before HANDING a build to anyone:** distributing binaries
 triggers the GPL source-offer for the app AND the bundled engine — the public
 repo (`designsvet/guild-butler-capture`, owner-decided 2026-08-20) plus the
