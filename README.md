@@ -119,11 +119,15 @@ ABI (cap vendors its own WinPcap SDK — no external download), assembles
 `resources/engine` — where the locator finds it and captures into the user's
 data folder (the install dir is never written).
 
-For testers, three things to know:
+For testers, two things to know:
 
-- **Install [Npcap](https://npcap.com) first** (free; leave “Restrict Npcap
-  driver's access to Administrators only” UNCHECKED). The app detects it and
-  says exactly this if it's missing.
+- **The capture driver installs itself from inside the app.** Windows needs
+  Npcap, whose licence forbids both bundling it and installing it silently
+  (`/S` is an OEM feature) — so the app fetches the installer from npcap.com,
+  **verifies its Authenticode signature before running anything**, and
+  launches Npcap's own short wizard. One click, one Windows prompt, Next a
+  few times. Every failure step has its own message and falls back to the
+  manual download. See `src/main/platform/npcapInstall.ts`.
 - **SmartScreen will warn** — the build is unsigned (signing is Q16, waiting
   on public launch). “More info → Run anyway” is expected for the guild beta.
 - The default engine ref is the owner's pushed branch
@@ -131,6 +135,16 @@ For testers, three things to know:
   heartbeat, character display, and his local-patch series. The SIGINT-flush
   patch is generated against that ref; picking another ref via the dispatch
   inputs may need it regenerated (the patch step fails loud, never silently).
+
+### Cutting a release
+
+Releases are cut by **dispatching the `capture-windows` workflow** with a
+`release_version` (e.g. `0.2.0`) — Actions → capture-windows → Run workflow.
+It records the version in `package.json` on `main`, builds the installer, and
+publishes the GitHub Release, creating the tag itself via the release API. No
+tag push is involved, which is deliberate: it keeps the whole flow inside
+Actions (and this project's git proxy cannot push tags at all). A hand-pushed
+`v*` tag still works and takes the same path.
 
 **Licence gate before HANDING a build to anyone:** distributing binaries
 triggers the GPL source-offer for the app AND the bundled engine — the public

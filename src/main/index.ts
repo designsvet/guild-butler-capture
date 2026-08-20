@@ -11,16 +11,29 @@
 
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { execFile, spawn } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, promises as fsp, readFileSync, renameSync, statSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  promises as fsp,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 
 import {
   ECaptureAccess,
   ECaptureStatus,
   EEngineErrorKind,
+  ENpcapInstallOutcome,
   EPermissionFixOutcome,
   initialCaptureState,
   type TCaptureState,
+  type TNpcapFixResult,
   type TPermissionFixResult,
   type TSetupStatus,
 } from "../shared/captureTypes.js";
@@ -36,6 +49,7 @@ import {
   stageBpfResources,
   type TBpfInstallResult,
 } from "./platform/macBpf.js";
+import { installNpcap, parseSignatureOutput, type TSignatureCheck } from "./platform/npcapInstall.js";
 import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpcap.js";
 import { loadSettings, saveSettings, settingsFilePath } from "./settings.js";
 
@@ -373,6 +387,81 @@ const registerIpc = (): void => {
     appLog(`bpf fix outcome: ${outcome} (access=${setup.access})`);
     return { setup, outcome, detail: result.detail };
   });
+  ipcMain.handle(IPC.setupInstallNpcap, async (): Promise<TNpcapFixResult> => {
+    if (process.platform !== "win32") {
+      return {
+        setup: await getSetup(),
+        install: { outcome: ENpcapInstallOutcome.Unsupported, version: null, detail: null },
+      };
+    }
+    const install = await installNpcap({
+      fetchText: async (url) => {
+        const res = await fetch(url, { redirect: "follow" });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return await res.text();
+      },
+      download: async (url) => {
+        const res = await fetch(url, { redirect: "follow" });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const dir = mkdtempSync(join(tmpdir(), "gbc-npcap-"));
+        const file = join(dir, "npcap-setup.exe");
+        await fsp.writeFile(file, Buffer.from(await res.arrayBuffer()));
+        return file;
+      },
+      // Authenticode via PowerShell: `Status|Subject` on one line, which
+      // parseSignatureOutput turns into the verdict. Anything unexpected —
+      // no PowerShell, odd output — parses to "not valid" and refuses.
+      verify: async (file): Promise<TSignatureCheck> => {
+        return await new Promise((resolve) => {
+          execFile(
+            "powershell.exe",
+            [
+              "-NoProfile",
+              "-NonInteractive",
+              "-Command",
+              "$s = Get-AuthenticodeSignature -LiteralPath $env:GBC_FILE; " +
+                "Write-Output ($s.Status.ToString() + '|' + $s.SignerCertificate.Subject)",
+            ],
+            { timeout: 60_000, env: { ...process.env, GBC_FILE: file } },
+            (err, stdout) => {
+              resolve(err != null ? { status: null, subject: null } : parseSignatureOutput(stdout));
+            },
+          );
+        });
+      },
+      // Npcap's installer asks for elevation itself (its manifest), so this is
+      // where Windows shows the UAC prompt — the app never elevates.
+      run: async (file) => {
+        await new Promise<void>((resolve, reject) => {
+          execFile(file, { timeout: 15 * 60_000, windowsHide: false }, (err) => {
+            if (err != null && (err as NodeJS.ErrnoException).code !== undefined && err.message.includes("EACCES")) {
+              reject(err);
+              return;
+            }
+            // A non-zero exit means the member cancelled the wizard; the
+            // re-probe decides, not the exit code.
+            resolve();
+          });
+        });
+      },
+      probe: probeAccess,
+      cleanup: (file) => {
+        try {
+          rmSync(dirname(file), { recursive: true, force: true });
+        } catch {
+          // a leftover temp file must never surface as an install failure
+        }
+      },
+      log: appLog,
+    });
+    appLog(`npcap install outcome=${install.outcome} version=${install.version ?? "?"} detail=${install.detail ?? ""}`);
+    return { setup: await getSetup(), install };
+  });
+
   ipcMain.handle(IPC.setupOpenNpcapPage, async () => {
     await shell.openExternal(NPCAP_URL);
   });

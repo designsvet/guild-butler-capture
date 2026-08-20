@@ -48,9 +48,9 @@ export const STR = {
     permissionTitle: "macOS is blocking network capture",
     permission:
       "macOS only lets administrators watch network traffic, which is why the old script needed sudo. Click “Fix capture permissions” — you'll be asked for your Mac password once, and the fix sticks across reboots. There is no switch for this in System Settings; the password prompt from this app is the whole fix.",
-    npcapMissingTitle: "Npcap is not installed",
+    npcapMissingTitle: "One-time setup: the capture driver",
     npcapMissing:
-      "Capturing on Windows needs Npcap, a free driver this app is not allowed to bundle. Install it from the official page — leave “Restrict Npcap driver's access to Administrators only” UNCHECKED — then come back and press Start.",
+      "Windows needs a small free driver (Npcap) before anything can watch game traffic — its licence doesn't let us include it, so the app fetches it from the makers and starts it for you. Click “Install capture driver”, say yes to Windows, and click Next through the short wizard. Once only.",
     npcapAdminOnlyTitle: "Npcap is restricted to administrators",
     npcapAdminOnly:
       "Npcap is installed, but it was set up so only Administrators may capture. Reinstall it with “Restrict Npcap driver's access to Administrators only” unchecked, or run this app as administrator.",
@@ -81,7 +81,8 @@ export const STR = {
     revealMac: "Reveal in Finder",
     revealWin: "Show in Explorer",
     fixMacPermissions: "Fix capture permissions…",
-    getNpcap: "Get Npcap",
+    installNpcap: "Install capture driver",
+    getNpcap: "Download it myself",
     chooseEngine: "Choose engine folder…",
     details: "Technical details",
   },
@@ -92,6 +93,9 @@ export const STR = {
     accessOk: "Capture permission looks good",
     accessUnknown: "Capture permission will be checked on Start",
     permissionNeeded: "One-time permission fix needed",
+    npcapNeeded: "One-time setup needed: the capture driver",
+    npcapAdminOnly: "The capture driver is installed but restricted to administrators",
+    npcapInstalling: "Fetching the capture driver from npcap.com…",
     // Feedback under the checklist after a "Fix capture permissions…" attempt.
     // Granting things in macOS System Settings does NOT touch this permission,
     // so the copy has to carry the user back to the password prompt.
@@ -99,6 +103,16 @@ export const STR = {
       "The password prompt was closed without finishing, so nothing was changed. Click “Fix capture permissions” and enter your Mac password — that prompt is the whole fix (System Settings has no switch for this).",
     permissionFixFailed: (detail: string | null): string =>
       `The permission fix didn't complete${detail != null ? ` — macOS said: ${detail}` : ""}. Try again; if it keeps failing, send your officer the app log.`,
+    npcapInstalled: (version: string | null): string =>
+      `Capture driver installed${version != null ? ` (Npcap ${version})` : ""} — press Start capture.`,
+    npcapNotCompleted:
+      "The driver wizard was closed before it finished, so nothing was installed. Click “Install capture driver” and click Next through to the end.",
+    npcapCancelled:
+      "Windows blocked the driver install — it needs your “Yes” on the Windows prompt. Try again and accept it.",
+    npcapDownloadFailed:
+      "Couldn't reach npcap.com to fetch the driver. Check your connection (a VPN or a strict firewall can block it) and try again, or use “Download it myself”.",
+    npcapUntrusted:
+      "The downloaded driver didn't carry a valid signature from its makers, so it was NOT run — that can mean a proxy or antivirus altered the download. Use “Download it myself” and get it straight from npcap.com.",
     permissionFixStillBlocked:
       "The fix was installed, but macOS still reports no capture access. Quit and reopen the app; if this message survives a reboot, tell your officer.",
   },

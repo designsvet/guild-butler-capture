@@ -9,9 +9,11 @@ import {
   ECaptureAccess,
   ECaptureStatus,
   EEngineErrorKind,
+  ENpcapInstallOutcome,
   EPermissionFixOutcome,
   lootLinesOf,
   type TCaptureState,
+  type TNpcapFixResult,
   type TPermissionFixResult,
   type TSetupStatus,
 } from "../shared/captureTypes.js";
@@ -25,6 +27,7 @@ type TGbc = {
   reveal: () => Promise<boolean>;
   getSetup: () => Promise<TSetupStatus>;
   fixMacPermissions: () => Promise<TPermissionFixResult>;
+  installNpcap: () => Promise<TNpcapFixResult>;
   openNpcapPage: () => Promise<void>;
   pickEnginePath: () => Promise<TSetupStatus>;
   onState: (listener: (state: TCaptureState) => void) => () => void;
@@ -57,6 +60,7 @@ const ui = {
   errorTitle: el<HTMLParagraphElement>("error-title"),
   errorBody: el<HTMLParagraphElement>("error-body"),
   errorFixMac: el<HTMLButtonElement>("btn-fix-mac"),
+  errorInstallNpcap: el<HTMLButtonElement>("btn-install-npcap"),
   errorGetNpcap: el<HTMLButtonElement>("btn-get-npcap"),
   errorChooseEngine: el<HTMLButtonElement>("btn-error-choose-engine"),
   errorFixNote: el<HTMLParagraphElement>("error-fix-note"),
@@ -66,6 +70,7 @@ const ui = {
   setupEngine: el<HTMLLIElement>("setup-engine"),
   setupAccess: el<HTMLLIElement>("setup-access"),
   setupFixMac: el<HTMLButtonElement>("btn-setup-fix-mac"),
+  setupInstallNpcap: el<HTMLButtonElement>("btn-setup-install-npcap"),
   setupGetNpcap: el<HTMLButtonElement>("btn-setup-get-npcap"),
   setupFixNote: el<HTMLParagraphElement>("setup-fix-note"),
   advEngine: el<HTMLSpanElement>("adv-engine-path"),
@@ -78,6 +83,9 @@ let state: TCaptureState | null = null;
 let setup: TSetupStatus | null = null;
 /** Last "Fix capture permissions…" attempt this window — feedback, not state. */
 let fixAttempt: TPermissionFixResult | null = null;
+/** Last in-app Npcap install attempt, and whether one is in flight. */
+let npcapAttempt: TNpcapFixResult | null = null;
+let npcapBusy = false;
 
 const WAITING_HINTS_AFTER_MS = 90_000;
 
@@ -145,6 +153,33 @@ const errorCopy = (kind: EEngineErrorKind | null): { title: string; body: string
 const basename = (path: string): string => {
   const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
   return idx >= 0 ? path.slice(idx + 1) : path;
+};
+
+/** The feedback line under an "Install capture driver" attempt — "" hides it. */
+const npcapNoteText = (): string => {
+  if (npcapBusy) {
+    return STR.setup.npcapInstalling;
+  }
+  switch (npcapAttempt?.install.outcome) {
+    case ENpcapInstallOutcome.Installed: {
+      return STR.setup.npcapInstalled(npcapAttempt.install.version);
+    }
+    case ENpcapInstallOutcome.NotCompleted: {
+      return STR.setup.npcapNotCompleted;
+    }
+    case ENpcapInstallOutcome.Cancelled: {
+      return STR.setup.npcapCancelled;
+    }
+    case ENpcapInstallOutcome.DownloadFailed: {
+      return STR.setup.npcapDownloadFailed;
+    }
+    case ENpcapInstallOutcome.Untrusted: {
+      return STR.setup.npcapUntrusted;
+    }
+    default: {
+      return "";
+    }
+  }
 };
 
 /** The feedback line under a "Fix capture permissions…" attempt — "" hides it. */
@@ -217,13 +252,20 @@ const render = (): void => {
     ui.errorTitle.textContent = copy.title;
     ui.errorBody.textContent = copy.body;
     show(ui.errorFixMac, s.errorKind === EEngineErrorKind.Permission && gbc.platform === "darwin");
+    show(ui.errorInstallNpcap, s.errorKind === EEngineErrorKind.NpcapMissing && gbc.platform === "win32");
+    ui.errorInstallNpcap.disabled = npcapBusy;
     show(
       ui.errorGetNpcap,
       s.errorKind === EEngineErrorKind.NpcapMissing ||
         (s.errorKind === EEngineErrorKind.Permission && gbc.platform === "win32"),
     );
     show(ui.errorChooseEngine, s.errorKind === EEngineErrorKind.EngineMissing);
-    const errorNote = s.errorKind === EEngineErrorKind.Permission && gbc.platform === "darwin" ? fixNoteText() : "";
+    const errorNote =
+      s.errorKind === EEngineErrorKind.NpcapMissing
+        ? npcapNoteText()
+        : s.errorKind === EEngineErrorKind.Permission && gbc.platform === "darwin"
+          ? fixNoteText()
+          : "";
     ui.errorFixNote.textContent = errorNote;
     show(ui.errorFixNote, errorNote.length > 0);
     show(ui.errorDetails, s.errorDetail != null);
@@ -245,13 +287,21 @@ const render = (): void => {
         ? STR.setup.accessOk
         : setup.access === ECaptureAccess.Unknown
           ? STR.setup.accessUnknown
-          : STR.setup.permissionNeeded;
+          : setup.access === ECaptureAccess.NpcapMissing
+            ? STR.setup.npcapNeeded
+            : setup.access === ECaptureAccess.NpcapAdminOnly
+              ? STR.setup.npcapAdminOnly
+              : STR.setup.permissionNeeded;
     show(ui.setupFixMac, setup.access === ECaptureAccess.NoPermission);
+    // Primary action is the in-app install; "download it myself" stays beside
+    // it as the escape hatch for a blocked network or a refused signature.
+    show(ui.setupInstallNpcap, setup.access === ECaptureAccess.NpcapMissing);
+    ui.setupInstallNpcap.disabled = npcapBusy;
     show(
       ui.setupGetNpcap,
       setup.access === ECaptureAccess.NpcapMissing || setup.access === ECaptureAccess.NpcapAdminOnly,
     );
-    const setupNote = fixNoteText();
+    const setupNote = npcapNoteText() || fixNoteText();
     ui.setupFixNote.textContent = setupNote;
     show(ui.setupFixNote, setupNote.length > 0);
   }
@@ -297,6 +347,27 @@ ui.setupFixMac.addEventListener("click", () => {
   void fixMac();
 });
 
+const installNpcapDriver = async (): Promise<void> => {
+  if (npcapBusy) {
+    return;
+  }
+  npcapBusy = true;
+  render();
+  try {
+    npcapAttempt = await gbc.installNpcap();
+    setup = npcapAttempt.setup;
+  } finally {
+    npcapBusy = false;
+    render();
+  }
+};
+ui.setupInstallNpcap.addEventListener("click", () => {
+  void installNpcapDriver();
+});
+ui.errorInstallNpcap.addEventListener("click", () => {
+  void installNpcapDriver();
+});
+
 const openNpcap = (): void => {
   void gbc.openNpcapPage();
 };
@@ -321,6 +392,10 @@ for (const hint of STR.waitingHints.items) {
   li.textContent = hint;
   ui.hintsList.append(li);
 }
+ui.setupInstallNpcap.textContent = STR.buttons.installNpcap;
+ui.errorInstallNpcap.textContent = STR.buttons.installNpcap;
+ui.setupGetNpcap.textContent = STR.buttons.getNpcap;
+ui.errorGetNpcap.textContent = STR.buttons.getNpcap;
 ui.footer.textContent = STR.footer.engineCredit;
 ui.revealBtn.textContent =
   gbc.platform === "darwin"
