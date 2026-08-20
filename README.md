@@ -138,13 +138,20 @@ For testers, two things to know:
 
 ### Cutting a release
 
-Releases are cut by **dispatching the `capture-windows` workflow** with a
-`release_version` (e.g. `0.2.0`) — Actions → capture-windows → Run workflow.
-It records the version in `package.json` on `main`, builds the installer, and
-publishes the GitHub Release, creating the tag itself via the release API. No
-tag push is involved, which is deliberate: it keeps the whole flow inside
-Actions (and this project's git proxy cannot push tags at all). A hand-pushed
-`v*` tag still works and takes the same path.
+Two ways, both ending in the same build-and-publish path:
+
+- **Bump the version on `main`.** A push whose `package.json` names a version
+  with no release yet cuts that release. This needs nothing but push access —
+  no tag push, no dispatch permission — which is what lets the agent cut one
+  too. Idempotent: an existing release means build-only, so ordinary pushes
+  and re-runs never republish.
+- **Dispatch the `capture-windows` workflow** with a `release_version` (e.g.
+  `0.2.0`) — Actions → capture-windows → Run workflow. It records the version
+  in `package.json` on `main` for you first.
+
+Either way the release is created through the release API, which makes the tag
+itself — no tag push is involved anywhere. A hand-pushed `v*` tag still works
+and takes the same path.
 
 **Licence gate before HANDING a build to anyone:** distributing binaries
 triggers the GPL source-offer for the app AND the bundled engine — the public
