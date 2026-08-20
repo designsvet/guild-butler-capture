@@ -103,10 +103,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Rebuild cap for the app's Electron ABI
-        run: node tools/engine-rebuild.mjs ../engine-src
+        run: node tools/engine-rebuild.mjs engine-src
 
       - name: Assemble engine-dist
-        run: node tools/prepare-engine-dist.mjs ../engine-src engine-dist
+        run: node tools/prepare-engine-dist.mjs engine-src engine-dist
 
       - name: Build the installer (unsigned)
         env:
