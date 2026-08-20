@@ -1,0 +1,122 @@
+/**
+ * Every user-visible string, in one place. English-only for Phase 1; keeping
+ * them here (instead of scattered through the renderer) is what makes adopting
+ * the bot's six-language i18n pattern a mechanical change later.
+ *
+ * Copy rules: members are not technical. Say what happened and what to click,
+ * never what subsystem failed. The two errors that actually happen — no capture
+ * permission, and Albion not running — get the most careful words.
+ */
+
+export const STR = {
+  appName: "Guild Butler Capture",
+  tagline: "Albion loot logging for your guild — no terminal required.",
+
+  status: {
+    idle: "Not capturing",
+    starting: "Starting the logger…",
+    waiting: "Waiting for Albion…",
+    capturing: "Capturing",
+    stopping: "Stopping…",
+    restarting: "The logger hiccupped — restarting it…",
+    error: "Something needs fixing",
+  },
+
+  statusHint: {
+    idle: "Press Start before you head into content. Loot picked up near you is written to a log file your officers can settle from.",
+    starting: "Getting the capture engine going.",
+    waiting:
+      "The logger is running, but no Albion traffic has reached it yet. The moment the game produces traffic it is picked up by itself — leaving this running through a game restart is fine.",
+    capturing: "Loot events near you are being written to the log.",
+    capturingAs: (character: string): string => `Loot events near ${character} are being written to the log.`,
+    stopping: "Asking the logger to finish writing and shut down.",
+    restarting: (seconds: number): string =>
+      `The capture engine stopped unexpectedly. It restarts by itself in ${seconds}s — your log file and counts are safe.`,
+  },
+
+  /** Shown under Waiting once nothing has been detected for a while. */
+  waitingHints: {
+    title: "Still nothing? The usual reasons:",
+    items: [
+      "Albion isn't running, or is sitting on the login screen — get in game and move around a bit.",
+      "A VPN or tunnel (NordVPN, ExitLag, …) is carrying the game's traffic where the logger cannot see it. Turn it off while capturing.",
+      "GeForce Now / cloud gaming — the game runs on their computer, so its traffic never touches this one. Capture cannot work there.",
+    ],
+  },
+
+  errors: {
+    permissionTitle: "macOS is blocking network capture",
+    permission:
+      "macOS only lets administrators watch network traffic, which is why the old script needed sudo. Click “Fix capture permissions” — you'll be asked for your Mac password once, and the fix sticks across reboots. There is no switch for this in System Settings; the password prompt from this app is the whole fix.",
+    npcapMissingTitle: "Npcap is not installed",
+    npcapMissing:
+      "Capturing on Windows needs Npcap, a free driver this app is not allowed to bundle. Install it from the official page — leave “Restrict Npcap driver's access to Administrators only” UNCHECKED — then come back and press Start.",
+    npcapAdminOnlyTitle: "Npcap is restricted to administrators",
+    npcapAdminOnly:
+      "Npcap is installed, but it was set up so only Administrators may capture. Reinstall it with “Restrict Npcap driver's access to Administrators only” unchecked, or run this app as administrator.",
+    abiMismatchTitle: "The capture engine needs a rebuild",
+    abiMismatch:
+      "The engine's native capture module was built for a different runtime than this app. Run the engine rebuild step from the README (pnpm engine:rebuild), then start the app again.",
+    engineMissingTitle: "Capture engine not found",
+    engineMissing:
+      "The ao-loot-logger folder wasn't found next to this app. Point the app at it under Advanced → “Choose engine folder”.",
+    crashTitle: "The logger keeps stopping",
+  },
+
+  stats: {
+    character: "Character",
+    characterUnknown: "detecting…",
+    loot: "Loot events this session",
+    traffic: "Albion traffic",
+    trafficSeenAgo: (seconds: number): string => (seconds <= 2 ? "live" : `seen ${seconds}s ago`),
+    trafficNotSeen: "not seen yet",
+    logFile: "Log file",
+    logFileNone: "created when capture starts",
+  },
+
+  buttons: {
+    start: "Start capture",
+    stop: "Stop capture",
+    reveal: "Reveal",
+    revealMac: "Reveal in Finder",
+    revealWin: "Show in Explorer",
+    fixMacPermissions: "Fix capture permissions…",
+    getNpcap: "Get Npcap",
+    chooseEngine: "Choose engine folder…",
+    details: "Technical details",
+  },
+
+  setup: {
+    engineOk: (source: string): string => `Capture engine found (${source})`,
+    engineMissing: "Capture engine not found",
+    accessOk: "Capture permission looks good",
+    accessUnknown: "Capture permission will be checked on Start",
+    permissionNeeded: "One-time permission fix needed",
+    // Feedback under the checklist after a "Fix capture permissions…" attempt.
+    // Granting things in macOS System Settings does NOT touch this permission,
+    // so the copy has to carry the user back to the password prompt.
+    permissionFixCancelled:
+      "The password prompt was closed without finishing, so nothing was changed. Click “Fix capture permissions” and enter your Mac password — that prompt is the whole fix (System Settings has no switch for this).",
+    permissionFixFailed: (detail: string | null): string =>
+      `The permission fix didn't complete${detail != null ? ` — macOS said: ${detail}` : ""}. Try again; if it keeps failing, send your officer the app log.`,
+    permissionFixStillBlocked:
+      "The fix was installed, but macOS still reports no capture access. Quit and reopen the app; if this message survives a reboot, tell your officer.",
+  },
+
+  advanced: {
+    summary: "Advanced",
+    engineLabel: "Engine",
+    engineNotFound: "not found — choose the ao-loot-logger folder",
+  },
+
+  quitConfirm: {
+    title: "Stop capturing?",
+    message: "Capture is still running. Quit and stop logging loot?",
+    quit: "Stop and quit",
+    cancel: "Keep capturing",
+  },
+
+  footer: {
+    engineCredit: "Capture engine: ao-loot-logger (GPL-3.0, open source)",
+  },
+} as const;

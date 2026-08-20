@@ -1,0 +1,16 @@
+diff --git a/src/index.js b/src/index.js
+index 82a0c72..b7b8015 100644
+--- a/src/index.js
++++ b/src/index.js
+@@ -82,6 +82,11 @@ async function main() {
+ 
+   KeyboardInput.init()
+ 
++  // Guild Butler Capture runs this engine as a child with stdin ignored, so
++  // Ctrl-C never reaches KeyboardInput; the supervisor stops it with SIGINT.
++  // Route that through the same orderly exit path (flush the log stream).
++  process.on('SIGINT', exit)
++
+   startHeartbeat()
+ 
+   console.info([

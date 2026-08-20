@@ -1,0 +1,14 @@
+# build + packaging output (node_modules/ and dist/ are covered by the repo root
+# .gitignore while the app is staged here; listed anyway so the folder is
+# self-sufficient after extraction to its own repo)
+node_modules/
+dist/
+release/
+engine-dist/
+
+# capture output — a dev run of the mock engine writes where it stands
+loot-events-*.txt
+engine-output-*.log
+
+*.tsbuildinfo
+.DS_Store

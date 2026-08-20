@@ -1,0 +1,17 @@
+# This file makes guild-butler-capture its own pnpm workspace root, which does
+# two load-bearing things:
+#
+# 1. STOPS the upward lookup — while this app is staged inside the raid-bot
+#    repo, a plain `pnpm install` in here must not join the bot's workspace
+#    (different deps, different lockfile, and the bot's CI installs with
+#    --frozen-lockfile). When the app is extracted to its own repo this file
+#    simply keeps working.
+# 2. Allows the dependency build scripts pnpm ≥10 gates by default: electron's
+#    postinstall is what downloads the platform binary — without this line the
+#    install "succeeds" and `electron .` then fails with a missing binary.
+#    (Same pattern as the bot repo's allowBuilds for better-sqlite3.)
+
+allowBuilds:
+  electron: true
+  # esbuild ships vitest's transform binary via its postinstall
+  esbuild: true

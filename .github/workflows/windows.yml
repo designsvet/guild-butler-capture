@@ -1,0 +1,135 @@
+# Guild Butler Capture — Windows test build (ADR 0096, Windows slice).
+#
+# Produces an UNSIGNED nsis installer with the engine BUNDLED (cap compiled
+# for the app's Electron ABI on this runner; cap vendors its own WinPcap SDK,
+# so no external SDK download). The artifact is for the guild's own testing;
+# distribution beyond that waits for the public repo (GPL source-offer —
+# owner's call, see ADR 0096). Npcap itself is never bundled (paid OEM
+# licence) — testers install it from npcap.com; the app explains this.
+#
+# Triggers:
+# - workflow_dispatch (pick engine repo/ref) — available once this file is on
+#   the default branch.
+# - pull_request touching THIS file — so the pipeline can be exercised from
+#   the PR before it merges (runs with the defaults below).
+#
+# Default engine ref: designsvet/ao-loot-logger@protocol18 — the owner's
+# pushed engine (2026-08-20): the [status] heartbeat, the 11-field CSV
+# (server__region) the bot's parser expects, and his 20 local-patch commits.
+# The flush-on-sigint patch below is generated against THIS ref; other refs
+# picked via the dispatch inputs may need it regenerated (the patch step
+# fails loud when it neither applies nor is present).
+
+name: capture-windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      engine_repo:
+        description: "Engine repo (owner/name)"
+        type: string
+        default: "designsvet/ao-loot-logger"
+      engine_ref:
+        description: "Engine branch / tag / sha"
+        type: string
+        default: "protocol18"
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # This job needs a WINDOWS runner, so it cannot ride the self-hosted
+    # `raid-bot` label; it gets its own kill-switch variable in the house
+    # pattern (test/ciWorkflow.test.ts): set repo var CI_RUNS_ON_WINDOWS to
+    # repoint it (e.g. to a self-hosted Windows box) with no PR.
+    #
+    # Default pinned to windows-2022, not windows-latest: since 2026-06 the
+    # latest image ships Visual Studio 2026 (internal v18), which node-gyp
+    # < 12.1 and @electron/rebuild's gyp fork cannot detect ("unknown version
+    # \"undefined\"" — the maiden run failed exactly there). windows-2022
+    # carries VS2022 and stays supported; unpin once the toolchain knows VS 18.
+    runs-on: ${{ vars.CI_RUNS_ON_WINDOWS || 'windows-2022' }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v5
+
+      - name: Checkout engine
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ inputs.engine_repo || 'designsvet/ao-loot-logger' }}
+          ref: ${{ inputs.engine_ref || 'protocol18' }}
+          path: engine-src
+
+      # House rule (test/ciWorkflow.test.ts): pnpm/action-setup BEFORE
+      # setup-node, with a per-runner dest.
+      - uses: pnpm/action-setup@v5
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Apply engine patches (idempotent — the owner's branch may already carry them)
+        run: |
+          cd engine-src
+          for p in ../resources/engine-patches/*.patch; do
+            if git apply --check "$p" 2>/dev/null; then
+              echo "applying $p"
+              git apply "$p"
+            elif git apply --reverse --check "$p" 2>/dev/null; then
+              echo "skipping $p — already applied on this engine ref"
+            else
+              echo "::error::$p neither applies nor is already applied on this engine ref"
+              exit 1
+            fi
+          done
+
+      - name: Install engine deps (no compile — cap is built once, for Electron's ABI, below)
+        run: cd engine-src && npm install --omit=dev --ignore-scripts
+
+      - name: Install app deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Rebuild cap for the app's Electron ABI
+        run: node tools/engine-rebuild.mjs ../engine-src
+
+      - name: Assemble engine-dist
+        run: node tools/prepare-engine-dist.mjs ../engine-src engine-dist
+
+      - name: Build the installer (unsigned)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+                    pnpm build
+          pnpm exec electron-builder --win --config electron-builder.win-ci.yml
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: guild-butler-capture-windows
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Stable-named copy — the download page's /latest/download URL
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: cp release/*.exe "release/GuildButlerCapture-Setup.exe"
+
+      - name: Publish GitHub Release (tag builds)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.exe
+          generate_release_notes: true

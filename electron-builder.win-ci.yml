@@ -1,0 +1,11 @@
+# CI overlay for the Windows test build (capture-windows.yml): the base
+# config plus the bundled engine. A separate file because electron-builder's
+# dotted CLI flags cannot express an array element (--config.extraResources.0
+# parses as an object key "0" and fails validation — the pipeline's second
+# maiden-run lesson), and because local `pnpm package:*` builds must keep
+# working with no engine-dist/ present.
+extends: ./electron-builder.yml
+
+extraResources:
+  - from: engine-dist
+    to: engine

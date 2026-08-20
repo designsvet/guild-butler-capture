@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
+    />
+    <title>Guild Butler Capture</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">⚔️</div>
+        <div>
+          <h1>Guild Butler Capture</h1>
+          <p class="tagline">Albion loot logging for your guild — no terminal required.</p>
+        </div>
+      </div>
+      <span id="app-version" class="version"></span>
+    </header>
+
+    <main>
+      <section class="card status-card">
+        <div class="status-row">
+          <span id="status-dot" class="status-dot" data-status="idle" aria-hidden="true"></span>
+          <span id="status-label" class="status-label">Not capturing</span>
+        </div>
+        <p id="status-hint" class="status-hint"></p>
+        <div id="waiting-hints" class="hints hidden">
+          <p id="waiting-hints-title" class="hints-title"></p>
+          <ul id="waiting-hints-list"></ul>
+        </div>
+      </section>
+
+      <section id="error-panel" class="card error-card hidden">
+        <p id="error-title" class="error-title"></p>
+        <p id="error-body" class="error-body"></p>
+        <div class="actions">
+          <button id="btn-fix-mac" class="btn accent hidden">Fix capture permissions…</button>
+          <button id="btn-get-npcap" class="btn accent hidden">Get Npcap</button>
+          <button id="btn-error-choose-engine" class="btn hidden">Choose engine folder…</button>
+        </div>
+        <p id="error-fix-note" class="fix-note hidden"></p>
+        <details id="error-details" class="hidden">
+          <summary>Technical details</summary>
+          <pre id="error-detail-text"></pre>
+        </details>
+      </section>
+
+      <section id="setup-panel" class="card setup-card hidden">
+        <ul class="setup-list">
+          <li id="setup-engine" data-ok="true"></li>
+          <li id="setup-access" data-ok="true"></li>
+        </ul>
+        <div class="actions">
+          <button id="btn-setup-fix-mac" class="btn accent hidden">Fix capture permissions…</button>
+          <button id="btn-setup-get-npcap" class="btn accent hidden">Get Npcap</button>
+        </div>
+        <p id="setup-fix-note" class="fix-note hidden"></p>
+      </section>
+
+      <section class="card stats-card">
+        <dl class="stats">
+          <div class="stat">
+            <dt>Character</dt>
+            <dd id="stat-character">—</dd>
+          </div>
+          <div class="stat">
+            <dt>Loot events this session</dt>
+            <dd id="stat-loot">0</dd>
+          </div>
+          <div class="stat">
+            <dt>Albion traffic</dt>
+            <dd id="stat-traffic">not seen yet</dd>
+          </div>
+          <div class="stat stat-file">
+            <dt>Log file</dt>
+            <dd class="file-row">
+              <span id="stat-file" class="file-name"></span>
+              <button id="btn-reveal" class="btn small" disabled>Reveal</button>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <button id="btn-primary" class="primary" data-mode="start">Start capture</button>
+
+      <details class="advanced">
+        <summary>Advanced</summary>
+        <div class="advanced-row">
+          <span class="advanced-label">Engine</span>
+          <span id="adv-engine-path" class="advanced-value"></span>
+          <button id="btn-choose-engine" class="btn small">Choose engine folder…</button>
+        </div>
+      </details>
+    </main>
+
+    <footer>
+      <p id="footer-credit"></p>
+    </footer>
+
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>

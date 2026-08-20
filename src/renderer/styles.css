@@ -1,0 +1,406 @@
+/* Guild Butler Capture — a single dark screen. No framework, no webfonts
+   (the CSP forbids remote anything); the system stack reads fine everywhere. */
+
+:root {
+  --bg: #14161b;
+  --panel: #1c1f26;
+  --panel-edge: #272b34;
+  --text: #e8e6e1;
+  --muted: #9aa0ab;
+  --accent: #d5a44c; /* guild gold */
+  --accent-press: #b8893a;
+  --good: #58c07a;
+  --warn: #e0b34a;
+  --bad: #e06c5c;
+  --calm: #6f7683;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font:
+    14px/1.5 -apple-system,
+    "Segoe UI",
+    system-ui,
+    sans-serif;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px 12px;
+  gap: 14px;
+  user-select: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* header */
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.brand-mark {
+  font-size: 26px;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #2a2417, #1d1a12);
+  border: 1px solid #3d3521;
+  border-radius: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: 0.2px;
+}
+
+.tagline {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.version {
+  color: var(--calm);
+  font-size: 11px;
+  padding-top: 4px;
+}
+
+/* layout */
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+/* status */
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--calm);
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 4%);
+}
+
+.status-dot[data-status="capturing"] {
+  background: var(--good);
+  box-shadow: 0 0 8px 1px rgb(88 192 122 / 55%);
+}
+
+.status-dot[data-status="waiting"],
+.status-dot[data-status="starting"],
+.status-dot[data-status="restarting"],
+.status-dot[data-status="stopping"] {
+  background: var(--warn);
+}
+
+.status-dot[data-status="error"] {
+  background: var(--bad);
+}
+
+.status-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.status-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.hints {
+  margin-top: 10px;
+  border-top: 1px solid var(--panel-edge);
+  padding-top: 10px;
+}
+
+.hints-title {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.hints ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.hints li + li {
+  margin-top: 4px;
+}
+
+/* error + setup */
+.error-card {
+  border-color: #59332c;
+  background: #241b19;
+}
+
+.error-title {
+  margin: 0;
+  font-weight: 600;
+  color: #f0a091;
+}
+
+.error-body {
+  margin: 6px 0 0;
+  color: var(--text);
+}
+
+.error-card details {
+  margin-top: 10px;
+}
+
+.error-card summary {
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.error-card pre {
+  margin: 8px 0 0;
+  padding: 10px;
+  background: #17110f;
+  border-radius: 8px;
+  font-size: 11px;
+  max-height: 140px;
+  overflow: auto;
+  user-select: text;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.setup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.setup-list li {
+  padding-left: 24px;
+  position: relative;
+}
+
+.setup-list li + li {
+  margin-top: 6px;
+}
+
+.setup-list li::before {
+  content: "✕";
+  position: absolute;
+  left: 2px;
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.setup-list li[data-ok="true"]::before {
+  content: "✓";
+  color: var(--good);
+}
+
+/* Feedback line under a "Fix capture permissions…" attempt. */
+.fix-note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #59332c;
+  background: #241b19;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.actions:empty {
+  display: none;
+}
+
+/* stats */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 18px;
+  margin: 0;
+}
+
+.stat dt {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.stat dd {
+  margin: 3px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.stat-file {
+  grid-column: 1 / -1;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text);
+  direction: rtl; /* ellipsis on the left, keep the changing tail visible */
+  text-align: left;
+  flex: 1;
+}
+
+/* buttons */
+.btn {
+  background: #262a33;
+  color: var(--text);
+  border: 1px solid #333845;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  background: #2d323d;
+}
+
+.btn.small {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.btn.accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1b1508;
+  font-weight: 600;
+}
+
+.btn.accent:hover:not(:disabled) {
+  background: var(--accent-press);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.primary {
+  border: 0;
+  border-radius: 10px;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--accent);
+  color: #1b1508;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--accent-press);
+}
+
+.primary[data-mode="stop"] {
+  background: #333845;
+  color: var(--text);
+}
+
+.primary[data-mode="stop"]:hover:not(:disabled) {
+  background: #3c4250;
+}
+
+.primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* advanced + footer */
+.advanced {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.advanced summary {
+  cursor: pointer;
+}
+
+.advanced-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.advanced-label {
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-size: 10px;
+}
+
+.advanced-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  user-select: text;
+}
+
+footer p {
+  margin: 0;
+  color: var(--calm);
+  font-size: 11px;
+  text-align: center;
+}
