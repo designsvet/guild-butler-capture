@@ -17,6 +17,7 @@ const CH = {
   captureReveal: "capture:reveal",
   setupGet: "setup:get",
   setupFixMacPermissions: "setup:fix-mac-permissions",
+  setupInstallNpcap: "setup:install-npcap",
   setupOpenNpcapPage: "setup:open-npcap-page",
   setupPickEnginePath: "setup:pick-engine-path",
   stateChanged: "capture:state-changed",
@@ -30,6 +31,7 @@ export type TGbcBridge = {
   reveal: () => Promise<boolean>;
   getSetup: () => Promise<unknown>;
   fixMacPermissions: () => Promise<unknown>;
+  installNpcap: () => Promise<unknown>;
   openNpcapPage: () => Promise<void>;
   pickEnginePath: () => Promise<unknown>;
   onState: (listener: (state: unknown) => void) => () => void;
@@ -43,6 +45,7 @@ const bridge: TGbcBridge = {
   reveal: () => ipcRenderer.invoke(CH.captureReveal) as Promise<boolean>,
   getSetup: () => ipcRenderer.invoke(CH.setupGet),
   fixMacPermissions: () => ipcRenderer.invoke(CH.setupFixMacPermissions),
+  installNpcap: () => ipcRenderer.invoke(CH.setupInstallNpcap),
   openNpcapPage: () => ipcRenderer.invoke(CH.setupOpenNpcapPage) as Promise<void>,
   pickEnginePath: () => ipcRenderer.invoke(CH.setupPickEnginePath),
   onState: (listener) => {

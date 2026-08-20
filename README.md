@@ -119,11 +119,15 @@ ABI (cap vendors its own WinPcap SDK — no external download), assembles
 `resources/engine` — where the locator finds it and captures into the user's
 data folder (the install dir is never written).
 
-For testers, three things to know:
+For testers, two things to know:
 
-- **Install [Npcap](https://npcap.com) first** (free; leave “Restrict Npcap
-  driver's access to Administrators only” UNCHECKED). The app detects it and
-  says exactly this if it's missing.
+- **The capture driver installs itself from inside the app.** Windows needs
+  Npcap, whose licence forbids both bundling it and installing it silently
+  (`/S` is an OEM feature) — so the app fetches the installer from npcap.com,
+  **verifies its Authenticode signature before running anything**, and
+  launches Npcap's own short wizard. One click, one Windows prompt, Next a
+  few times. Every failure step has its own message and falls back to the
+  manual download. See `src/main/platform/npcapInstall.ts`.
 - **SmartScreen will warn** — the build is unsigned (signing is Q16, waiting
   on public launch). “More info → Run anyway” is expected for the guild beta.
 - The default engine ref is the owner's pushed branch

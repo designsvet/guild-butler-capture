@@ -150,6 +150,35 @@ export enum EPermissionFixOutcome {
   StillBlocked = "still-blocked",
 }
 
+/**
+ * What happened when the app installed Npcap for the member (Windows).
+ * Lives in shared, not in the platform module, because the renderer renders
+ * one sentence per outcome — a generic "it didn't work" is the failure mode
+ * the macOS permission bug taught us to avoid.
+ */
+export enum ENpcapInstallOutcome {
+  Installed = "installed",
+  NotCompleted = "not-completed",
+  Cancelled = "cancelled",
+  DownloadFailed = "download-failed",
+  Untrusted = "untrusted",
+  Unsupported = "unsupported",
+}
+
+export type TNpcapInstallResult = {
+  outcome: ENpcapInstallOutcome;
+  /** Npcap version when known. */
+  version: string | null;
+  /** Diagnostic for the app log. */
+  detail: string | null;
+};
+
+/** IPC reply for the in-app Npcap install: the re-probe plus what happened. */
+export type TNpcapFixResult = {
+  setup: TSetupStatus;
+  install: TNpcapInstallResult;
+};
+
 export type TPermissionFixResult = {
   setup: TSetupStatus;
   /** Null when the fix does not apply (non-mac platforms). */
