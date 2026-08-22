@@ -130,6 +130,50 @@ export const STR = {
     cancel: "Keep capturing",
   },
 
+  /**
+   * Pairing + auto-upload (ADR 0092 P2 slice 4).
+   *
+   * Copy rule for this block: uploading is a CONVENIENCE, never a requirement.
+   * The log file on disk still works and officers can still take it by hand, so
+   * no message here may read as "your loot is lost" — the worst true statement
+   * is "not sent yet".
+   */
+  pairing: {
+    title: "Send loot to your guild",
+    notPairedHint:
+      "Connect this computer to your Discord account and captured loot is sent to your guild by itself — no dragging files around. Run /capture pair in Discord to get a code.",
+    pairedAs: (device: string): string => `Connected as ${device}`,
+    codeLabel: "Pairing code",
+    codePlaceholder: "XXXX-XXXX",
+    pair: "Pair with Discord",
+    pairing: "Connecting…",
+    unpair: "Disconnect this computer",
+    viewLoot: "View my loot",
+    uploadToggle: "Send loot automatically",
+    uploadOffHint: "Auto-send is off. Capture still writes the log file, and officers can take it by hand.",
+
+    // One sentence per failure — a generic "it didn't work" is the shape this
+    // project has already paid for twice (the mac permission fix, Npcap).
+    failBadCode:
+      "That code doesn't look right. It's 8 characters from the message Discord sent you — check for a typo and try again.",
+    failRefused:
+      "Discord's code wasn't accepted. Codes work once and expire after about 10 minutes — run /capture pair again for a fresh one.",
+    failUnreachable:
+      "Couldn't reach your guild's bot. Check your connection (a VPN or strict firewall can block it) and try again.",
+    failBadReply: "Your guild's bot answered something this version doesn't understand. It may need updating.",
+    failNoEncryption:
+      "This computer can't store the connection securely, so nothing was saved — the app won't keep a login token in a plain file. Capture still works; officers can take the log file by hand.",
+    failStoreFailed: "Couldn't save the connection securely. Try again; if it keeps failing, tell your officer.",
+
+    // Upload status line. "Not sent yet" is the honest worst case.
+    upDisabled: "Auto-send off",
+    upUpToDate: (n: number): string => (n > 0 ? `${n} lines sent` : "Nothing to send yet"),
+    upSending: "Sending…",
+    upRetrying: "Couldn't send just now — trying again. Your log file is safe.",
+    upUnauthorized: "This computer was disconnected in Discord. Pair it again to resume sending.",
+    upBlocked: "Sending is stuck — tell your officer. Your log file is safe and can be handed over by hand.",
+  },
+
   footer: {
     engineCredit: "Capture engine: ao-loot-logger (GPL-3.0, open source)",
   },

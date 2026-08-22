@@ -9,7 +9,8 @@
  * mismatch is detected and explained by the AbiMismatch error path.
  */
 
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from "electron";
+import { randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import {
   appendFileSync,
@@ -22,7 +23,7 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 
 import {
@@ -35,8 +36,13 @@ import {
   type TCaptureState,
   type TNpcapFixResult,
   type TPermissionFixResult,
+  EPairFailure,
+  initialPairingStatus,
+  type TPairAttempt,
+  type TPairingStatus,
   type TSetupStatus,
 } from "../shared/captureTypes.js";
+import { defaultDeviceName, isValidPairCodeShape, normalizePairCode } from "../shared/pairing.js";
 import { IPC, NPCAP_URL } from "../shared/ipc.js";
 import { reduceCaptureSession, type TSessionEvent } from "./captureSession.js";
 import { resolveEngine, type TResolvedEngine } from "./engineLocator.js";
@@ -52,6 +58,9 @@ import {
 import { installNpcap, parseSignatureOutput, type TSignatureCheck } from "./platform/npcapInstall.js";
 import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpcap.js";
 import { loadSettings, saveSettings, settingsFilePath } from "./settings.js";
+import { decryptToken, encryptPairing, EStoreOutcome } from "./pairingStore.js";
+import { apiBase, EPairOutcome, pairDevice } from "./uploadClient.js";
+import { createUploader, type TUploader } from "./uploader.js";
 
 const APP_ROOT = app.getAppPath();
 const SETTINGS_FILE = settingsFilePath(app.getPath("userData"));
@@ -105,8 +114,109 @@ const dispatch = (ev: TSessionEvent): void => {
   }
   if (state.status === ECaptureStatus.Idle || state.status === ECaptureStatus.Error) {
     stopTracker();
+    // Same condition as the tracker on purpose: the uploader's lifetime is the
+    // capture session's, and two separate end-detections would drift.
+    stopUploadLoop();
   }
   win?.webContents.send(IPC.stateChanged, state);
+};
+
+// --- pairing + auto-upload (ADR 0092 P2 slice 4) ------------------------------
+//
+// Uploading is a convenience layered OVER capture, never a precondition for it.
+// Nothing in this section may stop the engine, block a Start, or throw into the
+// capture session: the log file on disk is the fallback and officers can still
+// take it by hand.
+
+let uploader: TUploader | null = null;
+let uploadTimer: NodeJS.Timeout | null = null;
+
+/** Every 10s while capturing. Uploading is not urgent; the file is safe. */
+const UPLOAD_TICK_MS = 10_000;
+
+const storedToken = (): string | null => {
+  const pairing = loadSettings(SETTINGS_FILE).pairing;
+  return decryptToken(safeStorage, pairing);
+};
+
+const pairingStatus = (): TPairingStatus => {
+  const settings = loadSettings(SETTINGS_FILE);
+  const pairing = settings.pairing;
+  const up = uploader?.status() ?? null;
+  return {
+    paired: pairing != null,
+    deviceName: pairing?.deviceName ?? null,
+    guildId: pairing?.guildId ?? null,
+    pairedAt: pairing?.pairedAt ?? null,
+    uploadEnabled: settings.uploadEnabled !== false,
+    upload:
+      up == null
+        ? initialPairingStatus.upload
+        : {
+            state: up.state,
+            sentTotal: up.sentTotal,
+            lastSentAt: up.lastSentAt,
+            failures: up.failures,
+            lastError: up.lastError,
+          },
+  };
+};
+
+const pushPairing = (): void => {
+  win?.webContents.send(IPC.pairingChanged, pairingStatus());
+};
+
+const ensureUploader = (): TUploader => {
+  if (uploader != null) {
+    return uploader;
+  }
+  uploader = createUploader({
+    fetchLike: async (url, init) => {
+      const res = await fetch(url, init);
+      return { ok: res.ok, status: res.status, text: () => res.text() };
+    },
+    base: apiBase(loadSettings(SETTINGS_FILE).apiBase),
+    token: storedToken,
+    enabled: () => loadSettings(SETTINGS_FILE).uploadEnabled !== false,
+    // The tracker knows the current file; before it finds one there is nothing
+    // to send, which is not an error.
+    currentFile: () => state.logFile,
+    readFile: (path) => fsp.readFile(path, "utf8"),
+    newRunId: () => randomUUID(),
+    now: Date.now,
+    log: appLog,
+  });
+  return uploader;
+};
+
+const startUploadLoop = (): void => {
+  ensureUploader().resetSession();
+  if (uploadTimer != null) {
+    return;
+  }
+  uploadTimer = setInterval(() => {
+    // Fire and forget: a rejected upload must never surface as an unhandled
+    // rejection that could take the app down mid-raid.
+    void ensureUploader()
+      .tick()
+      .then(pushPairing)
+      .catch((err: unknown) => {
+        appLog(`[upload] tick failed: ${err instanceof Error ? err.message : "error"}`);
+      });
+  }, UPLOAD_TICK_MS);
+  uploadTimer.unref?.();
+};
+
+const stopUploadLoop = (): void => {
+  if (uploadTimer != null) {
+    clearInterval(uploadTimer);
+    uploadTimer = null;
+  }
+  // One last pass so the tail of a session is not left on disk until next time.
+  void ensureUploader()
+    .tick()
+    .then(pushPairing)
+    .catch(() => undefined);
 };
 
 // --- setup probing -----------------------------------------------------------
@@ -225,6 +335,7 @@ const startCapture = (): void => {
     resolveLogPath: (name) => (isAbsolute(name) ? name : join(engine.workDir, name)),
   });
   supervisor.startSession();
+  startUploadLoop();
 
   stopTracker();
   if (!supervisor.isActive()) {
@@ -460,6 +571,92 @@ const registerIpc = (): void => {
     });
     appLog(`npcap install outcome=${install.outcome} version=${install.version ?? "?"} detail=${install.detail ?? ""}`);
     return { setup: await getSetup(), install };
+  });
+
+  ipcMain.handle(IPC.pairingGet, () => pairingStatus());
+
+  ipcMain.handle(IPC.pairingPair, async (_event, rawCode: unknown): Promise<TPairAttempt> => {
+    const fail = (failure: EPairFailure, detail: string | null): TPairAttempt => {
+      appLog(`[pair] failed: ${failure}${detail != null ? ` (${detail})` : ""}`);
+      return { ok: false, failure, detail, status: pairingStatus() };
+    };
+
+    const code = normalizePairCode(typeof rawCode === "string" ? rawCode : "");
+    if (!isValidPairCodeShape(code)) {
+      // Caught locally: a typo costs no round trip, and the member gets the
+      // specific "that's not 8 characters" sentence instead of a server error.
+      return fail(EPairFailure.BadCode, null);
+    }
+
+    const settings = loadSettings(SETTINGS_FILE);
+    const name = defaultDeviceName(hostname(), process.platform);
+    const result = await pairDevice(
+      async (url, init) => {
+        const res = await fetch(url, init);
+        return { ok: res.ok, status: res.status, text: () => res.text() };
+      },
+      apiBase(settings.apiBase),
+      code,
+      name,
+    );
+    if (result.outcome !== EPairOutcome.Paired) {
+      const map = {
+        [EPairOutcome.Refused]: EPairFailure.Refused,
+        [EPairOutcome.Unreachable]: EPairFailure.Unreachable,
+        [EPairOutcome.BadReply]: EPairFailure.BadReply,
+      } as const;
+      return fail(map[result.outcome], result.detail);
+    }
+
+    // The token is written ENCRYPTED or not at all — see pairingStore.ts.
+    const stored = encryptPairing(safeStorage, result.device, Date.now());
+    if (stored.outcome !== EStoreOutcome.Stored) {
+      return fail(
+        stored.outcome === EStoreOutcome.NoEncryption ? EPairFailure.NoEncryption : EPairFailure.StoreFailed,
+        stored.detail,
+      );
+    }
+    saveSettings(SETTINGS_FILE, { ...settings, pairing: stored.pairing });
+    uploader?.refresh();
+    appLog(`[pair] connected as ${stored.pairing.deviceName} (guild ${stored.pairing.guildId})`);
+    const status = pairingStatus();
+    pushPairing();
+    return { ok: true, failure: null, detail: null, status };
+  });
+
+  ipcMain.handle(IPC.pairingUnpair, (): TPairingStatus => {
+    // Local only: the server's device row stays, so /capture devices still
+    // shows the history and the member can revoke it there. Deleting it from
+    // here would need the token we are about to forget.
+    const settings = loadSettings(SETTINGS_FILE);
+    delete settings.pairing;
+    saveSettings(SETTINGS_FILE, settings);
+    uploader?.refresh();
+    appLog("[pair] disconnected on this computer");
+    const status = pairingStatus();
+    pushPairing();
+    return status;
+  });
+
+  ipcMain.handle(IPC.pairingSetUpload, (_event, enabled: unknown): TPairingStatus => {
+    const settings = loadSettings(SETTINGS_FILE);
+    saveSettings(SETTINGS_FILE, { ...settings, uploadEnabled: enabled !== false });
+    uploader?.refresh();
+    const status = pairingStatus();
+    pushPairing();
+    return status;
+  });
+
+  ipcMain.handle(IPC.pairingOpenLoot, async () => {
+    const settings = loadSettings(SETTINGS_FILE);
+    const guildId = settings.pairing?.guildId;
+    // Without a guild the deep link has no target — send them to the app root
+    // rather than a 404 that reads as the feature being broken.
+    const url =
+      guildId != null && guildId.length > 0
+        ? `${apiBase(settings.apiBase)}/?guild=${encodeURIComponent(guildId)}`
+        : apiBase(settings.apiBase);
+    await shell.openExternal(url);
   });
 
   ipcMain.handle(IPC.setupOpenNpcapPage, async () => {

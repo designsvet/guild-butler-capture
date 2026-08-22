@@ -404,3 +404,56 @@ footer p {
   font-size: 11px;
   text-align: center;
 }
+
+/* --- pairing card (ADR 0092 P2 slice 4) ----------------------------------- */
+
+.pairing-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.pairing-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.pairing-label {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.pairing-input {
+  flex: 0 1 160px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pairing-input:focus {
+  outline: 2px solid rgba(224, 168, 78, 0.6);
+  outline-offset: 1px;
+}
+
+.pairing-as {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.pairing-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  cursor: pointer;
+}

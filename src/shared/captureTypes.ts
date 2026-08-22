@@ -186,3 +186,63 @@ export type TPermissionFixResult = {
   /** On Failed: what osascript/the installer said (also in the app log). */
   detail: string | null;
 };
+
+// --- pairing + upload (ADR 0092 P2 slice 4) ----------------------------------
+
+/**
+ * Why a pairing attempt did not work. One sentence per reason in the UI: the
+ * macOS permission fix and the Npcap install both taught this project that a
+ * generic "it didn't work" is indistinguishable from a broken feature.
+ */
+export enum EPairFailure {
+  /** The code was not 8 valid characters — caught locally, no round trip. */
+  BadCode = "bad-code",
+  /** The server said no: wrong, expired, already used, or at the device cap. */
+  Refused = "refused",
+  /** Could not reach the bot. */
+  Unreachable = "unreachable",
+  /** The bot answered something this version does not understand. */
+  BadReply = "bad-reply",
+  /** This computer cannot encrypt the token, and we will not store it plainly. */
+  NoEncryption = "no-encryption",
+  /** Encryption threw. */
+  StoreFailed = "store-failed",
+}
+
+/** What the member's computer knows about its own pairing. */
+export type TPairingStatus = {
+  paired: boolean;
+  deviceName: string | null;
+  /** Discord guild id — used only to build the "View my loot" link. */
+  guildId: string | null;
+  pairedAt: number | null;
+  /** Auto-upload toggle. Default ON. */
+  uploadEnabled: boolean;
+  upload: TUploadStatusView;
+};
+
+/** The upload half, flattened for the renderer. */
+export type TUploadStatusView = {
+  state: string;
+  sentTotal: number;
+  lastSentAt: number | null;
+  failures: number;
+  lastError: string | null;
+};
+
+export type TPairAttempt = {
+  ok: boolean;
+  failure: EPairFailure | null;
+  /** Diagnostic for the app log, never the member-facing sentence. */
+  detail: string | null;
+  status: TPairingStatus;
+};
+
+export const initialPairingStatus: TPairingStatus = {
+  paired: false,
+  deviceName: null,
+  guildId: null,
+  pairedAt: null,
+  uploadEnabled: true,
+  upload: { state: "unpaired", sentTotal: 0, lastSentAt: null, failures: 0, lastError: null },
+};
