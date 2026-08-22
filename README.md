@@ -239,6 +239,34 @@ each step proves an assumption the container build could not.
 9. **VPN reality check.** Turn on a VPN (or ExitLag) — traffic goes dark; the
    Waiting hints must be the story the member sees. GeForce Now: same.
 
+## Sending loot to your guild (v0.3.0+)
+
+Run `/capture pair` in Discord, then type the code into **Pair with Discord**
+here. From then on, captured lines are sent to the guild's bot as they are
+written; the officer's loot session picks them up by itself, and `View my loot`
+opens the member's own page.
+
+Three things about it worth knowing:
+
+- **Uploading never interferes with capturing.** Every failure is reported and
+  retried; the file on disk is the fallback and the drag-and-drop path still
+  works. No upload problem can stop the engine or block a Start.
+- **The token is stored encrypted** via Electron's `safeStorage` (Keychain /
+  DPAPI). Where the OS cannot encrypt, the app stays unpaired and says so
+  rather than writing a live bearer token into a plain JSON file.
+- **A new log file starts a new upload run.** The engine rolls its file at
+  midnight and the second file's line numbers restart at 0 — continuing the
+  same run would send indices the first file already used, and the server's
+  `UNIQUE (run, line_no)` would swallow every one of them as a duplicate. That
+  is silent data loss, so `uploadPlan.ts` mints a fresh run id per file.
+
+Auto-send is ON by default (owner ruling) and switchable per computer.
+`Disconnect this computer` forgets the token locally; the device row stays in
+Discord, where `/capture devices` and `/capture revoke` manage it.
+
+Pointing at a different bot (staging) is an `apiBase` entry in
+`settings.json` — same escape hatch as the engine folder.
+
 ## Permissions, in plain terms
 
 - **macOS** — capturing needs `/dev/bpf*`, which ships root-only (why the raw
@@ -276,9 +304,9 @@ source; the app must not promise more):
 ## Phases
 
 - **P1 (this)** — window, status, start/stop, permissions UX, errors. ✔ built
-- **P2** — pairing code from Discord → per-guild token → auto-upload of
-  captured lines. Needs the bot-side ingest endpoint (raid-bot ADR 0092 P2);
-  the bot repo owns that half.
+- **P2** — pairing code from Discord → per-DEVICE token → auto-upload of
+  captured lines. ✔ built in v0.3.0 (the bot half — ingest, the raid claim, the
+  member's Capture tab — shipped first; raid-bot ADR 0092 P2).
 - **P3** — signed installers (Apple Developer ID exists; Windows cert is an
   open question), auto-update via electron-builder/electron-updater, engine
   bundled into resources. Auto-update is the real prize: when a game patch

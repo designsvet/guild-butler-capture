@@ -21,6 +21,12 @@ const CH = {
   setupOpenNpcapPage: "setup:open-npcap-page",
   setupPickEnginePath: "setup:pick-engine-path",
   stateChanged: "capture:state-changed",
+  pairingGet: "pairing:get",
+  pairingPair: "pairing:pair",
+  pairingUnpair: "pairing:unpair",
+  pairingSetUpload: "pairing:set-upload",
+  pairingOpenLoot: "pairing:open-loot",
+  pairingChanged: "pairing:changed",
 } as const;
 
 export type TGbcBridge = {
@@ -35,6 +41,12 @@ export type TGbcBridge = {
   openNpcapPage: () => Promise<void>;
   pickEnginePath: () => Promise<unknown>;
   onState: (listener: (state: unknown) => void) => () => void;
+  getPairing: () => Promise<unknown>;
+  pair: (code: string) => Promise<unknown>;
+  unpair: () => Promise<unknown>;
+  setUpload: (enabled: boolean) => Promise<unknown>;
+  openLoot: () => Promise<void>;
+  onPairing: (listener: (status: unknown) => void) => () => void;
 };
 
 const bridge: TGbcBridge = {
@@ -55,6 +67,20 @@ const bridge: TGbcBridge = {
     ipcRenderer.on(CH.stateChanged, wrapped);
     return () => {
       ipcRenderer.removeListener(CH.stateChanged, wrapped);
+    };
+  },
+  getPairing: () => ipcRenderer.invoke(CH.pairingGet),
+  pair: (code) => ipcRenderer.invoke(CH.pairingPair, code),
+  unpair: () => ipcRenderer.invoke(CH.pairingUnpair),
+  setUpload: (enabled) => ipcRenderer.invoke(CH.pairingSetUpload, enabled),
+  openLoot: () => ipcRenderer.invoke(CH.pairingOpenLoot) as Promise<void>,
+  onPairing: (listener) => {
+    const wrapped = (_event: unknown, status: unknown): void => {
+      listener(status);
+    };
+    ipcRenderer.on(CH.pairingChanged, wrapped);
+    return () => {
+      ipcRenderer.removeListener(CH.pairingChanged, wrapped);
     };
   },
 };

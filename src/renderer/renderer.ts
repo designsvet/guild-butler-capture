@@ -15,6 +15,10 @@ import {
   type TCaptureState,
   type TNpcapFixResult,
   type TPermissionFixResult,
+  EPairFailure,
+  initialPairingStatus,
+  type TPairAttempt,
+  type TPairingStatus,
   type TSetupStatus,
 } from "../shared/captureTypes.js";
 import { STR } from "../shared/strings.js";
@@ -31,6 +35,12 @@ type TGbc = {
   openNpcapPage: () => Promise<void>;
   pickEnginePath: () => Promise<TSetupStatus>;
   onState: (listener: (state: TCaptureState) => void) => () => void;
+  getPairing: () => Promise<TPairingStatus>;
+  pair: (code: string) => Promise<TPairAttempt>;
+  unpair: () => Promise<TPairingStatus>;
+  setUpload: (enabled: boolean) => Promise<TPairingStatus>;
+  openLoot: () => Promise<void>;
+  onPairing: (listener: (status: TPairingStatus) => void) => () => void;
 };
 
 const gbc = (window as unknown as { gbc: TGbc }).gbc;
@@ -77,6 +87,20 @@ const ui = {
   advChoose: el<HTMLButtonElement>("btn-choose-engine"),
   footer: el<HTMLParagraphElement>("footer-credit"),
   version: el<HTMLSpanElement>("app-version"),
+  pairTitle: el<HTMLParagraphElement>("pairing-title"),
+  pairSetup: el<HTMLDivElement>("pairing-setup"),
+  pairHint: el<HTMLParagraphElement>("pairing-hint"),
+  pairCodeLabel: el<HTMLLabelElement>("pairing-code-label"),
+  pairCode: el<HTMLInputElement>("pairing-code"),
+  pairBtn: el<HTMLButtonElement>("btn-pair"),
+  pairError: el<HTMLParagraphElement>("pairing-error"),
+  pairConnected: el<HTMLDivElement>("pairing-connected"),
+  pairAs: el<HTMLParagraphElement>("pairing-as"),
+  pairUploadStatus: el<HTMLParagraphElement>("pairing-upload-status"),
+  pairUploadToggle: el<HTMLInputElement>("pairing-upload-toggle"),
+  pairUploadLabel: el<HTMLSpanElement>("pairing-upload-label"),
+  viewLootBtn: el<HTMLButtonElement>("btn-view-loot"),
+  unpairBtn: el<HTMLButtonElement>("btn-unpair"),
 };
 
 let state: TCaptureState | null = null;
@@ -86,6 +110,10 @@ let fixAttempt: TPermissionFixResult | null = null;
 /** Last in-app Npcap install attempt, and whether one is in flight. */
 let npcapAttempt: TNpcapFixResult | null = null;
 let npcapBusy = false;
+let pairing: TPairingStatus = initialPairingStatus;
+/** Last pairing attempt in THIS window — feedback, not persistent state. */
+let pairFailure: EPairFailure | null = null;
+let pairBusy = false;
 
 const WAITING_HINTS_AFTER_MS = 90_000;
 
@@ -403,6 +431,129 @@ ui.revealBtn.textContent =
     : gbc.platform === "win32"
       ? STR.buttons.revealWin
       : STR.buttons.reveal;
+
+// --- pairing (ADR 0092 P2 slice 4) --------------------------------------------
+
+const PAIR_FAIL_COPY: Record<EPairFailure, string> = {
+  [EPairFailure.BadCode]: STR.pairing.failBadCode,
+  [EPairFailure.Refused]: STR.pairing.failRefused,
+  [EPairFailure.Unreachable]: STR.pairing.failUnreachable,
+  [EPairFailure.BadReply]: STR.pairing.failBadReply,
+  [EPairFailure.NoEncryption]: STR.pairing.failNoEncryption,
+  [EPairFailure.StoreFailed]: STR.pairing.failStoreFailed,
+};
+
+/**
+ * One sentence per upload state. Note what is NOT here: no state says the loot
+ * is lost, because it never is — the file on disk is the fallback and an
+ * officer can still take it by hand.
+ */
+const uploadLine = (status: TPairingStatus): string => {
+  if (!status.uploadEnabled) {
+    return STR.pairing.uploadOffHint;
+  }
+  switch (status.upload.state) {
+    case "sending":
+      return STR.pairing.upSending;
+    case "retrying":
+      return STR.pairing.upRetrying;
+    case "unauthorized":
+      return STR.pairing.upUnauthorized;
+    case "blocked":
+      return STR.pairing.upBlocked;
+    default:
+      return STR.pairing.upUpToDate(status.upload.sentTotal);
+  }
+};
+
+const renderPairing = (): void => {
+  ui.pairTitle.textContent = STR.pairing.title;
+  ui.pairSetup.classList.toggle("hidden", pairing.paired);
+  ui.pairConnected.classList.toggle("hidden", !pairing.paired);
+
+  if (pairing.paired) {
+    ui.pairAs.textContent = STR.pairing.pairedAs(pairing.deviceName ?? "this computer");
+    ui.pairUploadStatus.textContent = uploadLine(pairing);
+    ui.pairUploadToggle.checked = pairing.uploadEnabled;
+    ui.pairUploadLabel.textContent = STR.pairing.uploadToggle;
+    ui.viewLootBtn.textContent = STR.pairing.viewLoot;
+    ui.unpairBtn.textContent = STR.pairing.unpair;
+    return;
+  }
+
+  ui.pairHint.textContent = STR.pairing.notPairedHint;
+  ui.pairCodeLabel.textContent = STR.pairing.codeLabel;
+  ui.pairCode.placeholder = STR.pairing.codePlaceholder;
+  ui.pairBtn.textContent = pairBusy ? STR.pairing.pairing : STR.pairing.pair;
+  ui.pairBtn.disabled = pairBusy;
+  const failure = pairFailure;
+  ui.pairError.classList.toggle("hidden", failure == null);
+  if (failure != null) {
+    ui.pairError.textContent = PAIR_FAIL_COPY[failure];
+  }
+};
+
+ui.pairBtn.addEventListener("click", () => {
+  if (pairBusy) {
+    return;
+  }
+  pairBusy = true;
+  pairFailure = null;
+  renderPairing();
+  void gbc
+    .pair(ui.pairCode.value)
+    .then((attempt) => {
+      pairing = attempt.status;
+      pairFailure = attempt.failure;
+      if (attempt.ok) {
+        // The code is single-use; leaving it in the box invites a second press
+        // that can only fail.
+        ui.pairCode.value = "";
+      }
+    })
+    .catch(() => {
+      pairFailure = EPairFailure.Unreachable;
+    })
+    .finally(() => {
+      pairBusy = false;
+      renderPairing();
+    });
+});
+
+ui.pairCode.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    ui.pairBtn.click();
+  }
+});
+
+ui.unpairBtn.addEventListener("click", () => {
+  void gbc.unpair().then((status) => {
+    pairing = status;
+    pairFailure = null;
+    renderPairing();
+  });
+});
+
+ui.pairUploadToggle.addEventListener("change", () => {
+  void gbc.setUpload(ui.pairUploadToggle.checked).then((status) => {
+    pairing = status;
+    renderPairing();
+  });
+});
+
+ui.viewLootBtn.addEventListener("click", () => {
+  void gbc.openLoot();
+});
+
+gbc.onPairing((status) => {
+  pairing = status;
+  renderPairing();
+});
+
+void gbc.getPairing().then((status) => {
+  pairing = status;
+  renderPairing();
+});
 
 gbc.onState((next) => {
   state = next;

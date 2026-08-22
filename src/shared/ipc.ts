@@ -22,8 +22,20 @@ export const IPC = {
   setupOpenNpcapPage: "setup:open-npcap-page",
   /** invoke → TSetupStatus. Directory picker for the engine folder (Advanced). */
   setupPickEnginePath: "setup:pick-engine-path",
+  /** invoke → TPairingStatus. Who this computer is connected to, if anyone. */
+  pairingGet: "pairing:get",
+  /** invoke(code) → TPairAttempt. Trade a Discord pairing code for a device token. */
+  pairingPair: "pairing:pair",
+  /** invoke → TPairingStatus. Forget the token on THIS computer (the server keeps the row). */
+  pairingUnpair: "pairing:unpair",
+  /** invoke(enabled) → TPairingStatus. Auto-upload on/off. */
+  pairingSetUpload: "pairing:set-upload",
+  /** invoke → void. Open the member's loot page in the browser. */
+  pairingOpenLoot: "pairing:open-loot",
   /** main → renderer. Full TCaptureState snapshot on every change. */
   stateChanged: "capture:state-changed",
+  /** main → renderer. Upload status changed (paired, sent, retrying…). */
+  pairingChanged: "pairing:changed",
 } as const;
 
 export const NPCAP_URL = "https://npcap.com/#download";
