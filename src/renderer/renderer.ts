@@ -439,6 +439,7 @@ const PAIR_FAIL_COPY: Record<EPairFailure, string> = {
   [EPairFailure.Refused]: STR.pairing.failRefused,
   [EPairFailure.Unreachable]: STR.pairing.failUnreachable,
   [EPairFailure.BadReply]: STR.pairing.failBadReply,
+  [EPairFailure.NotDeployed]: STR.pairing.failNotDeployed,
   [EPairFailure.NoEncryption]: STR.pairing.failNoEncryption,
   [EPairFailure.StoreFailed]: STR.pairing.failStoreFailed,
 };
@@ -461,6 +462,8 @@ const uploadLine = (status: TPairingStatus): string => {
       return STR.pairing.upUnauthorized;
     case "blocked":
       return STR.pairing.upBlocked;
+    case "bot-outdated":
+      return STR.pairing.upBotOutdated;
     default:
       return STR.pairing.upUpToDate(status.upload.sentTotal);
   }

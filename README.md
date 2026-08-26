@@ -260,6 +260,13 @@ Three things about it worth knowing:
   `UNIQUE (run, line_no)` would swallow every one of them as a duplicate. That
   is silent data loss, so `uploadPlan.ts` mints a fresh run id per file.
 
+**The guild's bot needs the feature too.** Pairing and upload live on the bot
+side as well, so a bot that predates them answers 404. The app says exactly that
+("an officer needs to update it") rather than blaming the code — the two need
+opposite things from the member, and treating a missing route as a rejected code
+sends them round a loop fetching fresh codes that can never be redeemed. Upload
+keeps retrying in that state, so it resumes on its own once the bot is updated.
+
 Auto-send is ON by default (owner ruling) and switchable per computer.
 `Disconnect this computer` forgets the token locally; the device row stays in
 Discord, where `/capture devices` and `/capture revoke` manage it.

@@ -161,6 +161,11 @@ export const STR = {
     failUnreachable:
       "Couldn't reach your guild's bot. Check your connection (a VPN or strict firewall can block it) and try again.",
     failBadReply: "Your guild's bot answered something this version doesn't understand. It may need updating.",
+    // Deliberately NOT the "get a fresh code" sentence: no code will ever work
+    // against a bot without the route, and sending the member back to Discord
+    // for another one is a loop with no exit.
+    failNotDeployed:
+      "Your guild's bot doesn't have this feature yet — an officer needs to update it. Getting another code won't help. (If you changed the server address in Advanced, check that too.)",
     failNoEncryption:
       "This computer can't store the connection securely, so nothing was saved — the app won't keep a login token in a plain file. Capture still works; officers can take the log file by hand.",
     failStoreFailed: "Couldn't save the connection securely. Try again; if it keeps failing, tell your officer.",
@@ -172,6 +177,8 @@ export const STR = {
     upRetrying: "Couldn't send just now — trying again. Your log file is safe.",
     upUnauthorized: "This computer was disconnected in Discord. Pair it again to resume sending.",
     upBlocked: "Sending is stuck — tell your officer. Your log file is safe and can be handed over by hand.",
+    upBotOutdated:
+      "Your guild's bot doesn't accept uploads yet — an officer needs to update it. Capture keeps running, and sending resumes by itself once they do.",
   },
 
   footer: {

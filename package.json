@@ -1,6 +1,6 @@
 {
   "name": "guild-butler-capture",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Desktop capture app for Albion Online loot logging — the Guild Butler companion client (macOS + Windows).",
   "author": {

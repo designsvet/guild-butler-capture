@@ -36,6 +36,12 @@ export enum EUploaderState {
   Unauthorized = "unauthorized",
   /** The server refused the batch's shape: a bug here, not a transient. */
   Blocked = "blocked",
+  /**
+   * This guild's bot has no upload route yet. Kept separate from Retrying so
+   * the UI does not blame the network for something only an officer can fix —
+   * but it IS retried, so the app resumes by itself once the bot is updated.
+   */
+  BotOutdated = "bot-outdated",
 }
 
 export type TUploaderStatus = {
@@ -121,7 +127,13 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
     const delay = retryDelayMs(failures);
     nextAttemptAt = deps.now() + delay;
     deps.log(`[upload] ${result.outcome} (${result.detail ?? "no detail"}) — retrying in ${Math.round(delay / 1000)}s`);
-    set({ state: EUploaderState.Retrying, failures, lastError: result.outcome });
+    set({
+      // Same retry mechanics, different sentence: a missing route is not a
+      // network hiccup and saying so would send the member chasing their wifi.
+      state: result.outcome === EUploadOutcome.NotDeployed ? EUploaderState.BotOutdated : EUploaderState.Retrying,
+      failures,
+      lastError: result.outcome,
+    });
   };
 
   const tick = async (): Promise<void> => {

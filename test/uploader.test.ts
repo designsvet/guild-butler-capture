@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { EPairOutcome, EUploadOutcome, apiBase, isRetryable, pairDevice, uploadBatch } from "../src/main/uploadClient.js";
+import {
+  EPairOutcome,
+  EUploadOutcome,
+  apiBase,
+  isMissingEndpoint,
+  isRetryable,
+  pairDevice,
+  uploadBatch,
+} from "../src/main/uploadClient.js";
 import { createUploader, EUploaderState, retryDelayMs } from "../src/main/uploader.js";
 import { decryptToken, encryptPairing, EStoreOutcome, type TSafeStorage } from "../src/main/pairingStore.js";
 import { defaultDeviceName, isValidPairCodeShape, normalizePairCode, PAIR_CODE_ALPHABET } from "../src/shared/pairing.js";
@@ -152,6 +160,18 @@ describe("pairDevice", () => {
     expect(down.outcome).toBe(EPairOutcome.Unreachable);
   });
 
+  it("tells a MISSING ROUTE apart from a refusal", async () => {
+    // The two need opposite things from the member. A refusal means get a fresh
+    // code; a missing route means no code will ever work and an officer has to
+    // update the bot. Folding them together sends them round a loop.
+    for (const status of [404, 405]) {
+      const r = await pairDevice(reply(status, {}), "https://bot", "3WEAJ4DR", "Mac");
+      expect(r.outcome, String(status)).toBe(EPairOutcome.NotDeployed);
+    }
+    const refused = await pairDevice(reply(400, { error: "not-found" }), "https://bot", "ZZZZ9999", "Mac");
+    expect(refused.outcome).toBe(EPairOutcome.Refused);
+  });
+
   it("refuses a 200 that is missing the token, rather than storing junk", async () => {
     const r = await pairDevice(reply(200, { guildId: "g", userId: "u" }), "https://bot", "3WEAJ4DR", "Mac");
     expect(r.outcome).toBe(EPairOutcome.BadReply);
@@ -167,6 +187,8 @@ describe("uploadBatch", () => {
       [401, { error: "unauthorized" }, EUploadOutcome.Unauthorized],
       [429, { error: "over_budget" }, EUploadOutcome.RateLimited],
       [400, { error: "bad_run" }, EUploadOutcome.Rejected],
+      [404, {}, EUploadOutcome.NotDeployed],
+      [405, {}, EUploadOutcome.NotDeployed],
       [503, {}, EUploadOutcome.ServerError],
     ];
     for (const [status, body, expected] of cases) {
@@ -181,6 +203,15 @@ describe("uploadBatch", () => {
     expect(isRetryable(EUploadOutcome.RateLimited)).toBe(true);
     expect(isRetryable(EUploadOutcome.Unauthorized)).toBe(false);
     expect(isRetryable(EUploadOutcome.Rejected)).toBe(false);
+    // Not the member's to fix, but it heals itself when the bot is updated.
+    expect(isRetryable(EUploadOutcome.NotDeployed)).toBe(true);
+  });
+
+  it("recognises a missing endpoint by status", () => {
+    expect(isMissingEndpoint(404)).toBe(true);
+    expect(isMissingEndpoint(405)).toBe(true);
+    expect(isMissingEndpoint(400)).toBe(false);
+    expect(isMissingEndpoint(500)).toBe(false);
   });
 });
 
@@ -281,6 +312,25 @@ describe("uploader loop", () => {
     expect(h.calls[1]).toEqual({ run: "run-1", from: 0, count: 1 });
     expect(uploader.status().state).toBe(EUploaderState.UpToDate);
     expect(uploader.status().failures).toBe(0);
+  });
+
+  it("a bot without the route gets its own state, and RESUMES once updated", async () => {
+    // The exact situation on 2026-08-22: the endpoints existed only on develop,
+    // so the app would have hit 404 on prod. It must not blame the network, and
+    // it must recover on its own the moment an officer promotes the bot.
+    const { uploader, h } = harness();
+    h.file.text = "one\n";
+    h.setReply(() => ({ status: 404, body: {} }));
+    await uploader.tick();
+    expect(uploader.status().state).toBe(EUploaderState.BotOutdated);
+    expect(uploader.status().lastError).toBe(EUploadOutcome.NotDeployed);
+
+    // Officer promotes the bot; no member action needed.
+    h.clock.now += retryDelayMs(1) + 1;
+    h.setReply((from) => ({ status: 200, body: { accepted: 1, duplicate: 0, rejected: 0, nextFrom: from } }));
+    await uploader.tick();
+    expect(uploader.status().state).toBe(EUploaderState.UpToDate);
+    expect(h.calls[1]).toEqual({ run: "run-1", from: 0, count: 1 });
   });
 
   it("stops after a 401 instead of hammering a door that will not open", async () => {
