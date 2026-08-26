@@ -604,6 +604,7 @@ const registerIpc = (): void => {
         [EPairOutcome.Refused]: EPairFailure.Refused,
         [EPairOutcome.Unreachable]: EPairFailure.Unreachable,
         [EPairOutcome.BadReply]: EPairFailure.BadReply,
+        [EPairOutcome.NotDeployed]: EPairFailure.NotDeployed,
       } as const;
       return fail(map[result.outcome], result.detail);
     }

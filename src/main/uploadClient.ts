@@ -36,6 +36,16 @@ export enum EPairOutcome {
   Unreachable = "unreachable",
   /** Reached it, but the reply was not what this version expects. */
   BadReply = "bad-reply",
+  /**
+   * The endpoint is not there (404/405).
+   *
+   * Distinct from Refused on purpose. Both are "not ok", but they need OPPOSITE
+   * things from the member: a refusal means get a fresh code, while a missing
+   * route means nothing they do with codes will ever work — an officer has to
+   * update the bot. Folding this into Refused sends them round a loop
+   * regenerating codes against a bot that has no route to redeem them.
+   */
+  NotDeployed = "not-deployed",
 }
 
 export type TPairedDevice = {
@@ -54,6 +64,17 @@ export type TFetchLike = (
   url: string,
   init: { method: string; headers: Record<string, string>; body: string },
 ) => Promise<{ ok: boolean; status: number; text: () => Promise<string> }>;
+
+/**
+ * Is this "the route isn't there", rather than "the route said no"?
+ *
+ * 404/405 from a bot that predates this feature, or from a base URL pointing
+ * somewhere that isn't the bot at all. The two are indistinguishable from the
+ * status alone, so the copy names both possibilities rather than guessing.
+ */
+export const isMissingEndpoint = (status: number): boolean => {
+  return status === 404 || status === 405;
+};
 
 const parseJson = (text: string): Record<string, unknown> | null => {
   try {
@@ -83,6 +104,9 @@ export const pairDevice = async (
 
   const text = await res.text().catch(() => "");
   const body = parseJson(text);
+  if (isMissingEndpoint(res.status)) {
+    return { outcome: EPairOutcome.NotDeployed, detail: String(res.status) };
+  }
   if (!res.ok) {
     // The server deliberately gives one shape for every refusal, so there is
     // no oracle for whether a given code exists. Pass its reason through for
@@ -119,6 +143,15 @@ export enum EUploadOutcome {
   Unreachable = "unreachable",
   /** The bot is up but unhappy (5xx). Retryable. */
   ServerError = "server-error",
+  /**
+   * The upload route is not on this bot (404/405) — it predates the feature.
+   *
+   * Deliberately RETRYABLE even though the member can do nothing about it: once
+   * an officer updates the bot, the app resumes on its own instead of needing
+   * the member to notice and re-press something. It gets its own sentence so
+   * the UI does not claim a transient network problem.
+   */
+  NotDeployed = "not-deployed",
 }
 
 export type TUploadReply = {
@@ -137,7 +170,10 @@ export const isRetryable = (outcome: EUploadOutcome): boolean => {
   return (
     outcome === EUploadOutcome.Unreachable ||
     outcome === EUploadOutcome.ServerError ||
-    outcome === EUploadOutcome.RateLimited
+    outcome === EUploadOutcome.RateLimited ||
+    // Not the member's to fix, but it heals by itself when the bot is updated —
+    // so keep trying rather than parking in a dead state they must clear.
+    outcome === EUploadOutcome.NotDeployed
   );
 };
 
@@ -167,6 +203,9 @@ export const uploadBatch = async (
   }
   if (res.status === 429) {
     return { outcome: EUploadOutcome.RateLimited, detail: typeof body?.error === "string" ? body.error : null };
+  }
+  if (isMissingEndpoint(res.status)) {
+    return { outcome: EUploadOutcome.NotDeployed, detail: String(res.status) };
   }
   if (res.status >= 500) {
     return { outcome: EUploadOutcome.ServerError, detail: String(res.status) };

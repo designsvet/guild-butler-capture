@@ -203,6 +203,8 @@ export enum EPairFailure {
   Unreachable = "unreachable",
   /** The bot answered something this version does not understand. */
   BadReply = "bad-reply",
+  /** This guild's bot has no pairing route yet — an officer must update it. */
+  NotDeployed = "not-deployed",
   /** This computer cannot encrypt the token, and we will not store it plainly. */
   NoEncryption = "no-encryption",
   /** Encryption threw. */
