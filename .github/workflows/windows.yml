@@ -176,6 +176,17 @@ jobs:
           pnpm build
           pnpm exec electron-builder --win --config electron-builder.win-ci.yml --publish never
 
+      - name: Update manifest exists (electron-updater reads this from the release)
+        # A hard gate, not a glob: upload-artifact's if-no-files-found only
+        # fires when NOTHING matches, so a missing latest.yml beside a present
+        # .exe would ride through silently — and auto-update would be dead on
+        # arrival with every other signal green. cat shows the manifest, so
+        # every run displays the exact fileName/version/sha512 the updater
+        # will be promised.
+        run: |
+          test -f release/latest.yml
+          cat release/latest.yml
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
