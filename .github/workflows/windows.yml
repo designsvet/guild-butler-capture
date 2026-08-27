@@ -116,8 +116,16 @@ jobs:
             # so a human or the agent can cut one the same way. Idempotent by
             # construction: an existing release means build-only, so ordinary
             # pushes and workflow re-runs never republish.
+            #
+            # "Existing" must mean PUBLISHED, so ask the REST tag endpoint,
+            # which 404s for drafts. `gh release view` resolves drafts by
+            # tag name too, so it read a cut severed mid-upload (whose
+            # debris is a tagless draft) as "already released" — and no
+            # push could ever re-cut it. v0.4.1's second attempt built and
+            # released nothing exactly that way; the sweep below is what
+            # deletes the debris itself.
             V=$(node -p "require('./package.json').version")
-            if gh release view "v$V" >/dev/null 2>&1; then
+            if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$V" --silent >/dev/null 2>&1; then
               echo "v$V is already released — building only"
             else
               echo "version=$V" >> "$GITHUB_OUTPUT"
@@ -209,9 +217,10 @@ jobs:
       # stranded and nothing served to updaters — latest.yml can never point
       # at a missing asset, an ordering we rely on. v0.4.1's first cut died
       # exactly there ("other side closed" on the third asset, a ~96MB exe
-      # on one TCP connection). The debris blocks nothing (`gh release view`
-      # in the Decide step can't see a draft, so the next main push re-cuts)
-      # but it piles up on the releases page; sweep it before every cut.
+      # on one TCP connection). The debris blocks nothing — the Decide step
+      # counts only a PUBLISHED release, and the tag endpoint it asks 404s
+      # for drafts, so the next main push re-cuts — but it piles up on the
+      # releases page; sweep it before every cut.
       # Published releases are never touched — drafts only.
       - name: Drop stale draft releases of this tag
         if: steps.rel.outputs.tag != ''
