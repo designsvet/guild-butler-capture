@@ -457,3 +457,17 @@ footer p {
   font-size: 13px;
   cursor: pointer;
 }
+
+/* Auto-update strip — visible only while an update is in flight or ready. */
+.update-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+.update-strip p {
+  margin: 0;
+}
+.update-strip .fix-note {
+  flex-basis: 100%;
+}

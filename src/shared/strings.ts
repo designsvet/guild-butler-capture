@@ -138,6 +138,18 @@ export const STR = {
    * no message here may read as "your loot is lost" — the worst true statement
    * is "not sent yet".
    */
+  update: {
+    downloading: (version: string | null, percent: number | null): string =>
+      `Downloading update${version != null ? ` v${version}` : ""}…${percent != null ? ` ${percent}%` : ""}`,
+    ready: (version: string | null): string =>
+      `Update${version != null ? ` v${version}` : ""} ready — it installs when you quit the app.`,
+    restartNow: "Restart and update",
+    // The one rule: never cut a live capture. Quitting later installs it anyway.
+    blockedCapturing: "Capture is running — the update installs when you quit, or stop capture first.",
+    failed: (detail: string | null): string =>
+      `Update check failed${detail != null ? ` (${detail})` : ""} — will retry later. Capture is unaffected.`,
+  },
+
   pairing: {
     title: "Send loot to your guild",
     notPairedHint:

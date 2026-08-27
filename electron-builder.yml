@@ -42,6 +42,11 @@ mac:
 win:
   target:
     - nsis
+  # Space-free so the GitHub asset name matches latest.yml byte-for-byte —
+  # GitHub rewrites spaces in asset names to dots, and electron-updater must
+  # find the file under exactly the name the manifest promises. The stable
+  # `GuildButlerCapture-Setup.exe` copy (the download page's pin) is unchanged.
+  artifactName: GuildButlerCapture-Setup-${version}.${ext}
 
 # One-click per-user install (LocalAppData): no admin prompt for guildmates,
 # and the install dir is per-user — the bundled engine still never writes
@@ -50,5 +55,11 @@ nsis:
   oneClick: true
   perMachine: false
 
-# Phase 3 wires auto-update (electron-updater needs a publish target here).
-publish: null
+# Auto-update (Phase 3, Windows slice): electron-updater reads this at BUILD
+# time — it embeds app-update.yml into the installed app and emits latest.yml
+# beside the installer. CI still publishes via action-gh-release (the build
+# runs with --publish never), so this never uploads anything by itself.
+publish:
+  provider: github
+  owner: designsvet
+  repo: guild-butler-capture

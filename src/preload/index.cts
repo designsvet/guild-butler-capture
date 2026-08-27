@@ -27,6 +27,9 @@ const CH = {
   pairingSetUpload: "pairing:set-upload",
   pairingOpenLoot: "pairing:open-loot",
   pairingChanged: "pairing:changed",
+  updateGet: "update:get",
+  updateRestart: "update:restart",
+  updateChanged: "update:changed",
 } as const;
 
 export type TGbcBridge = {
@@ -47,6 +50,9 @@ export type TGbcBridge = {
   setUpload: (enabled: boolean) => Promise<unknown>;
   openLoot: () => Promise<void>;
   onPairing: (listener: (status: unknown) => void) => () => void;
+  getUpdate: () => Promise<unknown>;
+  updateRestart: () => Promise<unknown>;
+  onUpdate: (listener: (status: unknown) => void) => () => void;
 };
 
 const bridge: TGbcBridge = {
@@ -81,6 +87,17 @@ const bridge: TGbcBridge = {
     ipcRenderer.on(CH.pairingChanged, wrapped);
     return () => {
       ipcRenderer.removeListener(CH.pairingChanged, wrapped);
+    };
+  },
+  getUpdate: () => ipcRenderer.invoke(CH.updateGet),
+  updateRestart: () => ipcRenderer.invoke(CH.updateRestart),
+  onUpdate: (listener) => {
+    const wrapped = (_event: unknown, status: unknown): void => {
+      listener(status);
+    };
+    ipcRenderer.on(CH.updateChanged, wrapped);
+    return () => {
+      ipcRenderer.removeListener(CH.updateChanged, wrapped);
     };
   },
 };
