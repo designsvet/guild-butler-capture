@@ -194,17 +194,71 @@ jobs:
           path: release/*.exe
           if-no-files-found: error
           retention-days: 14
+          # v4 artifacts are immutable per run: without this, a job RE-RUN
+          # dies right here on a name conflict, before the release step it
+          # was rerun for. The rerun's rebuild supersedes the first file.
+          overwrite: true
 
       - name: Stable-named copy — the download page's /latest/download URL
         if: steps.rel.outputs.tag != ''
         run: cp release/*.exe "release/GuildButlerCapture-Setup.exe"
 
-      - name: Publish GitHub Release
+      # action-gh-release publishes draft-first: create a draft → upload
+      # assets → publish (publishing is what creates the tag). So a network
+      # drop mid-upload fails the job with an invisible tagless DRAFT
+      # stranded and nothing served to updaters — latest.yml can never point
+      # at a missing asset, an ordering we rely on. v0.4.1's first cut died
+      # exactly there ("other side closed" on the third asset, a ~96MB exe
+      # on one TCP connection). The debris blocks nothing (`gh release view`
+      # in the Decide step can't see a draft, so the next main push re-cuts)
+      # but it piles up on the releases page; sweep it before every cut.
+      # Published releases are never touched — drafts only.
+      - name: Drop stale draft releases of this tag
         if: steps.rel.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: |
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+              --jq '.[] | select(.draft and .tag_name == env.TAG) | .id'); do
+            echo "deleting stale draft release $id (tag_name $TAG)"
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+          done
+
+      - name: Publish GitHub Release
+        id: publish1
+        if: steps.rel.outputs.tag != ''
+        # One severed upload must not strand the whole release — the steps
+        # below retry once from a clean slate. Both attempts failing fails
+        # the job, so a real breakage still shows red.
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           # action-gh-release creates the tag itself at target_commitish, so
           # cutting a release never needs a tag push.
+          tag_name: ${{ steps.rel.outputs.tag }}
+          target_commitish: ${{ steps.bump.outputs.sha || github.sha }}
+          files: |
+            release/*.exe
+            release/latest.yml
+          generate_release_notes: true
+
+      - name: Drop the severed draft before retrying
+        if: steps.rel.outputs.tag != '' && steps.publish1.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: |
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+              --jq '.[] | select(.draft and .tag_name == env.TAG) | .id'); do
+            echo "deleting severed draft release $id (tag_name $TAG)"
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+          done
+
+      - name: Publish GitHub Release (retry after a severed upload)
+        if: steps.rel.outputs.tag != '' && steps.publish1.outcome == 'failure'
+        uses: softprops/action-gh-release@v2
+        with:
           tag_name: ${{ steps.rel.outputs.tag }}
           target_commitish: ${{ steps.bump.outputs.sha || github.sha }}
           files: |
