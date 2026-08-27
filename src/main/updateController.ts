@@ -69,8 +69,9 @@ export type TUpdateDeps = {
 
 /** First check waits out app startup (engine spawn, window paint). */
 export const FIRST_CHECK_DELAY_MS = 30_000;
-/** Steady-state re-check. A release is picked up within this, worst case. */
-export const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+/** Steady-state re-check (owner's call, 2026-08-27: one hour — the manifest
+ *  fetch is a plain CDN download, so the cost of being prompt is nothing). */
+export const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 export type TUpdateController = {
   start: () => void;

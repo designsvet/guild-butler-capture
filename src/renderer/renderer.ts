@@ -206,6 +206,9 @@ const npcapNoteText = (): string => {
     case ENpcapInstallOutcome.Cancelled: {
       return STR.setup.npcapCancelled;
     }
+    case ENpcapInstallOutcome.LaunchFailed: {
+      return STR.setup.npcapLaunchFailed(npcapAttempt.install.detail != null ? npcapAttempt.install.detail.slice(0, 160) : null);
+    }
     case ENpcapInstallOutcome.DownloadFailed: {
       return STR.setup.npcapDownloadFailed;
     }

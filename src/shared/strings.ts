@@ -109,6 +109,11 @@ export const STR = {
       "The driver wizard was closed before it finished, so nothing was installed. Click “Install capture driver” and click Next through to the end.",
     npcapCancelled:
       "Windows blocked the driver install — it needs your “Yes” on the Windows prompt. Try again and accept it.",
+    // Distinct from Cancelled on purpose: the installer never STARTED, so no
+    // prompt was shown and "try again and accept it" cannot fix anything —
+    // that wrong-cause sentence is exactly what v0.3.1 showed a tester.
+    npcapLaunchFailed: (detail: string | null): string =>
+      `The driver installer couldn't be started${detail != null ? ` (${detail})` : ""}. Use “Download it myself” and run it from your Downloads folder.`,
     npcapDownloadFailed:
       "Couldn't reach npcap.com to fetch the driver. Check your connection (a VPN or a strict firewall can block it) and try again, or use “Download it myself”.",
     npcapUntrusted:

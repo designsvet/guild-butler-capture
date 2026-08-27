@@ -277,7 +277,7 @@ Pointing at a different bot (staging) is an `apiBase` entry in
 ## Auto-update (Windows, v0.4.0+)
 
 The Windows app updates itself: it checks GitHub Releases on startup and every
-four hours, downloads a newer installer in the background, and installs it
+hour, downloads a newer installer in the background, and installs it
 **when you quit** — nobody re-downloads anything. A strip appears in the app
 only while an update is downloading or ready; "Restart and update" is offered
 once it's ready, and is refused while capture is running — no version bump is

@@ -151,7 +151,23 @@ describe("npcap install flow", () => {
     expect(result.detail).toContain("404");
   });
 
-  it("a declined UAC prompt is Cancelled, not a failure", async () => {
+  it("only a MARKED UAC decline is Cancelled — the runner marks it off Windows' own error", async () => {
+    const declined: Error & { gbcUacDeclined?: boolean } = new Error("UAC prompt declined");
+    declined.gbcUacDeclined = true;
+    const result = await installNpcap(
+      deps({
+        run: async () => {
+          throw declined;
+        },
+      }),
+    );
+    expect(result.outcome).toBe(ENpcapInstallOutcome.Cancelled);
+  });
+
+  it("any other launch failure is LaunchFailed with its detail — never blamed on a prompt", async () => {
+    // v0.3.1's exact bug: execFile cannot elevate, Windows answers
+    // ERROR_ELEVATION_REQUIRED (EACCES in libuv), and the tester was told to
+    // "try again and accept" a UAC prompt that was never shown.
     const result = await installNpcap(
       deps({
         run: async () => {
@@ -159,7 +175,8 @@ describe("npcap install flow", () => {
         },
       }),
     );
-    expect(result.outcome).toBe(ENpcapInstallOutcome.Cancelled);
+    expect(result.outcome).toBe(ENpcapInstallOutcome.LaunchFailed);
+    expect(result.detail).toContain("EACCES");
   });
 
   it("installer ran but Npcap still missing = wizard cancelled, distinctly reported", async () => {

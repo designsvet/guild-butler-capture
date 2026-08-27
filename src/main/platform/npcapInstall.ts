@@ -182,8 +182,17 @@ export const installNpcap = async (deps: TNpcapInstallDeps): Promise<TNpcapInsta
     try {
       await deps.run(file);
     } catch (err) {
-      // The installer requires elevation; a declined UAC prompt lands here.
-      return { outcome: ENpcapInstallOutcome.Cancelled, version, detail: String(err).slice(0, 300) };
+      // Only a REAL UAC decline is "cancelled" — the runner marks it (the
+      // Start-Process error names ERROR_CANCELLED). Everything else is the
+      // installer failing to START, which "try again and accept it" cannot
+      // fix; v0.3.1 mapped every launch failure here and told a tester who
+      // was never shown a prompt that they had declined one.
+      const declined = (err as { gbcUacDeclined?: boolean }).gbcUacDeclined === true;
+      return {
+        outcome: declined ? ENpcapInstallOutcome.Cancelled : ENpcapInstallOutcome.LaunchFailed,
+        version,
+        detail: String(err instanceof Error ? err.message : err).slice(0, 300),
+      };
     }
 
     const access = await deps.probe();
