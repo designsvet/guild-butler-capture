@@ -160,6 +160,8 @@ export enum ENpcapInstallOutcome {
   Installed = "installed",
   NotCompleted = "not-completed",
   Cancelled = "cancelled",
+  /** The installer never started — no UAC prompt was ever shown. */
+  LaunchFailed = "launch-failed",
   DownloadFailed = "download-failed",
   Untrusted = "untrusted",
   Unsupported = "unsupported",

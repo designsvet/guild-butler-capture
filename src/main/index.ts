@@ -587,19 +587,40 @@ const registerIpc = (): void => {
           );
         });
       },
-      // Npcap's installer asks for elevation itself (its manifest), so this is
-      // where Windows shows the UAC prompt — the app never elevates.
+      // Npcap's installer demands elevation via its manifest, and that only
+      // works through ShellExecute semantics — Start-Process. Plain execFile
+      // (CreateProcess) CANNOT elevate: Windows answers ERROR_ELEVATION_REQUIRED
+      // (740), libuv maps it to EACCES, and v0.3.1's runner turned that into
+      // "you declined the prompt" for a prompt that never appeared. -Wait
+      // blocks until the wizard exits; a real UAC decline makes Start-Process
+      // throw ERROR_CANCELLED ("canceled by the user"), which is the ONE case
+      // marked as a decline. A non-zero wizard exit still resolves — the
+      // re-probe decides, not the exit code.
       run: async (file) => {
         await new Promise<void>((resolve, reject) => {
-          execFile(file, { timeout: 15 * 60_000, windowsHide: false }, (err) => {
-            if (err != null && (err as NodeJS.ErrnoException).code !== undefined && err.message.includes("EACCES")) {
-              reject(err);
-              return;
-            }
-            // A non-zero exit means the member cancelled the wizard; the
-            // re-probe decides, not the exit code.
-            resolve();
-          });
+          execFile(
+            "powershell.exe",
+            [
+              "-NoProfile",
+              "-NonInteractive",
+              "-Command",
+              "$ErrorActionPreference = 'Stop'; Start-Process -FilePath $env:GBC_FILE -Wait",
+            ],
+            { timeout: 15 * 60_000, windowsHide: false, env: { ...process.env, GBC_FILE: file } },
+            (err, _stdout, stderr) => {
+              if (err == null) {
+                resolve();
+                return;
+              }
+              const text = `${err.message} ${stderr ?? ""}`;
+              const declined = /canceled by the user|cancelled by the user|0x800704C7|1223/i.test(text);
+              const failure: Error & { gbcUacDeclined?: boolean } = new Error(
+                declined ? "UAC prompt declined" : `installer failed to start: ${String(stderr || err.message).slice(0, 200)}`,
+              );
+              failure.gbcUacDeclined = declined;
+              reject(failure);
+            },
+          );
         });
       },
       probe: probeAccess,
