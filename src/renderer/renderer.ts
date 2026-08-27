@@ -20,6 +20,11 @@ import {
   type TPairAttempt,
   type TPairingStatus,
   type TSetupStatus,
+  ERestartRefusal,
+  EUpdatePhase,
+  initialUpdateStatus,
+  type TRestartResult,
+  type TUpdateStatus,
 } from "../shared/captureTypes.js";
 import { STR } from "../shared/strings.js";
 
@@ -41,6 +46,9 @@ type TGbc = {
   setUpload: (enabled: boolean) => Promise<TPairingStatus>;
   openLoot: () => Promise<void>;
   onPairing: (listener: (status: TPairingStatus) => void) => () => void;
+  getUpdate: () => Promise<TUpdateStatus>;
+  updateRestart: () => Promise<TRestartResult>;
+  onUpdate: (listener: (status: TUpdateStatus) => void) => () => void;
 };
 
 const gbc = (window as unknown as { gbc: TGbc }).gbc;
@@ -556,6 +564,58 @@ gbc.onPairing((status) => {
 void gbc.getPairing().then((status) => {
   pairing = status;
   renderPairing();
+});
+
+// --- auto-update strip -------------------------------------------------------
+
+const updateEls = {
+  strip: el<HTMLDivElement>("update-strip"),
+  text: el<HTMLParagraphElement>("update-text"),
+  restart: el<HTMLButtonElement>("btn-update-restart"),
+  note: el<HTMLParagraphElement>("update-note"),
+};
+let update: TUpdateStatus = initialUpdateStatus;
+
+const renderUpdate = (): void => {
+  const u = update;
+  // Quiet phases stay invisible — the strip exists only when something is
+  // actually happening. An Error shows as one muted line so a tester can see
+  // it; capture is unaffected either way.
+  const visible =
+    u.phase === EUpdatePhase.Downloading || u.phase === EUpdatePhase.Ready || u.phase === EUpdatePhase.Error;
+  updateEls.strip.classList.toggle("hidden", !visible);
+  if (!visible) {
+    updateEls.note.classList.add("hidden");
+    return;
+  }
+  updateEls.restart.classList.toggle("hidden", u.phase !== EUpdatePhase.Ready);
+  if (u.phase === EUpdatePhase.Downloading) {
+    updateEls.text.textContent = STR.update.downloading(u.version, u.percent);
+  } else if (u.phase === EUpdatePhase.Ready) {
+    updateEls.text.textContent = STR.update.ready(u.version);
+  } else {
+    updateEls.text.textContent = STR.update.failed(u.error);
+  }
+};
+
+updateEls.restart.addEventListener("click", () => {
+  void gbc.updateRestart().then((result: TRestartResult) => {
+    if (!result.ok && result.reason === ERestartRefusal.Capturing) {
+      updateEls.note.textContent = STR.update.blockedCapturing;
+      updateEls.note.classList.remove("hidden");
+    }
+    // ok:true never renders — the app is quitting.
+  });
+});
+
+gbc.onUpdate((status) => {
+  update = status;
+  renderUpdate();
+});
+
+void gbc.getUpdate().then((status) => {
+  update = status;
+  renderUpdate();
 });
 
 gbc.onState((next) => {

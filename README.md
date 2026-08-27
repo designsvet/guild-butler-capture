@@ -274,6 +274,27 @@ Discord, where `/capture devices` and `/capture revoke` manage it.
 Pointing at a different bot (staging) is an `apiBase` entry in
 `settings.json` — same escape hatch as the engine folder.
 
+## Auto-update (Windows, v0.4.0+)
+
+The Windows app updates itself: it checks GitHub Releases on startup and every
+four hours, downloads a newer installer in the background, and installs it
+**when you quit** — nobody re-downloads anything. A strip appears in the app
+only while an update is downloading or ready; "Restart and update" is offered
+once it's ready, and is refused while capture is running — no version bump is
+worth a hole in tonight's loot log (quitting later installs it anyway). The
+bundled engine rides along, so a game-patch fix reaches every member by one
+version bump on `main`.
+
+Plainly, since the app is unsigned: an update is trusted because it comes from
+this repository's GitHub Releases over HTTPS, verified against the sha512 in
+`latest.yml` from the same release. The repo is the trust anchor; code signing
+(Q16) will pin updates to a certificate on top of this same mechanism.
+
+Notes for testers: v0.4.0 is the first version that *contains* the updater, so
+it must be installed by hand once — auto-update carries every version after
+it. macOS stays on manual installs until signing (Squirrel.Mac refuses
+unsigned updates). Set `GBC_NO_AUTO_UPDATE=1` to pin a machine to its build.
+
 ## Permissions, in plain terms
 
 - **macOS** — capturing needs `/dev/bpf*`, which ships root-only (why the raw

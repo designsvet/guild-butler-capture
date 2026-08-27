@@ -60,6 +60,9 @@ import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpca
 import { loadSettings, saveSettings, settingsFilePath } from "./settings.js";
 import { decryptToken, encryptPairing, EStoreOutcome } from "./pairingStore.js";
 import { apiBase, EPairOutcome, pairDevice } from "./uploadClient.js";
+import electronUpdater from "electron-updater";
+
+import { createUpdateController, updaterEnabled, type TUpdateController } from "./updateController.js";
 import { createUploader, type TUploader } from "./uploader.js";
 
 const APP_ROOT = app.getAppPath();
@@ -120,6 +123,46 @@ const dispatch = (ev: TSessionEvent): void => {
   }
   win?.webContents.send(IPC.stateChanged, state);
 };
+
+// --- auto-update (Phase 3, Windows slice) -------------------------------------
+
+// Thin adapter: electron-updater's `on` is keyed to its own event map, while
+// the controller keeps a loose, injectable surface — the cast lives HERE, once.
+const realUpdater = electronUpdater.autoUpdater;
+const updates: TUpdateController = createUpdateController({
+  updater: {
+    get autoDownload() {
+      return realUpdater.autoDownload;
+    },
+    set autoDownload(v: boolean) {
+      realUpdater.autoDownload = v;
+    },
+    get autoInstallOnAppQuit() {
+      return realUpdater.autoInstallOnAppQuit;
+    },
+    set autoInstallOnAppQuit(v: boolean) {
+      realUpdater.autoInstallOnAppQuit = v;
+    },
+    on: (event, listener) => realUpdater.on(event as never, listener as never),
+    checkForUpdates: () => realUpdater.checkForUpdates(),
+    quitAndInstall: () => {
+      realUpdater.quitAndInstall();
+    },
+  },
+  enabled: updaterEnabled(process.platform, app.isPackaged, process.env),
+  // Starting/waiting/capturing all mean a live engine child — never cut it.
+  engineRunning: () => state.status !== ECaptureStatus.Idle && state.status !== ECaptureStatus.Error,
+  schedule: (fn, ms) => {
+    const t = setTimeout(fn, ms);
+    return () => {
+      clearTimeout(t);
+    };
+  },
+  log: appLog,
+  onStatus: (status) => {
+    win?.webContents.send(IPC.updateChanged, status);
+  },
+});
 
 // --- pairing + auto-upload (ADR 0092 P2 slice 4) ------------------------------
 //
@@ -573,6 +616,8 @@ const registerIpc = (): void => {
     return { setup: await getSetup(), install };
   });
 
+  ipcMain.handle(IPC.updateGet, () => updates.status());
+  ipcMain.handle(IPC.updateRestart, () => updates.restartNow());
   ipcMain.handle(IPC.pairingGet, () => pairingStatus());
 
   ipcMain.handle(IPC.pairingPair, async (_event, rawCode: unknown): Promise<TPairAttempt> => {
@@ -705,6 +750,7 @@ if (!gotLock) {
   void app.whenReady().then(() => {
     registerIpc();
     createWindow();
+    updates.start();
     appLog(`app start v${app.getVersion()} (built ${BUILT_AT ?? "unstamped"}) on ${process.platform}`);
   });
 

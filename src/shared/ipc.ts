@@ -36,6 +36,12 @@ export const IPC = {
   stateChanged: "capture:state-changed",
   /** main → renderer. Upload status changed (paired, sent, retrying…). */
   pairingChanged: "pairing:changed",
+  /** invoke → TUpdateStatus. Auto-update state (Windows only for now). */
+  updateGet: "update:get",
+  /** invoke → TRestartResult. Install the downloaded update now — refused while capturing. */
+  updateRestart: "update:restart",
+  /** main → renderer. TUpdateStatus on every change. */
+  updateChanged: "update:changed",
 } as const;
 
 export const NPCAP_URL = "https://npcap.com/#download";

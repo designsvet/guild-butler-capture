@@ -248,3 +248,44 @@ export const initialPairingStatus: TPairingStatus = {
   uploadEnabled: true,
   upload: { state: "unpaired", sentTotal: 0, lastSentAt: null, failures: 0, lastError: null },
 };
+
+// --- auto-update (Phase 3, Windows slice) ------------------------------------
+
+export enum EUpdatePhase {
+  /** Updates not running: disabled platform, dev build, or not started yet. */
+  Off = "off",
+  /** Enabled and quiet — nothing known to be newer. */
+  UpToDate = "up-to-date",
+  Checking = "checking",
+  /** A newer version exists; the download is in flight. */
+  Downloading = "downloading",
+  /** Downloaded and verified — installs on quit, or on Restart now. */
+  Ready = "ready",
+  /** Last check or download failed; will try again on the next interval. */
+  Error = "error",
+}
+
+export type TUpdateStatus = {
+  phase: EUpdatePhase;
+  /** The newer version, once one is known. */
+  version: string | null;
+  /** Download progress 0–100, only while Downloading. */
+  percent: number | null;
+  /** Last failure, for the UI sentence and the app log. */
+  error: string | null;
+};
+
+export const initialUpdateStatus: TUpdateStatus = {
+  phase: EUpdatePhase.Off,
+  version: null,
+  percent: null,
+  error: null,
+};
+
+export enum ERestartRefusal {
+  NotReady = "not-ready",
+  /** Engine running — a restart would cut a live capture. */
+  Capturing = "capturing",
+}
+
+export type TRestartResult = { ok: true } | { ok: false; reason: ERestartRefusal };
