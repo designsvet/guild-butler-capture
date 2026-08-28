@@ -1,0 +1,31 @@
+# CI overlay for the macOS build (the `macos` job in .github/workflows/
+# build.yml): the base config plus the bundled engine. A separate file for the
+# same two reasons as the Windows overlay — electron-builder's dotted CLI
+# flags cannot express an array element, and local `pnpm package:mac` must
+# keep working with no engine-dist/ present.
+#
+# ONLY the engine is listed here, and that is load-bearing. `extends`
+# CONCATENATES arrays rather than replacing them, so naming `resources/mac`
+# again (which the base config already has under mac.extraResources) put the
+# same entry in the list twice and the second copy died on
+# `EEXIST … link resources/mac/fix-bpf.sh` — the first real macOS run, and a
+# Linux `--dir` dry run does not reproduce it, because the copier only hard
+# links when it can. The `macos` job asserts BOTH the engine and the BPF
+# helper are inside the built .app, which is what turns a wrong guess about
+# this merge into a failed build instead of an app that silently ships
+# without one of them.
+extends: ./electron-builder.yml
+
+mac:
+  extraResources:
+    - from: engine-dist
+      to: engine
+
+  # No Developer ID yet (open question Q16), so: no real signing, and
+  # `identity: null` so electron-builder still AD-HOC signs. That is not a
+  # nicety on Apple Silicon — an arm64 binary with no signature at all will
+  # not launch. Ad-hoc signed is launchable, and Gatekeeper still shows the
+  # unidentified-developer prompt the download page walks members through.
+  #
+  # A scalar, so the merge above cannot surprise us here: the child wins.
+  identity: null
