@@ -366,12 +366,19 @@ jobs:
       - name: Assemble engine-dist
         run: node tools/prepare-engine-dist.mjs engine-src engine-dist
 
+      # `--mac dmg` picks the target on the CLI rather than overriding
+      # mac.target in the overlay: `extends` concatenates arrays, so a config
+      # override would have produced [dmg, zip, dmg] and built the same disk
+      # image twice. The base config's zip target exists for electron-updater's
+      # mac feed, which is off by construction (updateController gates on
+      # win32 — electron-updater cannot update an unsigned app), so there is
+      # nothing to spend runner minutes on.
       - name: Build the DMG (ad-hoc signed, not notarized)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           pnpm build
-          pnpm exec electron-builder --mac --arm64 --config electron-builder.mac-ci.yml --publish never
+          pnpm exec electron-builder --mac dmg --arm64 --config electron-builder.mac-ci.yml --publish never
 
       # The engine is the whole point of the bundle, and a missing one fails
       # nothing at build time — the app would just fall back to "no engine
