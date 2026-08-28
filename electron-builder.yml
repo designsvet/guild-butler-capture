@@ -1,6 +1,14 @@
 # Packaging groundwork (Phase 3 finishes this: signing, notarization, updates).
 # Unsigned local builds work today via `pnpm package:mac` / `pnpm package:win`.
 #
+# `icon-master-1024.png` is the SOURCE the other three are generated from, and
+# it is committed for a reason: the supplied .icns arrived with its rounded
+# corners flattened onto opaque black, which renders as a black square wherever
+# the background is not dark (light-mode Finder, the Dock, the download page).
+# The master is that art with the corners cut back to real transparency, so the
+# next refresh starts from a correct file instead of reconstructing the alpha
+# again. Regenerate the derived formats from it, never from a .icns.
+#
 # Icons live in `resources/icons/` and are BUILD inputs, not shipped files:
 # electron-builder bakes the .icns into the .app bundle and the .ico into the
 # .exe, so neither needs to be in `files:` — adding them would put 3 MB of art
