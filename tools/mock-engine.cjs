@@ -72,7 +72,7 @@ const NET_EPOCH_TICKS = 621355968000000000;
 
 /**
  * One `[festivities]` line, the shape the real engine's FestivitiesUpdate handler prints
- * (raid-bot ADR 0100) — modelled on the payload RECORDED from live traffic on 2026-08-28:
+ * (raid-bot ADR 0102) — modelled on the payload RECORDED from live traffic on 2026-08-28:
  * seasonal rows carry an EMPTY category, production rows carry `GENERAL`, and every time is
  * .NET ticks, unconverted, because the engine reports what the wire said.
  */

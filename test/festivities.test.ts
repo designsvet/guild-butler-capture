@@ -6,7 +6,7 @@ import { buildFestivitiesLine } from "../tools/mock-engine.cjs";
 import { REAL } from "./fixtures/realEngineLines.js";
 
 /**
- * The daily bonus rotation as it crosses this app (raid-bot ADR 0100): the engine prints it,
+ * The daily bonus rotation as it crosses this app (raid-bot ADR 0102): the engine prints it,
  * the adapter reads it, the upload client posts it beside the loot batches.
  *
  * Both fixtures are recordings, never hand-written strings: `REAL.festivities` is the first real

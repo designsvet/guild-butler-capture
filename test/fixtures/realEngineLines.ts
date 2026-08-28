@@ -26,7 +26,7 @@ export const REAL = {
    */
   heartbeatWithHeld: "[status] character: Bors · lines written: 4 · held: 1",
   /**
-   * The daily bonus rotation (raid-bot ADR 0100), recorded 2026-08-28 on Europe — the FIRST
+   * The daily bonus rotation (raid-bot ADR 0102), recorded 2026-08-28 on Europe — the FIRST
    * real `FestivitiesUpdate`, which also confirmed the Photon event code is **518**.
    *
    * Ticks are verbatim, unconverted: the engine reports what the wire said, and this app's

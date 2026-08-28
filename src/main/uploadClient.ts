@@ -225,7 +225,7 @@ export const uploadBatch = async (
 };
 
 /**
- * Post one daily-bonus rotation snapshot (raid-bot ADR 0100).
+ * Post one daily-bonus rotation snapshot (raid-bot ADR 0102).
  *
  * A sibling of `uploadBatch`, not a mode of it: same token, same base, same outcome vocabulary
  * — but the payload is a SNAPSHOT of server state rather than an append to this member's file,

@@ -111,7 +111,7 @@ const LOG_ANNOUNCE_RE = /logs?\s+will\s+be\s+written\s+to\s+(.+?\.txt)\s*$/i;
 const LOG_FILE_RE = /(loot-events-[\w.:-]+\.txt)/i;
 
 /**
- * The daily bonus rotation (raid-bot ADR 0100), printed by the engine's FestivitiesUpdate
+ * The daily bonus rotation (raid-bot ADR 0102), printed by the engine's FestivitiesUpdate
  * handler as `[festivities] {json}`. RECORDED: Europe, 2026-08-28, Photon event code 518
  * (test/fixtures/realEngineLines.ts).
  *
