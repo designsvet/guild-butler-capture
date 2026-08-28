@@ -383,6 +383,7 @@ jobs:
         id: apple
         env:
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
           APPLE_API_KEY_B64: ${{ secrets.APPLE_API_KEY_B64 }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -396,6 +397,26 @@ jobs:
             exit 0
           fi
           echo "signing=true" >> "$GITHUB_OUTPUT"
+
+          # Exported here rather than in the build step's env: block, and that
+          # is the whole point. `CSC_LINK: ${{ secrets.X }}` with no secret set
+          # does not leave the variable unset, it sets it to the EMPTY STRING --
+          # and app-builder-lib treats empty as a real value on purpose:
+          #
+          #   getCscLink() { // allow to specify as empty string
+          #     ... chooseNotNull(config.cscLink, process.env.CSC_LINK) }
+          #   chooseNotNull = (v1, v2) => v1 == null ? v2 : v1
+          #
+          # "" is not null, so it survives, the `cscLink == null` guard never
+          # fires, and electron-builder tries to import a certificate from ""
+          # -- resolved against the project dir, which fails as
+          # "<repo root> not a file". Writing the vars only when they are real
+          # means the unsigned path has no CSC_LINK at all.
+          # Newlines are stripped so a wrapped base64 paste stays one line.
+          {
+            echo "CSC_LINK=$(printf '%s' "$CSC_LINK" | tr -d '\n\r ')"
+            echo "CSC_KEY_PASSWORD=${CSC_KEY_PASSWORD:-}"
+          } >> "$GITHUB_ENV"
 
           if [ -n "${APPLE_API_KEY_B64:-}" ] && [ -n "${APPLE_API_KEY_ID:-}" ] \
              && [ -n "${APPLE_API_ISSUER:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
@@ -433,8 +454,10 @@ jobs:
       # none of them.
       - name: Build the DMG
         env:
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          # CSC_LINK / CSC_KEY_PASSWORD deliberately absent: the decide step
+          # puts them in the environment only when a certificate really exists.
+          # Setting them here would define them as "" on every unsigned build,
+          # which is what broke the macOS job on main for four merges.
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ steps.apple.outputs.signing }}
         run: |
           pnpm build
