@@ -118,8 +118,9 @@ green and never fire.)
 ### Windows
 
 An **unsigned installer with the engine bundled**: it checks out an engine
-repo/ref (dispatch inputs; default `madvac/ao-loot-logger@main`), applies
-`resources/engine-patches/*` (currently one: flush the log on SIGINT — the
+repo/ref (dispatch inputs; default
+`designsvet/ao-loot-logger@protocol18`), applies `resources/engine-patches/*`
+(currently one: flush the log on SIGINT — the
 engine's own exit hook only fires from its raw-mode keyboard input, which a
 child with ignored stdin never gets), compiles `cap` for this app's Electron
 ABI (cap vendors its own WinPcap SDK — no external download), assembles
@@ -152,17 +153,36 @@ compiled for both arches on one runner, and cross-compiling a libpcap binding
 costs more than the shrinking audience is worth.
 
 The DMG is **ad-hoc signed, not notarized** — there is no Developer ID yet
-(Q16). Ad-hoc is not optional on Apple Silicon, where an unsigned binary will
-not launch at all; what it does not buy is Gatekeeper's blessing, so the first
-launch needs **right-click → Open** (or System Settings → Privacy & Security →
-Open Anyway). The download page says so.
+(Q16). Ad-hoc is not optional on Apple Silicon, where the kernel requires a
+valid signature to execute; what it does not buy is Gatekeeper's blessing, so
+the first launch needs **right-click → Open** (or System Settings → Privacy &
+Security → Open Anyway). The download page says so.
+
+That ad-hoc signature comes from the `afterPack` hook in
+`tools/adhoc-sign.cjs`, and it is worth knowing why it is a hook rather than a
+config line. `mac.identity: null` was believed to request ad-hoc signing. It
+does not — app-builder-lib reads it and skips signing entirely, logging
+`skipped macOS code signing  reason=identity explicitly is set to null`, and
+nothing else in electron-builder ad-hoc signs. Electron's prebuilt binaries do
+arrive ad-hoc signed, but electron-builder renames the bundle and its
+executable, rewrites `Info.plist` and adds `Contents/Resources`, which
+invalidates that seal. The first macOS build on `main` shipped exactly that
+bundle. The hook signs and then **verifies**, because an ad-hoc sign that
+fails silently restores the original bug with a green build either way.
 
 Two things the CI asserts, because neither fails the build on its own and both
 would only surface on a member's Mac: the engine is really inside
 `Contents/Resources/engine`, and the BPF helper scripts are really inside
-`Contents/Resources/mac`. The second exists because electron-builder lets a
-platform block *override* `extraResources` rather than extend it — the naive
-overlay drops the permission helper silently.
+`Contents/Resources/mac`. The second exists because `extends`
+**concatenates** arrays rather than replacing them: an overlay that re-lists
+`resources/mac` puts it in the list twice and the build dies on
+`EEXIST … link resources/mac/fix-bpf.sh`, while an overlay that assumes the
+override and lists only the engine is correct — but silently ships without the
+helper if that assumption is ever wrong. The assertion is what makes either
+guess a failed build instead of an app that cannot ask for permission on a
+member's Mac. (This paragraph asserted the opposite until the first real macOS
+run disproved it; a Linux `--dir` dry run does not reproduce the collision,
+because the copier only hard links when it can.)
 
 Auto-update stays Windows-only (`updateController.ts` gates on `win32`):
 electron-updater cannot update an app that is not Developer-ID signed, so the

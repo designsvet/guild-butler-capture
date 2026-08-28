@@ -21,11 +21,20 @@ mac:
     - from: engine-dist
       to: engine
 
-  # No Developer ID yet (open question Q16), so: no real signing, and
-  # `identity: null` so electron-builder still AD-HOC signs. That is not a
-  # nicety on Apple Silicon — an arm64 binary with no signature at all will
-  # not launch. Ad-hoc signed is launchable, and Gatekeeper still shows the
-  # unidentified-developer prompt the download page walks members through.
+  # No Developer ID yet (open question Q16), so no real signing.
+  #
+  # `identity: null` means exactly one thing, and it is NOT what the comment
+  # here used to claim: app-builder-lib logs "skipped macOS code signing" and
+  # returns before signing anything. It does not ad-hoc sign, and nothing else
+  # in electron-builder does either. The first macOS build on main shipped a
+  # bundle with no signature of its own, which on Apple Silicon is what
+  # Finder calls a damaged app.
+  #
+  # The ad-hoc signature the old comment described now really happens, in the
+  # `afterPack` hook the base config declares (tools/adhoc-sign.cjs) — which
+  # is also where the reasoning lives. Ad-hoc buys launchability only;
+  # Gatekeeper still shows the unidentified-developer prompt the download page
+  # walks members through.
   #
   # A scalar, so the merge above cannot surprise us here: the child wins.
   identity: null

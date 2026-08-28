@@ -384,13 +384,22 @@ jobs:
       # nothing at build time — the app would just fall back to "no engine
       # found" on a member's Mac. Assert it landed inside the .app, the way
       # the Windows job asserts latest.yml exists.
-      - name: The engine is inside the bundle
+      - name: The engine is inside the bundle, and the bundle is signed
+        # The signature check is here as well as inside the afterPack hook
+        # because this is the assertion a reader of a red build sees. The
+        # bundle shipped UNSIGNED for its first two builds -- `identity: null`
+        # skips signing rather than requesting an ad-hoc signature, and
+        # nothing read the result -- so "did anything actually sign this?"
+        # earns a line of its own. `codesign -dv` prints the authority, which
+        # reads "Signature=adhoc" today and a Developer ID once Q16 lands.
         run: |
           APP=$(ls -d release/mac*/*.app | head -1)
           echo "checking $APP"
           test -f "$APP/Contents/Resources/engine/src/index.js"
           test -d "$APP/Contents/Resources/engine/node_modules/cap"
           test -f "$APP/Contents/Resources/mac/install-bpf-helper.sh"
+          codesign --verify --deep --strict "$APP"
+          codesign -dv "$APP" 2>&1
           ls -la release/*.dmg
 
       - name: Upload DMG artifact

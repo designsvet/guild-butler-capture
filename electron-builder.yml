@@ -42,9 +42,17 @@ mac:
     - dmg
     - zip
   # Phase 3: hardenedRuntime + notarization once the Developer ID cert is wired.
+  # (hardenedRuntime needs no line here — app-builder-lib defaults it to true
+  # for non-MAS mac builds; it only takes effect once something actually signs.)
   extraResources:
     - from: resources/mac
       to: mac
+
+# Ad-hoc signs the macOS bundle so it will launch on Apple Silicon. Declared
+# here rather than in the CI overlay because a local `pnpm package:mac` needs
+# it just as much. Reads as a no-op on Windows and whenever a real certificate
+# is configured. See the header of tools/adhoc-sign.cjs for what it is fixing.
+afterPack: ./tools/adhoc-sign.cjs
 
 win:
   icon: resources/icons/icon.ico
