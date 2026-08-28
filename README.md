@@ -106,10 +106,18 @@ writes a real CSV whose rows are pinned by test to the bot's own parser regex.
 `--fail=permission|npcap|abi` and `--crash-after=<ms>` flags exercise the
 error and auto-restart paths (see `test/engineSupervisor.test.ts`).
 
-## Windows test builds (CI)
+## Builds (CI)
 
-The `capture-windows` workflow (in the raid-bot repo while staged) builds an
-**unsigned installer with the engine bundled**: it checks out an engine
+The `capture-build` workflow builds both platforms from one run: a `build` job
+for Windows that also owns every release decision, and a `macos` job that
+attaches a DMG to the release that job publishes. (The mac work is a job and
+not its own workflow because a release cut with `GITHUB_TOKEN` does not
+trigger further workflow runs — an `on: release` workflow would sit there
+green and never fire.)
+
+### Windows
+
+An **unsigned installer with the engine bundled**: it checks out an engine
 repo/ref (dispatch inputs; default `madvac/ao-loot-logger@main`), applies
 `resources/engine-patches/*` (currently one: flush the log on SIGINT — the
 engine's own exit hook only fires from its raw-mode keyboard input, which a
@@ -136,6 +144,30 @@ For testers, two things to know:
   patch is generated against that ref; picking another ref via the dispatch
   inputs may need it regenerated (the patch step fails loud, never silently).
 
+### macOS
+
+The same engine bundle, packaged as an **arm64 DMG** (Apple Silicon). Intel
+Macs get no build: a universal binary needs the engine's `cap` native module
+compiled for both arches on one runner, and cross-compiling a libpcap binding
+costs more than the shrinking audience is worth.
+
+The DMG is **ad-hoc signed, not notarized** — there is no Developer ID yet
+(Q16). Ad-hoc is not optional on Apple Silicon, where an unsigned binary will
+not launch at all; what it does not buy is Gatekeeper's blessing, so the first
+launch needs **right-click → Open** (or System Settings → Privacy & Security →
+Open Anyway). The download page says so.
+
+Two things the CI asserts, because neither fails the build on its own and both
+would only surface on a member's Mac: the engine is really inside
+`Contents/Resources/engine`, and the BPF helper scripts are really inside
+`Contents/Resources/mac`. The second exists because electron-builder lets a
+platform block *override* `extraResources` rather than extend it — the naive
+overlay drops the permission helper silently.
+
+Auto-update stays Windows-only (`updateController.ts` gates on `win32`):
+electron-updater cannot update an app that is not Developer-ID signed, so the
+mac feed would promise what it cannot deliver.
+
 ### Cutting a release
 
 Two ways, both ending in the same build-and-publish path:
@@ -145,8 +177,8 @@ Two ways, both ending in the same build-and-publish path:
   no tag push, no dispatch permission — which is what lets the agent cut one
   too. Idempotent: an existing release means build-only, so ordinary pushes
   and re-runs never republish.
-- **Dispatch the `capture-windows` workflow** with a `release_version` (e.g.
-  `0.2.0`) — Actions → capture-windows → Run workflow. It records the version
+- **Dispatch the `capture-build` workflow** with a `release_version` (e.g.
+  `0.2.0`) — Actions → capture-build → Run workflow. It records the version
   in `package.json` on `main` for you first.
 
 Either way the release is created through the release API, which makes the tag

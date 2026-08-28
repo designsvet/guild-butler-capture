@@ -1,4 +1,18 @@
-# Guild Butler Capture — Windows test build (ADR 0096, Windows slice).
+# Guild Butler Capture — the release build (ADR 0096).
+#
+# (Was `windows.yml` / `capture-windows` until 2026-08-28, when the macOS job
+# joined it and the old name stopped being true.)
+#
+# Two jobs: `build` produces the Windows installer AND owns every release
+# decision (tag, version bump, publish, retry); `macos` then attaches a DMG to
+# the release `build` just published.
+#
+# Why the mac work is a JOB here and not a workflow of its own: a release cut
+# with GITHUB_TOKEN does NOT trigger further workflow runs, so an
+# `on: release: [published]` mac workflow would never fire — green, silent, and
+# wrong. `needs: build` gives the same ordering and cannot be fooled. It also
+# degrades the right way: if the mac build breaks, the release still carries
+# the Windows installer.
 #
 # Produces an UNSIGNED nsis installer with the engine BUNDLED (cap compiled
 # for the app's Electron ABI on this runner; cap vendors its own WinPcap SDK,
@@ -20,7 +34,7 @@
 # picked via the dispatch inputs may need it regenerated (the patch step
 # fails loud when it neither applies nor is present).
 
-name: capture-windows
+name: capture-build
 
 on:
   workflow_dispatch:
@@ -47,6 +61,14 @@ permissions:
 
 jobs:
   build:
+    outputs:
+      # The mac job needs all three: the tag to upload against, and the sha so
+      # it packages the version-bump commit rather than the commit that
+      # triggered the run (electron-builder reads package.json for the DMG's
+      # name and version).
+      tag: ${{ steps.rel.outputs.tag }}
+      version: ${{ steps.rel.outputs.version }}
+      sha: ${{ steps.bump.outputs.sha }}
     # This job needs a WINDOWS runner, so it cannot ride the self-hosted
     # `raid-bot` label; it gets its own kill-switch variable in the house
     # pattern (test/ciWorkflow.test.ts): set repo var CI_RUNS_ON_WINDOWS to
@@ -274,3 +296,115 @@ jobs:
             release/*.exe
             release/latest.yml
           generate_release_notes: true
+
+  # ---------------------------------------------------------------------------
+  # macOS: same engine bundling, DMG instead of an installer, attached to the
+  # release the `build` job has already published.
+  # ---------------------------------------------------------------------------
+  macos:
+    needs: build
+    # Apple Silicon (macos-14 and later are arm64). Intel Macs get no build:
+    # a universal binary would need the engine's `cap` native module built for
+    # both arches on one runner, and cross-compiling a libpcap binding is a
+    # bigger job than the shrinking audience justifies. Same kill-switch
+    # pattern as the Windows job — repoint with a repo var, no PR.
+    runs-on: ${{ vars.CI_RUNS_ON_MACOS || 'macos-latest' }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v5
+        with:
+          # The bumped commit when `build` cut a release, else this run's own.
+          ref: ${{ needs.build.outputs.sha || github.sha }}
+
+      - name: Checkout engine
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ inputs.engine_repo || 'designsvet/ao-loot-logger' }}
+          ref: ${{ inputs.engine_ref || 'protocol18' }}
+          path: engine-src
+
+      - uses: pnpm/action-setup@v5
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Apply engine patches (idempotent — the owner's branch may already carry them)
+        run: |
+          cd engine-src
+          for p in ../resources/engine-patches/*.patch; do
+            if git apply --check "$p" 2>/dev/null; then
+              echo "applying $p"
+              git apply "$p"
+            elif git apply --reverse --check "$p" 2>/dev/null; then
+              echo "skipping $p — already applied on this engine ref"
+            else
+              echo "::error::$p neither applies nor is already applied on this engine ref"
+              exit 1
+            fi
+          done
+
+      - name: Install engine deps (no compile — cap is built once, for Electron's ABI, below)
+        run: cd engine-src && npm install --omit=dev --ignore-scripts
+
+      - name: Install app deps
+        run: pnpm install --frozen-lockfile
+
+      # macOS ships libpcap, so cap needs no vendored SDK here — the Windows
+      # job's one platform difference.
+      - name: Rebuild cap for the app's Electron ABI
+        run: node tools/engine-rebuild.mjs engine-src
+
+      - name: Assemble engine-dist
+        run: node tools/prepare-engine-dist.mjs engine-src engine-dist
+
+      - name: Build the DMG (ad-hoc signed, not notarized)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          pnpm build
+          pnpm exec electron-builder --mac --arm64 --config electron-builder.mac-ci.yml --publish never
+
+      # The engine is the whole point of the bundle, and a missing one fails
+      # nothing at build time — the app would just fall back to "no engine
+      # found" on a member's Mac. Assert it landed inside the .app, the way
+      # the Windows job asserts latest.yml exists.
+      - name: The engine is inside the bundle
+        run: |
+          APP=$(ls -d release/mac*/*.app | head -1)
+          echo "checking $APP"
+          test -f "$APP/Contents/Resources/engine/src/index.js"
+          test -d "$APP/Contents/Resources/engine/node_modules/cap"
+          test -f "$APP/Contents/Resources/mac/install-bpf-helper.sh"
+          ls -la release/*.dmg
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: guild-butler-capture-macos
+          path: release/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+
+      # Attach to the release `build` published. `gh release upload` rather
+      # than a second action-gh-release: the release already exists, and a
+      # second publisher is how two jobs end up racing over one tag.
+      # --clobber keeps a job re-run idempotent.
+      - name: Attach the DMG to the release
+        if: needs.build.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          cp release/*.dmg "release/GuildButlerCapture.dmg"
+          gh release upload "$TAG" release/*.dmg --clobber
+          gh release view "$TAG" --json assets --jq '.assets[].name'

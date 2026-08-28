@@ -1,6 +1,12 @@
-# Packaging groundwork (Phase 3 finishes this: signing, notarization, updates,
-# icon art). Unsigned local builds work today via `pnpm package:mac` /
-# `pnpm package:win`.
+# Packaging groundwork (Phase 3 finishes this: signing, notarization, updates).
+# Unsigned local builds work today via `pnpm package:mac` / `pnpm package:win`.
+#
+# Icons live in `resources/icons/` and are BUILD inputs, not shipped files:
+# electron-builder bakes the .icns into the .app bundle and the .ico into the
+# .exe, so neither needs to be in `files:` — adding them would put 3 MB of art
+# inside every build for nothing. Runtime `BrowserWindow({icon})` is likewise
+# unnecessary: macOS reads the dock icon from the bundle and Windows reads the
+# window/taskbar icon from the executable.
 #
 # Bundling the engine: the Windows CI workflow (.github/workflows/
 # capture-windows.yml in the raid-bot repo while staged) assembles an
@@ -31,6 +37,7 @@ npmRebuild: false
 
 mac:
   category: public.app-category.utilities
+  icon: resources/icons/icon.icns
   target:
     - dmg
     - zip
@@ -40,6 +47,7 @@ mac:
       to: mac
 
 win:
+  icon: resources/icons/icon.ico
   target:
     - nsis
   # Space-free so the GitHub asset name matches latest.yml byte-for-byte —
@@ -54,6 +62,11 @@ win:
 nsis:
   oneClick: true
   perMachine: false
+  # Named explicitly rather than left to default from `win.icon`: the installer
+  # and the Add/Remove Programs entry are the two places a member sees the mark
+  # before the app ever opens.
+  installerIcon: resources/icons/icon.ico
+  uninstallerIcon: resources/icons/icon.ico
 
 # Auto-update (Phase 3, Windows slice): electron-updater reads this at BUILD
 # time — it embeds app-update.yml into the installed app and emits latest.yml
