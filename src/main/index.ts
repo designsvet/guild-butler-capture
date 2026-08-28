@@ -59,11 +59,12 @@ import { installNpcap, parseSignatureOutput, type TSignatureCheck } from "./plat
 import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpcap.js";
 import { loadSettings, saveSettings, settingsFilePath } from "./settings.js";
 import { decryptToken, encryptPairing, EStoreOutcome } from "./pairingStore.js";
-import { apiBase, EPairOutcome, pairDevice } from "./uploadClient.js";
+import { apiBase, EPairOutcome, pairDevice, sendFestivities } from "./uploadClient.js";
 import electronUpdater from "electron-updater";
 
 import { createUpdateController, updaterEnabled, type TUpdateController } from "./updateController.js";
 import { createUploader, type TUploader } from "./uploader.js";
+import type { TEngineEvent } from "./engineAdapter.js";
 
 const APP_ROOT = app.getAppPath();
 const SETTINGS_FILE = settingsFilePath(app.getPath("userData"));
@@ -112,6 +113,9 @@ const stopTracker = (): void => {
 
 const dispatch = (ev: TSessionEvent): void => {
   state = reduceCaptureSession(state, ev);
+  if (ev.type === "engine-line" && ev.event.kind === "festivities") {
+    forwardFestivities(ev.event);
+  }
   if (ev.type === "engine-exit") {
     appLog(`engine exit fatal=${ev.fatal ?? "none"} willRestart=${ev.willRestart} attempt=${ev.attempt}`);
   }
@@ -176,6 +180,33 @@ let uploadTimer: NodeJS.Timeout | null = null;
 
 /** Every 10s while capturing. Uploading is not urgent; the file is safe. */
 const UPLOAD_TICK_MS = 10_000;
+
+/**
+ * Forward one daily-bonus rotation (raid-bot ADR 0102).
+ *
+ * Fire-and-forget, and silent at both gates. **Not paired** is the ordinary state of a fresh
+ * install, not an error to nag about. **No server** means the engine has not yet seen enough
+ * traffic to tell Europe from Americas — sending anyway would mean guessing whose rotation this
+ * is, and a wrong guess publishes a confidently wrong card to every guild on that server.
+ *
+ * No retry queue, deliberately: unlike loot, the rotation re-sends itself on the next login, and
+ * a snapshot the bot already holds beats a queue of stale ones.
+ */
+const forwardFestivities = (event: Extract<TEngineEvent, { kind: "festivities" }>): void => {
+  const settings = loadSettings(SETTINGS_FILE);
+  const token = decryptToken(safeStorage, settings.pairing);
+  if (token == null || event.server == null) {
+    return;
+  }
+  void sendFestivities(fetch, settings.apiBase ?? "", token, {
+    server: event.server,
+    capturedAt: Date.now(),
+    eventCode: event.code ?? 0,
+    entries: event.entries,
+  }).then((result) => {
+    appLog(`festivities ${result.outcome} server=${event.server} entries=${event.entries.length}`);
+  });
+};
 
 const storedToken = (): string | null => {
   const pairing = loadSettings(SETTINGS_FILE).pairing;

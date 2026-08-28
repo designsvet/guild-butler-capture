@@ -28,12 +28,22 @@
 
 import { EEngineErrorKind } from "../shared/captureTypes.js";
 
+/** One festivity as the bot's ingest wants it: epoch milliseconds, not .NET ticks. */
+export type TFestivityEntry = {
+  kind: number;
+  category: string;
+  uniqueName: string;
+  startMs: number;
+  endMs: number;
+};
+
 export type TEngineEvent =
   | { kind: "albion-detected" }
   | { kind: "albion-lost" }
   | { kind: "heartbeat"; character: string | null; linesWritten: number | null }
   | { kind: "character"; name: string }
   | { kind: "log-file"; file: string }
+  | { kind: "festivities"; server: string | null; code: number | null; entries: TFestivityEntry[] }
   | { kind: "fatal"; errorKind: EEngineErrorKind; line: string }
   | { kind: "noise"; line: string };
 
@@ -101,6 +111,70 @@ const LOG_ANNOUNCE_RE = /logs?\s+will\s+be\s+written\s+to\s+(.+?\.txt)\s*$/i;
 const LOG_FILE_RE = /(loot-events-[\w.:-]+\.txt)/i;
 
 /**
+ * The daily bonus rotation (raid-bot ADR 0102), printed by the engine's FestivitiesUpdate
+ * handler as `[festivities] {json}`. RECORDED: Europe, 2026-08-28, Photon event code 518
+ * (test/fixtures/realEngineLines.ts).
+ *
+ * The engine prints .NET ticks verbatim — it reports what the wire said and interprets nothing —
+ * so the unit change happens HERE, in the module whose job is knowing what the engine prints.
+ * The engine already read the Photon int64 into a JS number, which is lossy above 2^53; at tick
+ * magnitudes that is tens of microseconds, invisible in a countdown measured in days.
+ */
+const FESTIVITIES_MARK_RE = /\[festivities\]/i;
+
+/** .NET ticks (100ns since 0001-01-01) at the Unix epoch. */
+const NET_EPOCH_TICKS = 621_355_968_000_000_000;
+
+const ticksToMs = (ticks: number): number => Math.round((ticks - NET_EPOCH_TICKS) / 10_000);
+
+const parseFestivities = (line: string): TEngineEvent => {
+  const jsonStart = line.indexOf("{");
+  if (jsonStart < 0) {
+    return { kind: "noise", line };
+  }
+  try {
+    const obj = JSON.parse(line.slice(jsonStart)) as Record<string, unknown>;
+    const rawEntries = Array.isArray(obj.entries) ? obj.entries : [];
+    const entries: TFestivityEntry[] = [];
+    for (const raw of rawEntries) {
+      const row = raw as Record<string, unknown>;
+      const start = row.startTicks;
+      const end = row.endTicks;
+      if (
+        typeof row.kind !== "number" ||
+        typeof row.category !== "string" ||
+        typeof row.uniqueName !== "string" ||
+        typeof start !== "number" ||
+        typeof end !== "number"
+      ) {
+        // One malformed row voids the snapshot: it REPLACES the server's whole rotation on the
+        // bot side, so a partial read would publish a rotation missing whatever failed to parse.
+        // Note `category` is legitimately EMPTY on seasonal rows — that is recorded, not a fault.
+        return { kind: "noise", line };
+      }
+      entries.push({
+        kind: row.kind,
+        category: row.category,
+        uniqueName: row.uniqueName,
+        startMs: ticksToMs(start),
+        endMs: ticksToMs(end),
+      });
+    }
+    if (entries.length === 0) {
+      return { kind: "noise", line };
+    }
+    return {
+      kind: "festivities",
+      server: typeof obj.server === "string" ? obj.server : null,
+      code: typeof obj.code === "number" ? obj.code : null,
+      entries,
+    };
+  } catch {
+    return { kind: "noise", line };
+  }
+};
+
+/**
  * Failure classification, most-specific first. Order matters twice:
  * - ABI before Npcap: a native-module load failure on Windows says "The
  *   specified module could not be found", which mentions no driver — but
@@ -166,6 +240,9 @@ export const parseEngineLine = (raw: string): TEngineEvent => {
   }
   if (HEARTBEAT_MARK_RE.test(line)) {
     return parseHeartbeat(line);
+  }
+  if (FESTIVITIES_MARK_RE.test(line)) {
+    return parseFestivities(line);
   }
   if (DEBUG_TAG_RE.test(line)) {
     return { kind: "noise", line };
