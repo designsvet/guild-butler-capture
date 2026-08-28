@@ -21,20 +21,36 @@ mac:
     - from: engine-dist
       to: engine
 
-  # No Developer ID yet (open question Q16), so no real signing.
+  # SIGNING IS DECIDED BY THE ENVIRONMENT, NOT BY THIS FILE.
   #
-  # `identity: null` means exactly one thing, and it is NOT what the comment
-  # here used to claim: app-builder-lib logs "skipped macOS code signing" and
-  # returns before signing anything. It does not ad-hoc sign, and nothing else
-  # in electron-builder does either. The first macOS build on main shipped a
-  # bundle with no signature of its own, which on Apple Silicon is what
-  # Finder calls a damaged app.
+  # `identity` used to be pinned to null here, which does NOT mean "sign
+  # ad-hoc" -- app-builder-lib reads it and skips signing outright, and it
+  # skips it whether or not a real certificate is available. That made a
+  # signed build impossible to reach from this config, so the key is gone and
+  # the decision moved to the one place that knows whether a certificate
+  # exists: the workflow, via CSC_IDENTITY_AUTO_DISCOVERY.
   #
-  # The ad-hoc signature the old comment described now really happens, in the
-  # `afterPack` hook the base config declares (tools/adhoc-sign.cjs) — which
-  # is also where the reasoning lives. Ad-hoc buys launchability only;
-  # Gatekeeper still shows the unidentified-developer prompt the download page
-  # walks members through.
+  #   no MAC_CSC_LINK secret -> CSC_IDENTITY_AUTO_DISCOVERY=false. findIdentity
+  #     returns null without consulting the keychain, signing is skipped with a
+  #     warning, and the afterPack hook's ad-hoc signature is what ships.
+  #   MAC_CSC_LINK present -> auto-discovery on. electron-builder imports the
+  #     .p12 into a temporary keychain, finds the Developer ID, signs every
+  #     nested Mach-O with the hardened runtime (its default for non-MAS mac
+  #     builds), and notarizes if the API-key vars are also set.
   #
-  # A scalar, so the merge above cannot surprise us here: the child wins.
-  identity: null
+  # Note that PULL REQUEST builds never sign, whatever the secrets say --
+  # macCodeSign's isSignAllowed() refuses on PRs unless CSC_FOR_PULL_REQUEST
+  # is set. So the signed path can only be exercised by a push to main, and a
+  # PR build is always the ad-hoc one.
+
+# Sign the disk image too, not just the app inside it. Off by default in
+# electron-builder (the check is `sign === true`), and it degrades on its own
+# when there is no certificate: signDmg looks for a Developer ID, then a Mac
+# Developer identity, and returns quietly if it finds neither.
+#
+# electron-builder does NOT notarize the DMG -- it notarizes and staples the
+# .app during packing, before the disk image exists -- so the workflow
+# notarizes and staples the DMG itself afterwards. A signed but un-notarized
+# DMG is still refused by Gatekeeper on download, so the two belong together.
+dmg:
+  sign: true
