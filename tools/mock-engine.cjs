@@ -68,7 +68,29 @@ const buildLootLine = (now, index) => {
 const HEADER =
   "timestamp_utc;looted_by__alliance;looted_by__guild;looted_by__name;item_id;item_name;quantity;looted_from__alliance;looted_from__guild;looted_from__name;server__region";
 
-module.exports = { buildLootLine, HEADER, CHARACTER };
+const NET_EPOCH_TICKS = 621355968000000000;
+
+/**
+ * One `[festivities]` line, the shape the real engine's FestivitiesUpdate handler prints
+ * (raid-bot ADR 0100) — modelled on the payload RECORDED from live traffic on 2026-08-28:
+ * seasonal rows carry an EMPTY category, production rows carry `GENERAL`, and every time is
+ * .NET ticks, unconverted, because the engine reports what the wire said.
+ */
+const buildFestivitiesLine = (nowMs) => {
+  const ticks = (ms) => NET_EPOCH_TICKS + ms * 10000;
+  const day = 24 * 60 * 60 * 1000;
+  return `[festivities] ${JSON.stringify({
+    server: "europe",
+    code: 518,
+    entries: [
+      { kind: 0, category: "", uniqueName: "DRAGON_LEAD_UP_PHASE_1", startTicks: ticks(nowMs - day), endTicks: ticks(nowMs + 3 * day) },
+      { kind: 1, category: "ACTIVITIES", uniqueName: "MISTS", startTicks: ticks(nowMs), endTicks: ticks(nowMs + 2 * day) },
+      { kind: 2, category: "GENERAL", uniqueName: "COMMON_BOW", startTicks: ticks(nowMs), endTicks: ticks(nowMs + day) },
+    ],
+  })}`;
+};
+
+module.exports = { buildLootLine, HEADER, CHARACTER, buildFestivitiesLine };
 
 if (require.main === module) {
   const interval = Number(arg("interval", "2000"));
@@ -112,6 +134,8 @@ if (require.main === module) {
       detected = true;
       process.stdout.write("\tALBION DETECTED. Loot events should be logged.\n");
       process.stdout.write("\tCURRENT SERVER: Europe (Europe)\n");
+      // The rotation arrives with the session, exactly as the real event does on login.
+      process.stdout.write(`${buildFestivitiesLine(Date.now())}\n`);
     }, detectAfter);
   }
 

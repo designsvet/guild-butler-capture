@@ -25,6 +25,20 @@ export const REAL = {
    * Not seen in the recording (nothing was held) but the code can emit it.
    */
   heartbeatWithHeld: "[status] character: Bors · lines written: 4 · held: 1",
+  /**
+   * The daily bonus rotation (raid-bot ADR 0100), recorded 2026-08-28 on Europe — the FIRST
+   * real `FestivitiesUpdate`, which also confirmed the Photon event code is **518**.
+   *
+   * Ticks are verbatim, unconverted: the engine reports what the wire said, and this app's
+   * adapter is the thing that turns them into epoch milliseconds. Note the empty `category` on
+   * the seasonal rows and `GENERAL` on the production pair — neither was predicted.
+   */
+  festivities:
+    '[festivities] {"server":"europe","code":518,"entries":[' +
+    '{"kind":0,"category":"","uniqueName":"DRAGON_LEAD_UP_PHASE_1","startTicks":639187560000000000,"endTicks":639237672000000000},' +
+    '{"kind":1,"category":"ACTIVITIES","uniqueName":"MISTS","startTicks":639234216000000000,"endTicks":639236808000000000},' +
+    '{"kind":2,"category":"GENERAL","uniqueName":"COMMON_BOW","startTicks":639235080000000000,"endTicks":639235944000000000}' +
+    "]}",
 } as const;
 
 /**

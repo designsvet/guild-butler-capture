@@ -223,3 +223,62 @@ export const uploadBatch = async (
     },
   };
 };
+
+/**
+ * Post one daily-bonus rotation snapshot (raid-bot ADR 0100).
+ *
+ * A sibling of `uploadBatch`, not a mode of it: same token, same base, same outcome vocabulary
+ * — but the payload is a SNAPSHOT of server state rather than an append to this member's file,
+ * so it has no cursor, no run, and nothing to resume. A failure is simply dropped: the next
+ * login sends the rotation again, and a stale snapshot the bot already holds is worth more than
+ * a retry queue for data that refreshes itself.
+ */
+export const sendFestivities = async (
+  fetchLike: TFetchLike,
+  base: string,
+  token: string,
+  payload: {
+    server: string;
+    capturedAt: number;
+    eventCode: number;
+    entries: ReadonlyArray<{ kind: number; category: string; uniqueName: string; startMs: number; endMs: number }>;
+  },
+): Promise<TUploadResult> => {
+  let res: Awaited<ReturnType<TFetchLike>>;
+  try {
+    res = await fetchLike(`${apiBase(base)}/control/capture/festivities`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    return { outcome: EUploadOutcome.Unreachable, detail: err instanceof Error ? err.message : null };
+  }
+
+  const text = await res.text().catch(() => "");
+  const body = parseJson(text);
+  if (res.status === 401) {
+    return { outcome: EUploadOutcome.Unauthorized, detail: null };
+  }
+  if (res.status === 429) {
+    return { outcome: EUploadOutcome.RateLimited, detail: null };
+  }
+  if (isMissingEndpoint(res.status)) {
+    return { outcome: EUploadOutcome.NotDeployed, detail: String(res.status) };
+  }
+  if (res.status >= 500) {
+    return { outcome: EUploadOutcome.ServerError, detail: String(res.status) };
+  }
+  if (!res.ok) {
+    return { outcome: EUploadOutcome.Rejected, detail: typeof body?.error === "string" ? body.error : null };
+  }
+  return {
+    outcome: EUploadOutcome.Accepted,
+    reply: {
+      accepted: typeof body?.stored === "number" ? body.stored : 0,
+      duplicate: body?.superseded === true ? 1 : 0,
+      rejected: 0,
+      nextFrom: null,
+    },
+  };
+};
