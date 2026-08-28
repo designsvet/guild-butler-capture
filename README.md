@@ -184,9 +184,65 @@ member's Mac. (This paragraph asserted the opposite until the first real macOS
 run disproved it; a Linux `--dir` dry run does not reproduce the collision,
 because the copier only hard links when it can.)
 
-Auto-update stays Windows-only (`updateController.ts` gates on `win32`):
-electron-updater cannot update an app that is not Developer-ID signed, so the
-mac feed would promise what it cannot deliver.
+### Signing and notarization (macOS)
+
+The build signs and notarizes **when the secrets exist and skips when they do
+not**, with no config change either way. Absent them it behaves exactly as
+described above: ad-hoc signed, not notarized, green. The switch is
+`CSC_IDENTITY_AUTO_DISCOVERY`, set by the `Decide whether this build is
+signed` step.
+
+Repository secrets — the first two sign, the last four notarize, and the
+notarizing four are all-or-nothing:
+
+| Secret | What it is |
+| --- | --- |
+| `MAC_CSC_LINK` | The **Developer ID Application** certificate, exported from Keychain Access as a `.p12`, then base64-encoded |
+| `MAC_CSC_KEY_PASSWORD` | The password set when exporting that `.p12` |
+| `APPLE_API_KEY_B64` | An **App Store Connect API key** (`.p8`), base64-encoded |
+| `APPLE_API_KEY_ID` | That key's Key ID |
+| `APPLE_API_ISSUER` | The issuer UUID from App Store Connect |
+| `APPLE_TEAM_ID` | The 10-character Team ID |
+
+An API key rather than an Apple ID and app-specific password: the key does not
+break when the account's password or 2FA changes, and it carries no access to
+anything but notarization.
+
+Three behaviours worth knowing before reading a build log:
+
+- **`MAC_CSC_LINK` alone signs but does not notarize**, and the job says so
+  with a warning. A signed-but-un-notarized app is still refused by Gatekeeper,
+  so that state is a stop, not a step forward.
+- **Pull request builds never sign**, whatever the secrets say —
+  electron-builder's `isSignAllowed()` refuses on PRs unless
+  `CSC_FOR_PULL_REQUEST` is set. The signed path can only be exercised by a
+  push to `main`, so expect a PR build to report `Signature=adhoc`.
+- **A mangled key fails immediately.** The prepare step checks the decoded
+  `.p8` really begins with `BEGIN PRIVATE KEY`, rather than letting
+  `notarytool` discover it a quarter of an hour later.
+
+What the build then does, in order: electron-builder signs every nested Mach-O
+with the hardened runtime (its default for non-MAS mac builds) — including the
+engine's `cap.node`, because `@electron/osx-sign` walks the whole of
+`Contents/`, not just the app's own code — notarizes the `.app` and staples the
+ticket to it, then builds and signs the DMG. The workflow notarizes and staples
+the **DMG** separately afterwards, because electron-builder cannot: it
+notarizes during packing, before a disk image exists, and Gatekeeper checks the
+file the member actually downloaded.
+
+`spctl --assess` is asserted, not printed. It is the only check that answers
+the member's real question — will this open without a fight — and it passes
+only for a Developer ID signature *with* a ticket. A signed-but-rejected build
+is identical to a good one in every other line of the log.
+
+Auto-update is still Windows-only (`updateController.ts` gates on `win32`),
+but the reason has changed. It was that electron-updater cannot update an app
+that is not Developer ID signed, so a mac feed would have promised what it
+could not deliver. Once a notarized release exists that objection is gone and
+the remaining work is real but ordinary: publish the `zip` target the base
+config already declares, let electron-builder emit `latest-mac.yml`, and drop
+the platform gate. Not done here, because a feed is worth building against a
+release that has actually been notarized once.
 
 ### Cutting a release
 
