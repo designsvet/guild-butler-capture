@@ -153,10 +153,22 @@ compiled for both arches on one runner, and cross-compiling a libpcap binding
 costs more than the shrinking audience is worth.
 
 The DMG is **ad-hoc signed, not notarized** — there is no Developer ID yet
-(Q16). Ad-hoc is not optional on Apple Silicon, where an unsigned binary will
-not launch at all; what it does not buy is Gatekeeper's blessing, so the first
-launch needs **right-click → Open** (or System Settings → Privacy & Security →
-Open Anyway). The download page says so.
+(Q16). Ad-hoc is not optional on Apple Silicon, where the kernel requires a
+valid signature to execute; what it does not buy is Gatekeeper's blessing, so
+the first launch needs **right-click → Open** (or System Settings → Privacy &
+Security → Open Anyway). The download page says so.
+
+That ad-hoc signature comes from the `afterPack` hook in
+`tools/adhoc-sign.cjs`, and it is worth knowing why it is a hook rather than a
+config line. `mac.identity: null` was believed to request ad-hoc signing. It
+does not — app-builder-lib reads it and skips signing entirely, logging
+`skipped macOS code signing  reason=identity explicitly is set to null`, and
+nothing else in electron-builder ad-hoc signs. Electron's prebuilt binaries do
+arrive ad-hoc signed, but electron-builder renames the bundle and its
+executable, rewrites `Info.plist` and adds `Contents/Resources`, which
+invalidates that seal. The first macOS build on `main` shipped exactly that
+bundle. The hook signs and then **verifies**, because an ad-hoc sign that
+fails silently restores the original bug with a green build either way.
 
 Two things the CI asserts, because neither fails the build on its own and both
 would only surface on a member's Mac: the engine is really inside
