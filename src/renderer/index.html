@@ -72,7 +72,7 @@
            the log rain. The whole zone flexes so the window never resizes. -->
       <section id="hero" class="hero">
         <canvas id="rain-canvas" class="rain-canvas" aria-hidden="true"></canvas>
-        <div class="hero-stack">
+        <div id="hero-stack" class="hero-stack">
           <span class="status-chip">
             <span id="status-dot" class="status-dot" data-status="idle" aria-hidden="true"></span>
             <span id="status-label" class="status-label">Not capturing</span>
@@ -96,11 +96,10 @@
             <ul id="waiting-hints-list"></ul>
           </div>
         </div>
+        <div class="cta-row">
+          <button id="btn-primary" class="primary" data-mode="start">Start capture</button>
+        </div>
       </section>
-
-      <div class="cta-row">
-        <button id="btn-primary" class="primary" data-mode="start">Start capture</button>
-      </div>
 
       <!-- The bottom slot: pairing. One card, two exclusive faces. -->
       <section id="pairing-panel" class="card pairing-card">
@@ -153,6 +152,7 @@
               </svg>
             </button>
           </div>
+          <!-- Opens as an overlay ABOVE the row — the fixed window never re-flows. -->
           <div id="pairing-details" class="pair-details" hidden>
             <label class="switch-row" for="pairing-upload-toggle">
               <span class="switch">

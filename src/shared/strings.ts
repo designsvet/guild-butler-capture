@@ -90,6 +90,8 @@ const EN = {
   buttons: {
     start: "Start capture",
     stop: "Stop capture",
+    starting: "Starting…",
+    stopping: "Stopping…",
     reveal: "Reveal",
     revealMac: "Reveal in Finder",
     revealWin: "Show in Explorer",
@@ -313,6 +315,8 @@ const UK: TStrings = {
   buttons: {
     start: "Почати запис",
     stop: "Зупинити запис",
+    starting: "Запускаємо…",
+    stopping: "Зупиняємо…",
     reveal: "Показати",
     revealMac: "Показати у Finder",
     revealWin: "Показати у Провіднику",
@@ -513,6 +517,8 @@ const RU: TStrings = {
   buttons: {
     start: "Начать запись",
     stop: "Остановить запись",
+    starting: "Запускаем…",
+    stopping: "Останавливаем…",
     reveal: "Показать",
     revealMac: "Показать в Finder",
     revealWin: "Показать в Проводнике",
@@ -714,6 +720,8 @@ const DE: TStrings = {
   buttons: {
     start: "Aufzeichnung starten",
     stop: "Aufzeichnung stoppen",
+    starting: "Wird gestartet…",
+    stopping: "Wird gestoppt…",
     reveal: "Anzeigen",
     revealMac: "Im Finder anzeigen",
     revealWin: "Im Explorer anzeigen",
@@ -920,6 +928,8 @@ const FR: TStrings = {
   buttons: {
     start: "Démarrer la capture",
     stop: "Arrêter la capture",
+    starting: "Démarrage…",
+    stopping: "Arrêt…",
     reveal: "Afficher",
     revealMac: "Afficher dans le Finder",
     revealWin: "Afficher dans l'Explorateur",
@@ -1125,6 +1135,8 @@ const PT: TStrings = {
   buttons: {
     start: "Iniciar captura",
     stop: "Parar captura",
+    starting: "Iniciando…",
+    stopping: "Parando…",
     reveal: "Mostrar",
     revealMac: "Mostrar no Finder",
     revealWin: "Mostrar no Explorer",

@@ -90,6 +90,7 @@ const el = <T extends HTMLElement>(id: string): T => {
 
 const ui = {
   hero: el<HTMLElement>("hero"),
+  heroStack: el<HTMLDivElement>("hero-stack"),
   rainCanvas: el<HTMLCanvasElement>("rain-canvas"),
   statusDot: el<HTMLSpanElement>("status-dot"),
   statusLabel: el<HTMLSpanElement>("status-label"),
@@ -310,6 +311,66 @@ const show = (element: HTMLElement, visible: boolean): void => {
   element.classList.toggle("hidden", !visible);
 };
 
+// --- the primary CTA ----------------------------------------------------------
+//
+// The button flips identity (Start <-> Stop) the moment the engine answers, and
+// with the cursor still resting on it from the press, the NEW mode's hover lit
+// instantly — read as flicker. Two mechanisms calm it: while the engine is in
+// transit the button goes data-busy (pointer-events off, an in-between label),
+// and when the flip lands a short .settle grace holds hover off until the
+// cursor has had a beat to be a cursor again. Writes are change-only because
+// render() runs on a 1s clock — rewriting identical text would restart any
+// in-flight CSS transition every tick.
+
+/** Hover stays off this long after Start<->Stop swap under the cursor. */
+const PRIMARY_SETTLE_MS = 350;
+
+let primaryLast = { text: "", mode: "", busy: false };
+let primarySettleTimer: number | null = null;
+
+const syncPrimary = (status: ECaptureStatus): void => {
+  const busy = status === ECaptureStatus.Starting || status === ECaptureStatus.Stopping;
+  const stoppedish = status === ECaptureStatus.Idle || status === ECaptureStatus.Error;
+  const text = busy
+    ? status === ECaptureStatus.Starting
+      ? STR.buttons.starting
+      : STR.buttons.stopping
+    : stoppedish
+      ? STR.buttons.start
+      : STR.buttons.stop;
+  // Restarting keeps mode "stop" and stays clickable — the crash-backoff loop
+  // must remain stoppable, so it is deliberately NOT busy.
+  const mode = stoppedish ? "start" : "stop";
+
+  if (primaryLast.busy && !busy) {
+    // The flip just landed: hold hover off for a beat.
+    ui.primaryBtn.classList.add("settle");
+    if (primarySettleTimer != null) {
+      window.clearTimeout(primarySettleTimer);
+    }
+    primarySettleTimer = window.setTimeout(() => {
+      ui.primaryBtn.classList.remove("settle");
+      primarySettleTimer = null;
+    }, PRIMARY_SETTLE_MS);
+  }
+
+  if (text !== primaryLast.text) {
+    ui.primaryBtn.textContent = text;
+  }
+  if (mode !== primaryLast.mode) {
+    ui.primaryBtn.dataset.mode = mode;
+  }
+  if (busy !== primaryLast.busy) {
+    if (busy) {
+      ui.primaryBtn.dataset.busy = "true";
+    } else {
+      delete ui.primaryBtn.dataset.busy;
+    }
+    ui.primaryBtn.setAttribute("aria-busy", String(busy));
+  }
+  primaryLast = { text, mode, busy };
+};
+
 const render = (): void => {
   if (state == null) {
     return;
@@ -348,10 +409,7 @@ const render = (): void => {
   ui.statFile.title = s.logFile ?? "";
   ui.revealBtn.disabled = s.logFile == null;
 
-  const stoppedish = s.status === ECaptureStatus.Idle || s.status === ECaptureStatus.Error;
-  ui.primaryBtn.textContent = stoppedish ? STR.buttons.start : STR.buttons.stop;
-  ui.primaryBtn.dataset.mode = stoppedish ? "start" : "stop";
-  ui.primaryBtn.disabled = s.status === ECaptureStatus.Stopping;
+  syncPrimary(s.status);
 
   // Error panel with its contextual fix actions.
   const isError = s.status === ECaptureStatus.Error;
@@ -415,8 +473,10 @@ const render = (): void => {
     show(ui.setupFixNote, setupNote.length > 0);
   }
 
-  // Fix cards replace the greeting zone — both never fight for the same room.
-  show(ui.hero, !isError && !showSetup);
+  // Fix cards replace the GREETING, not the zone: the hero section stays (it
+  // owns the flex space and, since round 6, the CTA) and only the stack hides —
+  // otherwise an error would take the Start/Stop button down with it.
+  show(ui.heroStack, !isError && !showSetup);
 
   ui.advEngine.textContent = setup?.engineRoot ?? STR.advanced.engineNotFound;
   // The build time answers "am I looking at the code I just built?" — the
@@ -438,10 +498,12 @@ const refreshSetup = async (): Promise<void> => {
 
 // --- the log rain (cosmetic, cheap by construction) ---------------------------
 //
-// One canvas, the session's flavor of loot lines drifting upward at ~12 fps.
-// Runs ONLY while capturing, pauses when the window blurs or hides, and is off
-// entirely under prefers-reduced-motion — the effect exists when someone is
-// actually looking at a live session, and never costs a frame anywhere else.
+// One canvas, the session's flavor of loot lines behind the greeting. Since
+// round 6 it is ALWAYS there as a still image (half strength), and capture is
+// what sets it in motion: the ~12 fps drift runs only while Capturing with the
+// window focused and visible, and never under prefers-reduced-motion — those
+// keep the still frame, so the texture survives without costing a frame. When
+// a fix card replaces the greeting the canvas goes dark entirely.
 
 const RAIN_POOL = [
   "3× Rugged Hide",
@@ -472,12 +534,17 @@ const RAIN_POOL = [
 
 type TRainColumn = { x: number; y: number; speed: number; dim: boolean; items: string[] };
 
-const rain = ((): { sync: (active: boolean) => void; restyle: () => void } => {
+type TRainMode = "off" | "still" | "drift";
+
+const rain = ((): { sync: (mode: TRainMode) => void; restyle: () => void } => {
   const canvas = ui.rainCanvas;
   const ctx = canvas.getContext("2d");
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
   let columns: TRainColumn[] = [];
   let timer: number | null = null;
+  let mode: TRainMode = "off";
+  /** The size the columns were laid out for — a mismatch means re-layout. */
+  let laidW = 0;
+  let laidH = 0;
   let color = "rgba(230, 195, 108, 0.16)";
   let colorDim = "rgba(230, 195, 108, 0.10)";
   const LINE_H = 30;
@@ -493,6 +560,8 @@ const rain = ((): { sync: (active: boolean) => void; restyle: () => void } => {
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
+    laidW = w;
+    laidH = h;
     if (w === 0 || h === 0) {
       columns = [];
       return;
@@ -515,7 +584,7 @@ const rain = ((): { sync: (active: boolean) => void; restyle: () => void } => {
     });
   };
 
-  const step = (): void => {
+  const draw = (): void => {
     if (ctx == null) {
       return;
     }
@@ -524,11 +593,7 @@ const rain = ((): { sync: (active: boolean) => void; restyle: () => void } => {
     ctx.clearRect(0, 0, w, h);
     ctx.font = '10px "JetBrains Mono", ui-monospace, monospace';
     for (const col of columns) {
-      col.y -= col.speed;
       const span = col.items.length * LINE_H + 120;
-      if (col.y < -span) {
-        col.y += span;
-      }
       ctx.fillStyle = col.dim ? colorDim : color;
       // Draw two stacked copies so the wrap is seamless.
       for (let pass = 0; pass < 2; pass += 1) {
@@ -544,49 +609,100 @@ const rain = ((): { sync: (active: boolean) => void; restyle: () => void } => {
     }
   };
 
-  const start = (): void => {
-    if (timer != null) {
-      return;
+  const advance = (): void => {
+    for (const col of columns) {
+      col.y -= col.speed;
+      const span = col.items.length * LINE_H + 120;
+      if (col.y < -span) {
+        col.y += span;
+      }
     }
-    readColors();
-    layout();
-    timer = window.setInterval(step, TICK_MS);
   };
 
-  const stop = (): void => {
+  const stopTimer = (): void => {
     if (timer != null) {
       window.clearInterval(timer);
       timer = null;
     }
-    ctx?.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
   };
 
-  const sync = (active: boolean): void => {
-    const shouldRun = active && !document.hidden && document.hasFocus() && !reduced.matches;
-    if (shouldRun) {
-      start();
+  const sync = (next: TRainMode): void => {
+    // The 1s render clock calls this every tick; same mode + same size is a
+    // no-op so a still frame is painted once, not sixty times a minute.
+    const resized = canvas.clientWidth !== laidW || canvas.clientHeight !== laidH;
+    if (next === mode && !resized) {
+      return;
+    }
+    mode = next;
+    if (next === "off") {
+      stopTimer();
+      ctx?.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+      return;
+    }
+    readColors();
+    if (resized || columns.length === 0) {
+      layout();
+    }
+    if (next === "drift") {
+      if (timer == null) {
+        timer = window.setInterval(() => {
+          advance();
+          draw();
+        }, TICK_MS);
+      }
+      draw(); // first frame now, not a tick later
     } else {
-      stop();
+      stopTimer();
+      draw(); // the still image
     }
   };
 
-  reduced.addEventListener?.("change", () => {
-    sync(state?.status === ECaptureStatus.Capturing);
-  });
-
-  return { sync, restyle: readColors };
+  return {
+    sync,
+    // Theme swaps (and the mono font arriving) repaint in place; while
+    // drifting the next tick would repaint anyway, but a still frame would
+    // keep the old ink forever without this.
+    restyle: (): void => {
+      readColors();
+      if (mode !== "off") {
+        draw();
+      }
+    },
+  };
 })();
 
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
 const syncRain = (): void => {
-  rain.sync(state?.status === ECaptureStatus.Capturing && !ui.hero.classList.contains("hidden"));
+  // No greeting (a fix card took its place) — no rain at all.
+  if (ui.heroStack.classList.contains("hidden")) {
+    rain.sync("off");
+    return;
+  }
+  const drifting =
+    state?.status === ECaptureStatus.Capturing && !document.hidden && document.hasFocus() && !reducedMotion.matches;
+  rain.sync(drifting ? "drift" : "still");
 };
 
+reducedMotion.addEventListener?.("change", () => {
+  syncRain();
+});
 document.addEventListener("visibilitychange", syncRain);
 window.addEventListener("blur", syncRain);
+// The still frame paints before the mono font loads on a cold start; repaint
+// once the real glyphs are in.
+void document.fonts.ready.then(() => {
+  rain.restyle();
+});
 
 // --- wiring ------------------------------------------------------------------
 
 ui.primaryBtn.addEventListener("click", () => {
+  // pointer-events already blocks the mouse while busy; this catches keyboard
+  // activation, which CSS cannot.
+  if (ui.primaryBtn.dataset.busy === "true") {
+    return;
+  }
   if (ui.primaryBtn.dataset.mode === "start") {
     void gbc.start();
   } else {
@@ -758,6 +874,9 @@ const renderPairing = (): void => {
     return;
   }
 
+  // The details overlay belongs to the connected face; leaving that face
+  // (unpair) closes it so a later re-pair starts clean.
+  setPairDetails(false);
   ui.pairTitle.textContent = STR.pairing.title;
   ui.pairIntro.textContent = STR.pairing.intro;
   ui.pairStep1.textContent = STR.pairing.step1;
@@ -824,10 +943,22 @@ ui.viewLootBtn.addEventListener("click", () => {
   void gbc.openLoot();
 });
 
-ui.pairMore.addEventListener("click", () => {
-  const open = ui.pairDetails.hidden;
+// The details are an overlay above the row (the fixed window never re-flows),
+// so they close like one: outside click, Escape, or the chevron again.
+const setPairDetails = (open: boolean): void => {
   ui.pairDetails.hidden = !open;
   ui.pairMore.setAttribute("aria-expanded", String(open));
+};
+
+ui.pairMore.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setPairDetails(ui.pairDetails.hidden);
+});
+
+document.addEventListener("click", (event) => {
+  if (!ui.pairDetails.hidden && !ui.pairDetails.contains(event.target as Node)) {
+    setPairDetails(false);
+  }
 });
 
 // Copy feedback clears itself; a second click restarts the clock.
@@ -1007,6 +1138,10 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     if (!ui.langMenu.hidden) {
       setLangOpen(false);
+      return;
+    }
+    if (!ui.pairDetails.hidden) {
+      setPairDetails(false);
       return;
     }
     setPopover(false);
