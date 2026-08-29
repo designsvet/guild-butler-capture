@@ -23,10 +23,19 @@ import {
   ERestartRefusal,
   EUpdatePhase,
   initialUpdateStatus,
+  type TAppSettings,
   type TRestartResult,
   type TUpdateStatus,
 } from "../shared/captureTypes.js";
-import { STR } from "../shared/strings.js";
+import { detectLang } from "../shared/i18n.js";
+import { stringsFor } from "../shared/strings.js";
+
+// The OS decides the language, once, at boot. navigator.language in an
+// Electron renderer follows the system locale; the binding keeps the name STR
+// so every call site below reads exactly as it did when there was one catalog.
+const LANG = detectLang(navigator.language);
+const STR = stringsFor(LANG);
+document.documentElement.lang = LANG;
 
 type TGbc = {
   platform: string;
@@ -49,6 +58,8 @@ type TGbc = {
   getUpdate: () => Promise<TUpdateStatus>;
   updateRestart: () => Promise<TRestartResult>;
   onUpdate: (listener: (status: TUpdateStatus) => void) => () => void;
+  getSettings: () => Promise<TAppSettings>;
+  setAutoCapture: (enabled: boolean) => Promise<TAppSettings>;
 };
 
 const gbc = (window as unknown as { gbc: TGbc }).gbc;
@@ -109,6 +120,16 @@ const ui = {
   pairUploadLabel: el<HTMLSpanElement>("pairing-upload-label"),
   viewLootBtn: el<HTMLButtonElement>("btn-view-loot"),
   unpairBtn: el<HTMLButtonElement>("btn-unpair"),
+  tagline: el<HTMLParagraphElement>("app-tagline"),
+  statCharacterLabel: el<HTMLSpanElement>("stat-character-label"),
+  statLootLabel: el<HTMLSpanElement>("stat-loot-label"),
+  statTrafficLabel: el<HTMLSpanElement>("stat-traffic-label"),
+  statFileLabel: el<HTMLSpanElement>("stat-file-label"),
+  errorDetailsSummary: el<HTMLElement>("error-details-summary"),
+  advSummary: el<HTMLElement>("adv-summary"),
+  advEngineLabel: el<HTMLSpanElement>("adv-engine-label"),
+  autoToggle: el<HTMLInputElement>("auto-capture-toggle"),
+  autoLabel: el<HTMLSpanElement>("auto-capture-label"),
 };
 
 let state: TCaptureState | null = null;
@@ -436,6 +457,19 @@ ui.errorInstallNpcap.textContent = STR.buttons.installNpcap;
 ui.setupGetNpcap.textContent = STR.buttons.getNpcap;
 ui.errorGetNpcap.textContent = STR.buttons.getNpcap;
 ui.footer.textContent = STR.footer.engineCredit;
+ui.tagline.textContent = STR.tagline;
+ui.statCharacterLabel.textContent = STR.stats.character;
+ui.statLootLabel.textContent = STR.stats.loot;
+ui.statTrafficLabel.textContent = STR.stats.traffic;
+ui.statFileLabel.textContent = STR.stats.logFile;
+ui.errorDetailsSummary.textContent = STR.buttons.details;
+ui.advSummary.textContent = STR.advanced.summary;
+ui.advEngineLabel.textContent = STR.advanced.engineLabel;
+ui.autoLabel.textContent = STR.prefs.autoCapture;
+ui.errorFixMac.textContent = STR.buttons.fixMacPermissions;
+ui.setupFixMac.textContent = STR.buttons.fixMacPermissions;
+ui.errorChooseEngine.textContent = STR.buttons.chooseEngine;
+ui.advChoose.textContent = STR.buttons.chooseEngine;
 ui.revealBtn.textContent =
   gbc.platform === "darwin"
     ? STR.buttons.revealMac
@@ -578,6 +612,7 @@ const updateEls = {
   note: el<HTMLParagraphElement>("update-note"),
 };
 let update: TUpdateStatus = initialUpdateStatus;
+updateEls.restart.textContent = STR.update.restartNow;
 
 const renderUpdate = (): void => {
   const u = update;
@@ -626,9 +661,41 @@ gbc.onState((next) => {
   render();
 });
 
+// --- auto-capture (default ON) ------------------------------------------------
+
+/**
+ * Auto-start goes through the exact same path as the button, once per window.
+ * If permissions are missing the start lands on the fix card — which on a
+ * first run is the right first thing to see, and better than a button the
+ * member has to press to discover it. A member who pressed Stop is not
+ * re-started (the flag), and a reopened window over an already-running
+ * capture starts nothing (the Idle check).
+ */
+let autoStartDone = false;
+
+const maybeAutoStart = (settings: TAppSettings): void => {
+  ui.autoToggle.checked = settings.autoCapture;
+  if (autoStartDone || !settings.autoCapture) {
+    return;
+  }
+  autoStartDone = true;
+  if (state?.status === ECaptureStatus.Idle) {
+    void gbc.start();
+  }
+};
+
+ui.autoToggle.addEventListener("change", () => {
+  void gbc.setAutoCapture(ui.autoToggle.checked).then((settings) => {
+    ui.autoToggle.checked = settings.autoCapture;
+  });
+});
+
 void gbc.getState().then((initial) => {
   state = initial;
   render();
+  // Settings are read AFTER the first state snapshot on purpose: the Idle
+  // check above needs to know whether something is already running.
+  void gbc.getSettings().then(maybeAutoStart);
 });
 void refreshSetup();
 

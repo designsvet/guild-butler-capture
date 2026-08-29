@@ -37,6 +37,12 @@ export type TSettings = {
   pairing?: TPairing;
   /** Auto-upload while capturing. Default ON (owner ruling, 2026-08-20). */
   uploadEnabled?: boolean;
+  /**
+   * Start capture as soon as the app opens. Default ON (owner ask,
+   * 2026-08-29): the app exists to be forgotten about — open it, play. Read
+   * as `!== false` at use sites so absence means on, like uploadEnabled.
+   */
+  autoCapture?: boolean;
 };
 
 /**
@@ -90,6 +96,9 @@ export const loadSettings = (file: string): TSettings => {
     }
     if (typeof raw.uploadEnabled === "boolean") {
       out.uploadEnabled = raw.uploadEnabled;
+    }
+    if (typeof raw.autoCapture === "boolean") {
+      out.autoCapture = raw.autoCapture;
     }
     const pairing = readPairing(raw.pairing);
     if (pairing != null) {

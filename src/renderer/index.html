@@ -7,15 +7,21 @@
       content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
     />
     <title>Guild Butler Capture</title>
+    <link rel="stylesheet" href="./fonts.css" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <!-- English in the markup is the no-JS fallback; the renderer overwrites
+         every string at boot from the OS-language catalog. -->
     <header class="app-header">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">⚔️</div>
-        <div>
-          <h1>Guild Butler Capture</h1>
-          <p class="tagline">Albion loot logging for your guild — no terminal required.</p>
+        <img class="brand-mark" src="./crest.png" alt="" width="44" height="44" />
+        <div class="brand-text">
+          <div class="brand-name-row">
+            <h1 class="brand-name">Guild Butler</h1>
+            <span class="brand-eyebrow">Capture</span>
+          </div>
+          <p id="app-tagline" class="tagline">Albion loot logging for your guild — no terminal required.</p>
         </div>
       </div>
       <span id="app-version" class="version"></span>
@@ -51,7 +57,7 @@
         </div>
         <p id="error-fix-note" class="fix-note hidden"></p>
         <details id="error-details" class="hidden">
-          <summary>Technical details</summary>
+          <summary id="error-details-summary">Technical details</summary>
           <pre id="error-detail-text"></pre>
         </details>
       </section>
@@ -69,29 +75,38 @@
         <p id="setup-fix-note" class="fix-note hidden"></p>
       </section>
 
-      <section class="card stats-card">
-        <dl class="stats">
-          <div class="stat">
-            <dt>Character</dt>
-            <dd id="stat-character">—</dd>
-          </div>
-          <div class="stat">
-            <dt>Loot events this session</dt>
-            <dd id="stat-loot">0</dd>
-          </div>
-          <div class="stat">
-            <dt>Albion traffic</dt>
-            <dd id="stat-traffic">not seen yet</dd>
-          </div>
-          <div class="stat stat-file">
-            <dt>Log file</dt>
-            <dd class="file-row">
-              <span id="stat-file" class="file-name"></span>
-              <button id="btn-reveal" class="btn small" disabled>Reveal</button>
-            </dd>
-          </div>
-        </dl>
+      <section class="stats-grid" aria-label="session">
+        <div class="card stat-tile">
+          <span id="stat-character-label" class="stat-label">Character</span>
+          <span id="stat-character" class="stat-value">—</span>
+        </div>
+        <div class="card stat-tile stat-tile-loot">
+          <span id="stat-loot-label" class="stat-label">Loot events this session</span>
+          <span id="stat-loot" class="stat-value stat-value-big">0</span>
+        </div>
+        <div class="card stat-tile">
+          <span id="stat-traffic-label" class="stat-label">Albion traffic</span>
+          <span id="stat-traffic" class="stat-value">not seen yet</span>
+        </div>
       </section>
+
+      <section class="card file-card">
+        <span id="stat-file-label" class="stat-label">Log file</span>
+        <div class="file-row">
+          <span id="stat-file" class="file-name"></span>
+          <button id="btn-reveal" class="btn small" disabled>Reveal</button>
+        </div>
+      </section>
+
+      <button id="btn-primary" class="primary" data-mode="start">Start capture</button>
+
+      <label class="switch-row" for="auto-capture-toggle">
+        <span class="switch">
+          <input id="auto-capture-toggle" type="checkbox" checked />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+        <span id="auto-capture-label" class="switch-label">Start capturing when the app opens</span>
+      </label>
 
       <section id="pairing-panel" class="card">
         <p id="pairing-title" class="pairing-title"></p>
@@ -118,25 +133,24 @@
         <div id="pairing-connected" class="hidden">
           <p id="pairing-as" class="pairing-as"></p>
           <p id="pairing-upload-status" class="status-hint"></p>
-          <div class="pairing-row">
-            <label class="pairing-toggle">
+          <label class="switch-row" for="pairing-upload-toggle">
+            <span class="switch">
               <input id="pairing-upload-toggle" type="checkbox" checked />
-              <span id="pairing-upload-label"></span>
-            </label>
-          </div>
-          <div class="error-actions">
+              <span class="switch-track" aria-hidden="true"></span>
+            </span>
+            <span id="pairing-upload-label" class="switch-label"></span>
+          </label>
+          <div class="actions">
             <button id="btn-view-loot" class="btn small"></button>
             <button id="btn-unpair" class="btn small"></button>
           </div>
         </div>
       </section>
 
-      <button id="btn-primary" class="primary" data-mode="start">Start capture</button>
-
       <details class="advanced">
-        <summary>Advanced</summary>
+        <summary id="adv-summary">Advanced</summary>
         <div class="advanced-row">
-          <span class="advanced-label">Engine</span>
+          <span id="adv-engine-label" class="advanced-label">Engine</span>
           <span id="adv-engine-path" class="advanced-value"></span>
           <button id="btn-choose-engine" class="btn small">Choose engine folder…</button>
         </div>

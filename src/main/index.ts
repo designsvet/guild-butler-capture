@@ -41,6 +41,7 @@ import {
   type TPairAttempt,
   type TPairingStatus,
   type TSetupStatus,
+  type TAppSettings,
 } from "../shared/captureTypes.js";
 import { defaultDeviceName, isValidPairCodeShape, normalizePairCode } from "../shared/pairing.js";
 import { IPC, NPCAP_URL } from "../shared/ipc.js";
@@ -58,6 +59,8 @@ import {
 import { installNpcap, parseSignatureOutput, type TSignatureCheck } from "./platform/npcapInstall.js";
 import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpcap.js";
 import { loadSettings, saveSettings, settingsFilePath } from "./settings.js";
+import { detectLang } from "../shared/i18n.js";
+import { stringsFor } from "../shared/strings.js";
 import { decryptToken, encryptPairing, EStoreOutcome } from "./pairingStore.js";
 import { apiBase, EPairOutcome, pairDevice, sendFestivities } from "./uploadClient.js";
 import electronUpdater from "electron-updater";
@@ -469,11 +472,13 @@ const describeBpfDevices = async (): Promise<string> => {
 
 const createWindow = (): void => {
   win = new BrowserWindow({
-    width: 620,
-    height: 720,
-    minWidth: 480,
-    minHeight: 560,
-    backgroundColor: "#14161b",
+    width: 660,
+    height: 780,
+    minWidth: 560,
+    minHeight: 620,
+    // Matches --gb-bg so the flash before first paint is the brand ground,
+    // not a grey rectangle.
+    backgroundColor: "#0a0a0c",
     title: "Guild Butler Capture",
     webPreferences: {
       preload: join(APP_ROOT, "dist", "preload", "index.cjs"),
@@ -494,13 +499,16 @@ const createWindow = (): void => {
       return;
     }
     event.preventDefault();
+    // The one main-process surface with words on it follows the OS language
+    // like the window does; app.getLocale() is settled by this point.
+    const qc = stringsFor(detectLang(app.getLocale())).quitConfirm;
     const choice = dialog.showMessageBoxSync(win as BrowserWindow, {
       type: "question",
-      buttons: ["Stop and quit", "Keep capturing"],
+      buttons: [qc.quit, qc.cancel],
       defaultId: 1,
       cancelId: 1,
-      title: "Stop capturing?",
-      message: "Capture is still running. Quit and stop logging loot?",
+      title: qc.title,
+      message: qc.message,
     });
     if (choice === 0) {
       quitConfirmed = true;
@@ -668,6 +676,14 @@ const registerIpc = (): void => {
     return { setup: await getSetup(), install };
   });
 
+  ipcMain.handle(IPC.settingsGet, (): TAppSettings => {
+    return { autoCapture: loadSettings(SETTINGS_FILE).autoCapture !== false };
+  });
+  ipcMain.handle(IPC.settingsSetAutoCapture, (_event, enabled: unknown): TAppSettings => {
+    const settings = loadSettings(SETTINGS_FILE);
+    saveSettings(SETTINGS_FILE, { ...settings, autoCapture: enabled !== false });
+    return { autoCapture: enabled !== false };
+  });
   ipcMain.handle(IPC.updateGet, () => updates.status());
   ipcMain.handle(IPC.updateRestart, () => updates.restartNow());
   ipcMain.handle(IPC.pairingGet, () => pairingStatus());

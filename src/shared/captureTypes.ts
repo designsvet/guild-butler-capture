@@ -291,3 +291,9 @@ export enum ERestartRefusal {
 }
 
 export type TRestartResult = { ok: true } | { ok: false; reason: ERestartRefusal };
+
+/** Renderer-visible app settings (IPC `settings:get` / `settings:set-auto-capture`). */
+export type TAppSettings = {
+  /** Start capture as soon as the app opens. Default ON. */
+  autoCapture: boolean;
+};

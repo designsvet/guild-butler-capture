@@ -67,6 +67,30 @@ extracted (its own repo):          staged (inside the Raid-Bot repo):
 
 Any other location: Advanced → “Choose engine folder…” in the app.
 
+## Languages & appearance
+
+The app speaks the bot's six languages — English, Українська, Русский,
+Deutsch, Français, Português — and follows the **operating system's** language
+with no picker: `detectLang` reads the OS locale and anything unrecognised
+falls back to English. Catalogs live in `src/shared/strings.ts`, where every
+language is type-checked against the English shape, so a missing key anywhere
+is a compile error rather than a runtime fallback. Same provenance caveat as
+the bot: EN and UK are written with care, the rest are machine-quality and
+welcome a native proofread.
+
+The screen itself is the Guild Butler design system — the dashboard's token
+layer (`styles.css` carries the same `--gb-*` names and values) with the three
+brand fonts **bundled** as woff2 subsets (latin + latin-ext + cyrillic, OFL
+licences beside the files in `src/renderer/fonts/`). Bundled rather than
+fetched because the CSP forbids remote anything and a capture tool must render
+identically offline.
+
+**Capture starts by itself when the app opens** (default on — the app exists
+to be forgotten about; open it, play). The toggle under the Start button turns
+that off, persisted in `settings.json` as `autoCapture`. Auto-start goes
+through exactly the button's code path, so a machine with permissions missing
+lands on the fix card — which on a first run is the right first thing to see.
+
 ## Development
 
 Every command runs from INSIDE this folder (while staged, that is

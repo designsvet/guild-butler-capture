@@ -30,6 +30,8 @@ const CH = {
   updateGet: "update:get",
   updateRestart: "update:restart",
   updateChanged: "update:changed",
+  settingsGet: "settings:get",
+  settingsSetAutoCapture: "settings:set-auto-capture",
 } as const;
 
 export type TGbcBridge = {
@@ -53,6 +55,8 @@ export type TGbcBridge = {
   getUpdate: () => Promise<unknown>;
   updateRestart: () => Promise<unknown>;
   onUpdate: (listener: (status: unknown) => void) => () => void;
+  getSettings: () => Promise<unknown>;
+  setAutoCapture: (enabled: boolean) => Promise<unknown>;
 };
 
 const bridge: TGbcBridge = {
@@ -91,6 +95,8 @@ const bridge: TGbcBridge = {
   },
   getUpdate: () => ipcRenderer.invoke(CH.updateGet),
   updateRestart: () => ipcRenderer.invoke(CH.updateRestart),
+  getSettings: () => ipcRenderer.invoke(CH.settingsGet),
+  setAutoCapture: (enabled) => ipcRenderer.invoke(CH.settingsSetAutoCapture, enabled),
   onUpdate: (listener) => {
     const wrapped = (_event: unknown, status: unknown): void => {
       listener(status);

@@ -42,6 +42,10 @@ export const IPC = {
   updateRestart: "update:restart",
   /** main → renderer. TUpdateStatus on every change. */
   updateChanged: "update:changed",
+  /** invoke → TAppSettings. The renderer-visible settings (auto-capture). */
+  settingsGet: "settings:get",
+  /** invoke(enabled) → TAppSettings. Persist the auto-capture toggle. */
+  settingsSetAutoCapture: "settings:set-auto-capture",
 } as const;
 
 export const NPCAP_URL = "https://npcap.com/#download";
