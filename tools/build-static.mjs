@@ -29,7 +29,11 @@ cpSync(join(root, "src", "renderer"), dest, {
   filter: (src) => !src.endsWith(".ts"),
 });
 
-cpSync(join(root, "resources", "icons", "icon-256.png"), join(dest, "crest.png"));
+// The header mark is the crest WITHOUT the app-tile ring and background —
+// `website/guild-butler-capture-mark-1024.png` from the owner's icon set,
+// downscaled once and committed. The app/dock icon keeps the full tile; this
+// one sits on the app's own titlebar, where a second border reads as a sticker.
+cpSync(join(root, "resources", "icons", "crest-mark.png"), join(dest, "crest.png"));
 
 // Stamp the build so the window and the app log can say WHICH build is
 // running — package.json's version is static across dev builds, and the first
