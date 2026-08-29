@@ -204,7 +204,21 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           pnpm build
-          pnpm exec electron-builder --win --config electron-builder.win-ci.yml --publish never
+          # electron-builder fetches the ~100 MB Electron zip from GitHub's
+          # release CDN on every run, uncached, and a 504 from that CDN kills
+          # the whole packaging step — it happened on this PR with every line
+          # of the build itself already green. app-builder does not retry a
+          # 5xx, so retry the pack: three attempts, backing off, and the third
+          # failure is a real one.
+          for attempt in 1 2 3; do
+            if pnpm exec electron-builder --win --config electron-builder.win-ci.yml --publish never; then
+              exit 0
+            fi
+            echo "::warning::electron-builder attempt $attempt failed (usually the Electron download). Retrying."
+            sleep $((attempt * 20))
+          done
+          echo "::error::electron-builder failed three times — this is not a flaky download."
+          exit 1
 
       - name: Update manifest exists (electron-updater reads this from the release)
         # A hard gate, not a glob: upload-artifact's if-no-files-found only
@@ -461,7 +475,21 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ steps.apple.outputs.signing }}
         run: |
           pnpm build
-          pnpm exec electron-builder --mac dmg --arm64 --config electron-builder.mac-ci.yml --publish never
+          # electron-builder fetches the ~100 MB Electron zip from GitHub's
+          # release CDN on every run, uncached, and a 504 from that CDN kills
+          # the whole packaging step — it happened on this PR with every line
+          # of the build itself already green. app-builder does not retry a
+          # 5xx, so retry the pack: three attempts, backing off, and the third
+          # failure is a real one.
+          for attempt in 1 2 3; do
+            if pnpm exec electron-builder --mac dmg --arm64 --config electron-builder.mac-ci.yml --publish never; then
+              exit 0
+            fi
+            echo "::warning::electron-builder attempt $attempt failed (usually the Electron download). Retrying."
+            sleep $((attempt * 20))
+          done
+          echo "::error::electron-builder failed three times — this is not a flaky download."
+          exit 1
 
       # The engine is the whole point of the bundle, and a missing one fails
       # nothing at build time — the app would just fall back to "no engine
