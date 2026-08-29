@@ -32,6 +32,10 @@ const CH = {
   updateChanged: "update:changed",
   settingsGet: "settings:get",
   settingsSetAutoCapture: "settings:set-auto-capture",
+  settingsSetLanguage: "settings:set-language",
+  settingsSetTheme: "settings:set-theme",
+  updateCheck: "update:check",
+  appCopyText: "app:copy-text",
 } as const;
 
 export type TGbcBridge = {
@@ -57,6 +61,10 @@ export type TGbcBridge = {
   onUpdate: (listener: (status: unknown) => void) => () => void;
   getSettings: () => Promise<unknown>;
   setAutoCapture: (enabled: boolean) => Promise<unknown>;
+  setLanguage: (lang: string | null) => Promise<unknown>;
+  setTheme: (theme: string) => Promise<unknown>;
+  updateCheckNow: () => Promise<unknown>;
+  copyText: (text: string) => Promise<void>;
 };
 
 const bridge: TGbcBridge = {
@@ -97,6 +105,10 @@ const bridge: TGbcBridge = {
   updateRestart: () => ipcRenderer.invoke(CH.updateRestart),
   getSettings: () => ipcRenderer.invoke(CH.settingsGet),
   setAutoCapture: (enabled) => ipcRenderer.invoke(CH.settingsSetAutoCapture, enabled),
+  setLanguage: (lang) => ipcRenderer.invoke(CH.settingsSetLanguage, lang),
+  setTheme: (theme) => ipcRenderer.invoke(CH.settingsSetTheme, theme),
+  updateCheckNow: () => ipcRenderer.invoke(CH.updateCheck),
+  copyText: (text) => ipcRenderer.invoke(CH.appCopyText, text) as Promise<void>,
   onUpdate: (listener) => {
     const wrapped = (_event: unknown, status: unknown): void => {
       listener(status);

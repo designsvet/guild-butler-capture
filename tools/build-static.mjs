@@ -29,7 +29,7 @@ cpSync(join(root, "src", "renderer"), dest, {
   filter: (src) => !src.endsWith(".ts"),
 });
 
-cpSync(join(root, "resources", "icons", "icon-256.png"), join(dest, "crest.png"));
+cpSync(join(root, "resources", "icons", "crest-mark.png"), join(dest, "crest.png"));
 
 // Stamp the build so the window and the app log can say WHICH build is
 // running — package.json's version is static across dev builds, and the first

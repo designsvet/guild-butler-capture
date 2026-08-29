@@ -42,10 +42,21 @@ export const IPC = {
   updateRestart: "update:restart",
   /** main → renderer. TUpdateStatus on every change. */
   updateChanged: "update:changed",
-  /** invoke → TAppSettings. The renderer-visible settings (auto-capture). */
+  /** invoke → TAppSettings. The renderer-visible settings (auto-capture, language, theme). */
   settingsGet: "settings:get",
   /** invoke(enabled) → TAppSettings. Persist the auto-capture toggle. */
   settingsSetAutoCapture: "settings:set-auto-capture",
+  /** invoke(lang|null) → TAppSettings. Persist the language override; null = follow the OS. */
+  settingsSetLanguage: "settings:set-language",
+  /** invoke(theme) → TAppSettings. Persist the window look (obsidian/parchment). */
+  settingsSetTheme: "settings:set-theme",
+  /** invoke → TUpdateStatus. Manual "Check for updates"; where auto-update is off it opens the download page. */
+  updateCheck: "update:check",
+  /** invoke(text) → void. Copy a short string to the OS clipboard (the /capture pair chip). */
+  appCopyText: "app:copy-text",
 } as const;
 
 export const NPCAP_URL = "https://npcap.com/#download";
+
+/** The Discord command the pairing card offers to copy — never localized. */
+export const PAIR_COMMAND = "/capture pair";

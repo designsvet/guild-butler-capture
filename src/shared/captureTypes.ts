@@ -292,8 +292,20 @@ export enum ERestartRefusal {
 
 export type TRestartResult = { ok: true } | { ok: false; reason: ERestartRefusal };
 
-/** Renderer-visible app settings (IPC `settings:get` / `settings:set-auto-capture`). */
+/** The two window looks, named like the kill-card grounds (ADR 0074). */
+export type TTheme = "obsidian" | "parchment";
+
+/** Narrow an untrusted stored value to a theme, or null. */
+export const asTheme = (value: unknown): TTheme | null => {
+  return value === "obsidian" || value === "parchment" ? value : null;
+};
+
+/** Renderer-visible app settings (IPC `settings:get` / `settings:set-*`). */
 export type TAppSettings = {
   /** Start capture as soon as the app opens. Default ON. */
   autoCapture: boolean;
+  /** Stored language override; null = follow the OS (the "System" pick). */
+  language: string | null;
+  /** Window look. Default obsidian. */
+  theme: TTheme;
 };

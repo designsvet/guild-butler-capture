@@ -71,12 +71,14 @@ Any other location: Advanced → “Choose engine folder…” in the app.
 
 The app speaks the bot's six languages — English, Українська, Русский,
 Deutsch, Français, Português — and follows the **operating system's** language
-with no picker: `detectLang` reads the OS locale and anything unrecognised
-falls back to English. Catalogs live in `src/shared/strings.ts`, where every
-language is type-checked against the English shape, so a missing key anywhere
-is a compile error rather than a runtime fallback. Same provenance caveat as
-the bot: EN and UK are written with care, the rest are machine-quality and
-welcome a native proofread.
+by default: `detectLang` reads the OS locale and anything unrecognised falls
+back to English. The gear popover carries a picker whose default, "System", is
+exactly that detection — choosing a language stores it in `settings.json` and
+re-renders live, quit dialog included. Catalogs live in
+`src/shared/strings.ts`, where every language is type-checked against the
+English shape, so a missing key anywhere is a compile error rather than a
+runtime fallback. Same provenance caveat as the bot: EN and UK are written
+with care, the rest are machine-quality and welcome a native proofread.
 
 The screen itself is the Guild Butler design system — the dashboard's token
 layer (`styles.css` carries the same `--gb-*` names and values) with the three
@@ -85,11 +87,26 @@ licences beside the files in `src/renderer/fonts/`). Bundled rather than
 fetched because the CSP forbids remote anything and a capture tool must render
 identically offline.
 
+Two window looks, named like the kill-card grounds: **Obsidian** (dark, the
+default) and **Parchment** — preview tiles in the gear popover, stored as
+`settings.json` `theme`. The whole palette is CSS tokens, so the layout never
+forks; on Windows the overlay window-controls retint with the theme. The
+window itself is **frameless with the OS chrome merged in**: the 48px header
+is the drag region, macOS keeps its traffic lights over it (`hiddenInset`),
+Windows gets overlay controls, and the window is ONE fixed size in every
+state — the greeting zone flexes instead of the frame. While capturing, the
+greeting sits over the **log rain**: a canvas of loot lines drifting at ~12
+fps, paused on blur/hidden, disabled under reduced-motion, and only ever
+drawn during a live session.
+
 **Capture starts by itself when the app opens** (default on — the app exists
-to be forgotten about; open it, play). The toggle under the Start button turns
+to be forgotten about; open it, play). The toggle in the gear popover turns
 that off, persisted in `settings.json` as `autoCapture`. Auto-start goes
 through exactly the button's code path, so a machine with permissions missing
 lands on the fix card — which on a first run is the right first thing to see.
+The popover also carries a manual **Check for updates** — the backup to
+auto-update; where the updater is off (unsigned mac, dev builds) it opens the
+download page instead.
 
 ## Development
 

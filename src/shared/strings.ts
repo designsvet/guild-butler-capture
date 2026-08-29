@@ -141,6 +141,23 @@ const EN = {
     engineNotFound: "not found — choose the ao-loot-logger folder",
   },
 
+  hero: {
+    noCharacter: "your character appears with Albion traffic",
+  },
+  settings: {
+    gearLabel: "Settings",
+    language: "Language",
+    system: "System",
+    theme: "Theme",
+    themeObsidian: "Obsidian",
+    themeParchment: "Parchment",
+    updates: "Updates",
+    upToDate: "up to date",
+    checkUpdates: "Check for updates",
+    checking: "checking…",
+    updateOff: "Auto-update is off in this build — this opens the download page.",
+    advancedEngine: "Advanced — engine",
+  },
   prefs: {
     /** The auto-start toggle. Default ON; the label describes the ON state. */
     autoCapture: "Start capturing when the app opens",
@@ -171,6 +188,13 @@ const EN = {
    * "your loot is lost"; the worst true statement is "not sent yet".
    */
   pairing: {
+    intro: "Link this computer once — captures post to your guild's loot page and Discord.",
+    step1: "In your guild's Discord, run",
+    step2: "Guild Butler replies with your code:",
+    copy: "Copy",
+    copied: "Copied!",
+    pairShort: "Pair",
+    more: "More options",
     title: "Send loot to your guild",
     notPairedHint:
       "Connect this computer to your Discord account and captured loot is sent to your guild by itself — no dragging files around. Run /capture pair in Discord to get a code.",
@@ -334,6 +358,23 @@ const UK: TStrings = {
     engineNotFound: "не знайдено — виберіть теку ao-loot-logger",
   },
 
+  hero: {
+    noCharacter: "ваш персонаж з'явиться з трафіком Albion",
+  },
+  settings: {
+    gearLabel: "Налаштування",
+    language: "Мова",
+    system: "Системна",
+    theme: "Тема",
+    themeObsidian: "Обсидіан",
+    themeParchment: "Пергамент",
+    updates: "Оновлення",
+    upToDate: "актуальна версія",
+    checkUpdates: "Перевірити оновлення",
+    checking: "перевіряємо…",
+    updateOff: "У цій збірці автооновлення вимкнено — кнопка відкриє сторінку завантаження.",
+    advancedEngine: "Додатково — рушій",
+  },
   prefs: {
     autoCapture: "Починати запис, коли застосунок відкривається",
   },
@@ -357,6 +398,13 @@ const UK: TStrings = {
   },
 
   pairing: {
+    intro: "Зв'яжіть цей комп'ютер один раз — і кожен запис потраплятиме на сторінку здобичі гільдії та в Discord.",
+    step1: "У Discord вашої гільдії виконайте",
+    step2: "Guild Butler відповість вашим кодом:",
+    copy: "Копіювати",
+    copied: "Скопійовано!",
+    pairShort: "Зв'язати",
+    more: "Більше опцій",
     title: "Надсилайте лут своїй гільдії",
     notPairedHint:
       "З'єднайте цей комп'ютер зі своїм Discord — і записаний лут сам летітиме до гільдії, без перетягування файлів. Виконайте /capture pair у Discord, щоб отримати код.",
@@ -510,6 +558,23 @@ const RU: TStrings = {
     engineNotFound: "не найден — выберите папку ao-loot-logger",
   },
 
+  hero: {
+    noCharacter: "ваш персонаж появится с трафиком Albion",
+  },
+  settings: {
+    gearLabel: "Настройки",
+    language: "Язык",
+    system: "Системный",
+    theme: "Тема",
+    themeObsidian: "Обсидиан",
+    themeParchment: "Пергамент",
+    updates: "Обновления",
+    upToDate: "актуальная версия",
+    checkUpdates: "Проверить обновления",
+    checking: "проверяем…",
+    updateOff: "В этой сборке автообновление выключено — кнопка откроет страницу загрузки.",
+    advancedEngine: "Дополнительно — движок",
+  },
   prefs: {
     autoCapture: "Начинать запись при открытии приложения",
   },
@@ -533,6 +598,13 @@ const RU: TStrings = {
   },
 
   pairing: {
+    intro: "Свяжите этот компьютер один раз — и каждая запись будет попадать на страницу добычи гильдии и в Discord.",
+    step1: "В Discord вашей гильдии выполните",
+    step2: "Guild Butler ответит вашим кодом:",
+    copy: "Копировать",
+    copied: "Скопировано!",
+    pairShort: "Связать",
+    more: "Больше опций",
     title: "Отправляйте лут своей гильдии",
     notPairedHint:
       "Соедините этот компьютер со своим Discord — и записанный лут сам полетит в гильдию, без перетаскивания файлов. Выполните /capture pair в Discord, чтобы получить код.",
@@ -687,6 +759,23 @@ const DE: TStrings = {
     engineNotFound: "nicht gefunden — wähle den ao-loot-logger-Ordner",
   },
 
+  hero: {
+    noCharacter: "dein Charakter erscheint mit Albion-Traffic",
+  },
+  settings: {
+    gearLabel: "Einstellungen",
+    language: "Sprache",
+    system: "System",
+    theme: "Design",
+    themeObsidian: "Obsidian",
+    themeParchment: "Pergament",
+    updates: "Updates",
+    upToDate: "auf dem neuesten Stand",
+    checkUpdates: "Nach Updates suchen",
+    checking: "wird geprüft…",
+    updateOff: "Auto-Update ist in diesem Build aus — der Knopf öffnet die Download-Seite.",
+    advancedEngine: "Erweitert — Engine",
+  },
   prefs: {
     autoCapture: "Aufzeichnung beim Öffnen der App starten",
   },
@@ -711,6 +800,13 @@ const DE: TStrings = {
   },
 
   pairing: {
+    intro: "Verknüpfe diesen Computer einmal — jede Aufzeichnung landet auf der Beuteseite deiner Gilde und in Discord.",
+    step1: "Führe im Discord deiner Gilde aus:",
+    step2: "Guild Butler antwortet mit deinem Code:",
+    copy: "Kopieren",
+    copied: "Kopiert!",
+    pairShort: "Verbinden",
+    more: "Mehr Optionen",
     title: "Schick deiner Gilde den Loot",
     notPairedHint:
       "Verbinde diesen Rechner mit deinem Discord-Konto, und aufgezeichneter Loot geht von selbst an deine Gilde — kein Dateien-Herumschieben. Führe /capture pair in Discord aus, um einen Code zu bekommen.",
@@ -869,6 +965,23 @@ const FR: TStrings = {
     engineNotFound: "introuvable — choisissez le dossier ao-loot-logger",
   },
 
+  hero: {
+    noCharacter: "ton personnage apparaît avec le trafic Albion",
+  },
+  settings: {
+    gearLabel: "Réglages",
+    language: "Langue",
+    system: "Système",
+    theme: "Thème",
+    themeObsidian: "Obsidienne",
+    themeParchment: "Parchemin",
+    updates: "Mises à jour",
+    upToDate: "à jour",
+    checkUpdates: "Vérifier les mises à jour",
+    checking: "vérification…",
+    updateOff: "La mise à jour auto est désactivée dans cette version — le bouton ouvre la page de téléchargement.",
+    advancedEngine: "Avancé — moteur",
+  },
   prefs: {
     autoCapture: "Démarrer la capture à l'ouverture de l'app",
   },
@@ -893,6 +1006,13 @@ const FR: TStrings = {
   },
 
   pairing: {
+    intro: "Associe cet ordinateur une fois — chaque capture arrive sur la page de butin de ta guilde et sur Discord.",
+    step1: "Dans le Discord de ta guilde, lance",
+    step2: "Guild Butler répond avec ton code :",
+    copy: "Copier",
+    copied: "Copié !",
+    pairShort: "Associer",
+    more: "Plus d'options",
     title: "Envoyez le loot à votre guilde",
     notPairedHint:
       "Connectez cet ordinateur à votre compte Discord et le loot capturé part tout seul vers votre guilde — plus de fichiers à trimballer. Lancez /capture pair dans Discord pour obtenir un code.",
@@ -1050,6 +1170,23 @@ const PT: TStrings = {
     engineNotFound: "não encontrado — escolha a pasta ao-loot-logger",
   },
 
+  hero: {
+    noCharacter: "seu personagem aparece com o tráfego do Albion",
+  },
+  settings: {
+    gearLabel: "Configurações",
+    language: "Idioma",
+    system: "Sistema",
+    theme: "Tema",
+    themeObsidian: "Obsidiana",
+    themeParchment: "Pergaminho",
+    updates: "Atualizações",
+    upToDate: "atualizado",
+    checkUpdates: "Verificar atualizações",
+    checking: "verificando…",
+    updateOff: "A atualização automática está desligada nesta build — o botão abre a página de download.",
+    advancedEngine: "Avançado — engine",
+  },
   prefs: {
     autoCapture: "Iniciar a captura quando o app abrir",
   },
@@ -1073,6 +1210,13 @@ const PT: TStrings = {
   },
 
   pairing: {
+    intro: "Vincule este computador uma vez — cada captura vai para a página de loot da guilda e para o Discord.",
+    step1: "No Discord da sua guilda, use",
+    step2: "O Guild Butler responde com seu código:",
+    copy: "Copiar",
+    copied: "Copiado!",
+    pairShort: "Vincular",
+    more: "Mais opções",
     title: "Mande o loot para a sua guilda",
     notPairedHint:
       "Conecte este computador à sua conta do Discord e o loot capturado vai sozinho para a guilda — sem arrastar arquivos. Rode /capture pair no Discord para receber um código.",

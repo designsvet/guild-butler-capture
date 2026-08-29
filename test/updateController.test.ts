@@ -192,6 +192,24 @@ describe("createUpdateController", () => {
     expect(h.updater.installed).toBe(true);
   });
 
+  it("checkNow pulls the next check forward; a no-op when disabled or unstarted", async () => {
+    const off = harness({ enabled: false });
+    off.controller.start();
+    off.controller.checkNow();
+    expect(off.updater.checkCalls).toBe(0);
+
+    const h = harness();
+    h.controller.checkNow(); // before start(): nothing to do yet
+    expect(h.updater.checkCalls).toBe(0);
+    h.controller.start();
+    h.controller.checkNow();
+    await Promise.resolve();
+    expect(h.updater.checkCalls).toBe(1);
+    // The manual check re-books the steady interval like any other.
+    await Promise.resolve();
+    expect(h.pending.at(-1)?.ms).toBe(CHECK_INTERVAL_MS);
+  });
+
   it("start() is idempotent — a second call adds no second schedule", () => {
     const h = harness();
     h.controller.start();
