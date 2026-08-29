@@ -49,6 +49,25 @@ export const REAL = {
 } as const;
 
 /**
+ * A REAL failure from a member's Windows machine, 2026-08-29 (app v0.6.0),
+ * verbatim. Npcap was not installed, so `cap.node` could not resolve
+ * wpcap.dll — and note what the text does NOT contain: the words npcap,
+ * wpcap or winpcap appear nowhere. Windows names the addon it found, not the
+ * dependency it could not.
+ *
+ * This is why the fatal rules order the specific pattern before the generic
+ * one. Read as an ABI mismatch, it told the member to run `pnpm
+ * engine:rebuild` from a README for a repo they do not have.
+ */
+export const REAL_WIN_NPCAP_MISSING: readonly string[] = [
+  "Error: The specified module could not be found.",
+  "\\\\?\\C:\\Users\\User\\AppData\\Local\\Programs\\guild-butler-capture\\resources\\engine\\node_modules\\cap\\build\\Release\\cap.node",
+  "    at process.func [as dlopen] (node:electron/js2c/node_init:2:2617)",
+  "    at Module._extensions..node (node:internal/modules/cjs/loader:1874:18)",
+  "  code: 'ERR_DLOPEN_FAILED'",
+];
+
+/**
  * Diagnostic lines that must stay noise: never fatal, never a character or
  * log-file event. Includes the recoverable photon-decoder warnings and samples
  * of the huge [debug] event dumps (header lines and untagged continuation
