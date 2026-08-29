@@ -178,7 +178,15 @@
       </label>
       <div class="settings-row">
         <span id="lang-label" class="settings-label">Language</span>
-        <select id="lang-select" class="settings-select"></select>
+        <div class="dd" id="lang-dd" data-open="false">
+          <button id="btn-lang" class="dd-btn" aria-haspopup="listbox" aria-expanded="false">
+            <span id="lang-current">System</span>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+              <path d="M2 3.5 L5 6.5 L8 3.5"></path>
+            </svg>
+          </button>
+          <div id="lang-menu" class="dd-menu" role="listbox" hidden></div>
+        </div>
       </div>
       <div class="settings-theme">
         <span id="theme-label" class="settings-label">Theme</span>

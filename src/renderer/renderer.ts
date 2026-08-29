@@ -149,7 +149,10 @@ const ui = {
   autoToggle: el<HTMLInputElement>("auto-capture-toggle"),
   autoLabel: el<HTMLSpanElement>("auto-capture-label"),
   langLabel: el<HTMLSpanElement>("lang-label"),
-  langSelect: el<HTMLSelectElement>("lang-select"),
+  langDd: el<HTMLDivElement>("lang-dd"),
+  langBtn: el<HTMLButtonElement>("btn-lang"),
+  langCurrent: el<HTMLSpanElement>("lang-current"),
+  langMenu: el<HTMLDivElement>("lang-menu"),
   themeLabel: el<HTMLSpanElement>("theme-label"),
   themeObsidian: el<HTMLButtonElement>("theme-obsidian"),
   themeParchment: el<HTMLButtonElement>("theme-parchment"),
@@ -176,6 +179,8 @@ let pairing: TPairingStatus = initialPairingStatus;
 let pairFailure: EPairFailure | null = null;
 let pairBusy = false;
 let theme: TTheme = "obsidian";
+/** The language picker's value: "system" or a TLang. */
+let langValue = "system";
 
 const WAITING_HINTS_AFTER_MS = 90_000;
 
@@ -683,21 +688,7 @@ const applyStatic = (): void => {
   ui.advCaption.textContent = STR.settings.advancedEngine;
   ui.credit.textContent = STR.footer.engineCredit;
   // The picker names each language in ITSELF; only "System" translates.
-  const current = ui.langSelect.value;
-  ui.langSelect.replaceChildren();
-  const system = document.createElement("option");
-  system.value = "system";
-  system.textContent = STR.settings.system;
-  ui.langSelect.append(system);
-  for (const lang of SUPPORTED_LANGS) {
-    const option = document.createElement("option");
-    option.value = lang;
-    option.textContent = LANG_NAMES[lang];
-    ui.langSelect.append(option);
-  }
-  if (current.length > 0) {
-    ui.langSelect.value = current;
-  }
+  rebuildLangMenu();
   ui.copyCmdBtn.setAttribute("aria-label", STR.pairing.copy);
   ui.pairMore.setAttribute("aria-label", STR.pairing.more);
 };
@@ -962,8 +953,35 @@ void gbc.getUpdate().then((status) => {
   renderUpdateInline();
 });
 
+let igniteTimer: number | null = null;
+
+/**
+ * The ignite beat: when a session actually reaches Capturing, the hero plays
+ * one orchestrated reveal (dot pulse -> name -> count bloom -> chips) and the
+ * rain fades in behind it. Only on a genuine transition — a window reopened
+ * over an already-running capture starts calm.
+ */
+const maybeIgnite = (prev: ECaptureStatus | null, next: ECaptureStatus): void => {
+  if (next !== ECaptureStatus.Capturing || prev === ECaptureStatus.Capturing || prev == null) {
+    return;
+  }
+  ui.hero.classList.remove("ignite");
+  // force a reflow so a rapid stop/start replays the animation
+  void ui.hero.offsetWidth;
+  ui.hero.classList.add("ignite");
+  if (igniteTimer != null) {
+    window.clearTimeout(igniteTimer);
+  }
+  igniteTimer = window.setTimeout(() => {
+    ui.hero.classList.remove("ignite");
+    igniteTimer = null;
+  }, 950);
+};
+
 gbc.onState((next) => {
+  const prev = state?.status ?? null;
   state = next;
+  maybeIgnite(prev, next.status);
   render();
 });
 
@@ -987,6 +1005,10 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    if (!ui.langMenu.hidden) {
+      setLangOpen(false);
+      return;
+    }
     setPopover(false);
   }
 });
@@ -1007,7 +1029,7 @@ const applyTheme = (next: TTheme): void => {
 
 const applySettings = (settings: TAppSettings): void => {
   ui.autoToggle.checked = settings.autoCapture;
-  ui.langSelect.value = settings.language ?? "system";
+  setLangValue(settings.language ?? "system");
   applyTheme(asTheme(settings.theme) ?? "obsidian");
   applyLang(asLang(settings.language) ?? detectLang(navigator.language));
 };
@@ -1039,12 +1061,68 @@ ui.autoToggle.addEventListener("change", () => {
   });
 });
 
-ui.langSelect.addEventListener("change", () => {
-  const picked = ui.langSelect.value;
-  void gbc.setLanguage(picked === "system" ? null : picked).then((settings) => {
-    ui.langSelect.value = settings.language ?? "system";
+// --- the language dropdown (ours, not the OS's) -------------------------------
+
+const langLabelFor = (value: string): string => {
+  const lang = asLang(value);
+  return lang != null ? LANG_NAMES[lang] : STR.settings.system;
+};
+
+const setLangOpen = (open: boolean): void => {
+  ui.langMenu.hidden = !open;
+  ui.langDd.dataset.open = String(open);
+  ui.langBtn.setAttribute("aria-expanded", String(open));
+};
+
+const rebuildLangMenu = (): void => {
+  ui.langMenu.replaceChildren();
+  for (const value of ["system", ...SUPPORTED_LANGS]) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "dd-item";
+    item.dataset.value = value;
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", String(value === langValue));
+    const check = document.createElement("span");
+    check.className = "dd-check";
+    check.innerHTML =
+      '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 6.4 L4.8 9 L10 3.4"></path></svg>';
+    const label = document.createElement("span");
+    label.textContent = langLabelFor(value);
+    item.append(check, label);
+    item.addEventListener("click", () => {
+      setLangOpen(false);
+      pickLanguage(value);
+    });
+    ui.langMenu.append(item);
+  }
+  ui.langCurrent.textContent = langLabelFor(langValue);
+};
+
+const setLangValue = (value: string): void => {
+  langValue = asLang(value) != null ? value : "system";
+  ui.langCurrent.textContent = langLabelFor(langValue);
+  for (const item of ui.langMenu.querySelectorAll<HTMLElement>(".dd-item")) {
+    item.setAttribute("aria-selected", String(item.dataset.value === langValue));
+  }
+};
+
+const pickLanguage = (value: string): void => {
+  void gbc.setLanguage(value === "system" ? null : value).then((settings) => {
+    setLangValue(settings.language ?? "system");
     applyLang(asLang(settings.language) ?? detectLang(navigator.language));
   });
+};
+
+ui.langBtn.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setLangOpen(ui.langMenu.hidden);
+});
+
+document.addEventListener("click", (event) => {
+  if (!ui.langMenu.hidden && !ui.langDd.contains(event.target as Node)) {
+    setLangOpen(false);
+  }
 });
 
 const pickTheme = (next: TTheme): void => {

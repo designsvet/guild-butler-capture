@@ -46,6 +46,13 @@
   --gb-stop-bg: rgba(181, 86, 44, 0.1);
   --gb-stop-line: rgba(181, 86, 44, 0.55);
   --gb-stop-ink: #e8a184;
+  --gb-stop-bg-hover: rgba(181, 86, 44, 0.18);
+  --gb-stop-line-hover: rgba(224, 122, 70, 0.75);
+
+  /* — Interaction washes (hover fills for ghost controls) — */
+  --gb-wash: rgba(244, 241, 234, 0.05);
+  --gb-wash-strong: rgba(244, 241, 234, 0.09);
+  --gb-gold-wash: rgba(230, 195, 108, 0.1);
 
   /* — The log rain (canvas reads this at start) — */
   --gb-rain: rgba(230, 195, 108, 0.16);
@@ -94,6 +101,12 @@ html[data-theme="parchment"] {
   --gb-stop-bg: rgba(181, 86, 44, 0.07);
   --gb-stop-line: rgba(150, 60, 25, 0.5);
   --gb-stop-ink: #a04a20;
+  --gb-stop-bg-hover: rgba(181, 86, 44, 0.13);
+  --gb-stop-line-hover: rgba(150, 60, 25, 0.75);
+
+  --gb-wash: rgba(42, 36, 22, 0.05);
+  --gb-wash-strong: rgba(42, 36, 22, 0.09);
+  --gb-gold-wash: rgba(143, 109, 30, 0.1);
 
   --gb-rain: rgba(140, 105, 40, 0.15);
   --gb-rain-dim: rgba(140, 105, 40, 0.09);
@@ -212,6 +225,17 @@ input {
   background: var(--gb-inset);
   color: var(--gb-gold);
   padding: 0;
+}
+
+.gear-btn {
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.gear-btn:hover {
+  border-color: var(--gb-gold);
+  background: var(--gb-gold-wash);
 }
 
 .gear-btn svg {
@@ -395,6 +419,12 @@ main {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+.hero[data-active="true"] .rain-canvas {
+  opacity: 1;
 }
 
 .hero-stack {
@@ -452,6 +482,90 @@ main {
   .status-dot[data-status="capturing"] {
     animation: none;
     box-shadow: 0 0 0 3px rgba(95, 191, 106, 0.16);
+  }
+}
+
+/* --- the ignite: one orchestrated beat when capture begins ----------------
+   dot pulse -> the name rises -> the count blooms -> chips follow -> the
+   rain fades in behind it all. Class is set by the renderer for ~900ms on
+   the idle->capturing transition only. */
+
+@keyframes dot-pulse {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes count-bloom {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.045);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.hero.ignite .status-dot {
+  animation: dot-pulse 0.5s ease;
+}
+
+.hero.ignite .status-label {
+  animation: rise-in 0.35s ease backwards;
+}
+
+.hero.ignite .hero-character {
+  animation: rise-in 0.45s ease 0.06s backwards;
+}
+
+.hero.ignite .hero-count {
+  animation: count-bloom 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.18) 0.12s backwards;
+}
+
+.hero.ignite .hero-caption {
+  animation: rise-in 0.4s ease 0.2s backwards;
+}
+
+.hero.ignite .hero-chips .chip:nth-child(1) {
+  animation: rise-in 0.4s ease 0.26s backwards;
+}
+
+.hero.ignite .hero-chips .chip:nth-child(2) {
+  animation: rise-in 0.4s ease 0.32s backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rain-canvas {
+    transition: none;
+  }
+  .hero.ignite .status-dot,
+  .hero.ignite .status-label,
+  .hero.ignite .hero-character,
+  .hero.ignite .hero-count,
+  .hero.ignite .hero-caption,
+  .hero.ignite .hero-chips .chip {
+    animation: none;
   }
 }
 
@@ -628,17 +742,30 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
   color: var(--gb-gold-ink);
   background: var(--gb-grad-gold);
   box-shadow: 0 12px 34px -10px rgba(230, 195, 108, 0.45);
+  /* filter, not background, on hover — a gradient cannot transition, its
+     brightness can. */
   transition:
-    transform 0.12s ease,
-    box-shadow 0.15s ease;
+    transform 0.14s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .primary:hover:not(:disabled) {
-  box-shadow: 0 14px 38px -10px rgba(230, 195, 108, 0.55);
+  transform: translateY(-1px);
+  filter: brightness(1.06) saturate(1.06);
+  box-shadow:
+    0 18px 44px -10px rgba(230, 195, 108, 0.6),
+    inset 0 1px 0 rgba(255, 246, 214, 0.8);
 }
 
 .primary:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: translateY(1px) scale(0.985);
+  filter: brightness(0.95);
+  box-shadow: 0 7px 18px -8px rgba(230, 195, 108, 0.4);
+  transition-duration: 0.06s;
 }
 
 .primary:disabled {
@@ -654,6 +781,20 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
   font-weight: 600;
   font-size: 15.5px;
   box-shadow: 0 10px 28px -10px rgba(181, 86, 44, 0.35);
+}
+
+.primary[data-mode="stop"]:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: none;
+  background: var(--gb-stop-bg-hover);
+  border-color: var(--gb-stop-line-hover);
+  box-shadow: 0 14px 34px -10px rgba(181, 86, 44, 0.45);
+}
+
+.primary[data-mode="stop"]:active:not(:disabled) {
+  transform: translateY(1px) scale(0.99);
+  filter: none;
+  box-shadow: 0 6px 16px -8px rgba(181, 86, 44, 0.35);
 }
 
 .primary[data-mode="stop"]::before {
@@ -673,17 +814,31 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
   gap: 7px;
   white-space: nowrap;
   border-radius: 999px;
-  border: 1px solid rgba(167, 163, 155, 0.22);
+  border: 1px solid rgba(167, 163, 155, 0.28);
   background: transparent;
   color: var(--gb-muted);
   font-size: 12.5px;
   font-weight: 600;
-  padding: 7px 14px;
+  min-height: 34px;
+  padding: 0 16px;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    transform 0.1s ease,
+    filter 0.15s ease;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: rgba(167, 163, 155, 0.4);
+  border-color: rgba(167, 163, 155, 0.5);
   color: var(--gb-ink);
+  background: var(--gb-wash);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+  background: var(--gb-wash-strong);
+  transition-duration: 0.05s;
 }
 
 .btn:disabled {
@@ -693,14 +848,22 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
 
 .btn.small {
   font-size: 12px;
-  padding: 6px 13px;
+  min-height: 30px;
+  padding: 0 14px;
 }
 
 .btn.tiny {
   font-size: 11.5px;
-  padding: 3px 11px;
+  min-height: 24px;
+  padding: 0 11px;
   color: var(--gb-gold);
   border-color: var(--gb-line-strong);
+}
+
+.btn.tiny:hover:not(:disabled) {
+  color: var(--gb-gold-bright);
+  border-color: var(--gb-gold);
+  background: var(--gb-gold-wash);
 }
 
 .btn.accent,
@@ -711,6 +874,18 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
   font-weight: 700;
 }
 
+.btn.accent:hover:not(:disabled),
+.btn.gold:hover:not(:disabled) {
+  filter: brightness(1.06);
+  background: var(--gb-grad-gold);
+}
+
+.btn.accent:active:not(:disabled),
+.btn.gold:active:not(:disabled) {
+  filter: brightness(0.95);
+  background: var(--gb-grad-gold);
+}
+
 .btn.gold-ghost {
   color: var(--gb-gold);
   border-color: var(--gb-line-strong);
@@ -719,6 +894,7 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
 .btn.gold-ghost:hover:not(:disabled) {
   color: var(--gb-gold-bright);
   border-color: var(--gb-gold);
+  background: var(--gb-gold-wash);
 }
 
 /* --- pairing (the bottom slot) ---------------------------------------------- */
@@ -805,9 +981,17 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
   padding: 0;
 }
 
+.copy-btn {
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
 .copy-btn:hover {
   color: var(--gb-gold-bright);
   border-color: var(--gb-gold);
+  background: var(--gb-gold-wash);
 }
 
 .copy-note {
@@ -1029,15 +1213,112 @@ html[data-theme="parchment"] .settings-popover {
   text-overflow: ellipsis;
 }
 
-.settings-select {
+/* Our own dropdown — the native <select> popup ignores the theme entirely. */
+.dd {
+  position: relative;
+}
+
+.dd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px 0 12px;
   background: var(--gb-inset);
   color: var(--gb-ink);
   border: 1px solid var(--gb-line-strong);
   border-radius: var(--gb-r-sm);
   font-size: 12px;
   font-weight: 600;
-  padding: 5px 8px;
-  max-width: 160px;
+  max-width: 170px;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.dd-btn:hover {
+  border-color: var(--gb-gold);
+  background: var(--gb-gold-wash);
+}
+
+.dd-btn svg {
+  transition: transform 0.2s ease;
+  color: var(--gb-faint);
+}
+
+.dd[data-open="true"] .dd-btn svg {
+  transform: rotate(180deg);
+}
+
+.dd-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  min-width: 100%;
+  width: max-content;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px;
+  background: var(--gb-popover);
+  border: 1px solid var(--gb-line-strong);
+  border-radius: 10px;
+  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.85);
+  animation: dd-open 0.16s ease;
+}
+
+html[data-theme="parchment"] .dd-menu {
+  box-shadow: 0 18px 40px -16px rgba(80, 60, 20, 0.5);
+}
+
+@keyframes dd-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dd-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px 7px 9px;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--gb-muted);
+  text-align: left;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.dd-item:hover {
+  background: var(--gb-wash);
+  color: var(--gb-ink);
+}
+
+.dd-item .dd-check {
+  width: 14px;
+  color: var(--gb-gold);
+  visibility: hidden;
+  flex-shrink: 0;
+}
+
+.dd-item[aria-selected="true"] {
+  color: var(--gb-gold);
+  font-weight: 600;
+}
+
+.dd-item[aria-selected="true"] .dd-check {
+  visibility: visible;
 }
 
 .settings-theme {
