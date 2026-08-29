@@ -74,30 +74,38 @@
         <canvas id="rain-canvas" class="rain-canvas" aria-hidden="true"></canvas>
         <div id="hero-stack" class="hero-stack">
           <span class="status-chip">
-            <span id="status-dot" class="status-dot" data-status="idle" aria-hidden="true"></span>
-            <span id="status-label" class="status-label">Not capturing</span>
+            <span id="status-dot" class="status-dot" data-status="idle" aria-hidden="true">
+              <span class="dot-sweep"></span>
+              <span class="dot-ping"></span>
+            </span>
+            <span id="status-label" class="status-label swap">Not capturing</span>
           </span>
-          <span id="hero-character" class="hero-character" data-known="false">—</span>
-          <span id="stat-loot" class="hero-count">0</span>
+          <span id="hero-character" class="hero-character swap" data-known="false">—</span>
+          <span id="stat-loot" class="hero-count"><span class="roll">0</span></span>
           <span id="stat-loot-label" class="hero-caption">Loot events this session</span>
           <div class="hero-chips">
             <span class="chip" id="traffic-chip">
               <span id="traffic-dot" class="chip-dot" aria-hidden="true"></span>
-              <span id="stat-traffic">not seen yet</span>
+              <span id="stat-traffic" class="swap">not seen yet</span>
             </span>
             <span class="chip chip-log">
-              <span id="stat-file" class="chip-file"></span>
+              <span id="stat-file" class="chip-file swap"></span>
               <button id="btn-reveal" class="btn tiny" disabled>Reveal</button>
             </span>
           </div>
-          <p id="status-hint" class="status-hint hero-hint"></p>
+          <p id="status-hint" class="status-hint hero-hint swap"></p>
           <div id="waiting-hints" class="hints hidden">
             <p id="waiting-hints-title" class="hints-title"></p>
             <ul id="waiting-hints-list"></ul>
           </div>
         </div>
         <div class="cta-row">
-          <button id="btn-primary" class="primary" data-mode="start">Start capture</button>
+          <button id="btn-primary" class="primary" data-mode="start">
+            <span class="pill-lay pill-ember" aria-hidden="true"></span>
+            <span class="pill-lay pill-gold" aria-hidden="true"></span>
+            <span class="pill-lay pill-shimmer" aria-hidden="true"></span>
+            <span class="pill-face"><span class="pill-square" aria-hidden="true"></span><span id="btn-primary-text" class="swap">Start capture</span></span>
+          </button>
         </div>
       </section>
 

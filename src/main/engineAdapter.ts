@@ -41,6 +41,8 @@ export type TEngineEvent =
   | { kind: "albion-detected" }
   | { kind: "albion-lost" }
   | { kind: "heartbeat"; character: string | null; linesWritten: number | null }
+  /** One pickup, printed the moment it is written to the log. */
+  | { kind: "loot" }
   | { kind: "character"; name: string }
   | { kind: "log-file"; file: string }
   | { kind: "festivities"; server: string | null; code: number | null; entries: TFestivityEntry[] }
@@ -102,6 +104,39 @@ const CHARACTER_RE = new RegExp(`(?:logged in as|playing as|character(?: detecte
 // away from a bogus character event — so the tag short-circuits to noise.
 // Verified against the recording: no signal line carries one of these tags.
 const DEBUG_TAG_RE = /\[(?:debug|verbose|silly)\]/i;
+
+// One pickup, echoed to stdout as it is written. REAL SHAPE, recorded:
+//   05:42:00 UTC: {UA} [VITRYLA] Bors looted 1x Expert's Rune from @MOB_MORGANA…
+// The locale tag and the guild bracket are optional (a player with no guild
+// prints neither), everything else is required.
+//
+// This one is deliberately STRICT where the others are liberal, and the reason
+// is the direction of the failure: a missed loot line costs a second of
+// counter lag until the next heartbeat, while a false one invents loot that
+// never happened. So the shape is pinned end to end and the player token is
+// then VALIDATED as a name — the heartbeat that parsed a character called
+// "not" is the standing reminder that a liberal pattern fails by MATCHING.
+const LOOT_RE = new RegExp(
+  "^\\d{2}:\\d{2}:\\d{2}\\s+[A-Z]{2,5}:\\s+" + // 05:42:00 UTC:
+    "(?:\\{[A-Za-z-]{2,8}\\}\\s*)?" + // {UA}
+    "(?:\\[[^\\]]{0,32}\\]\\s*)?" + // [VITRYLA]
+    `(${NAME})\\s+looted\\s+` + // Bors looted
+    "(\\d{1,7})x\\s+" + // 1x
+    "(.+?)\\s+from\\s+@?\\S", // Expert's Rune from @MOB_…
+);
+
+/** The recorded line, or null when anything about it fails to validate. */
+const parseLoot = (line: string): TEngineEvent | null => {
+  const m = LOOT_RE.exec(line);
+  if (m == null) {
+    return null;
+  }
+  const quantity = Number(m[2]);
+  if (cleanName(m[1]) == null || !Number.isFinite(quantity) || quantity <= 0 || (m[3] ?? "").trim().length === 0) {
+    return null;
+  }
+  return { kind: "loot" };
+};
 
 // The output file. REAL SHAPE, recorded: a startup announcement carrying the
 // ABSOLUTE path, which may contain spaces — so the announcement line is
@@ -246,6 +281,12 @@ export const parseEngineLine = (raw: string): TEngineEvent => {
   }
   if (DEBUG_TAG_RE.test(line)) {
     return { kind: "noise", line };
+  }
+  // Before the fatal scan: in a live session this is the most frequent line
+  // there is, and its shape cannot collide with an error.
+  const loot = parseLoot(line);
+  if (loot != null) {
+    return loot;
   }
   const fatal = classifyFatalLine(line);
   if (fatal != null) {

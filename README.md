@@ -99,6 +99,32 @@ greeting sits over the **log rain**: a canvas of loot lines drifting at ~12
 fps, paused on blur/hidden, disabled under reduced-motion, and only ever
 drawn during a live session.
 
+### How it moves
+
+The four states — idle, starting, waiting, capturing — are one continuous
+run, and the interface treats them that way. One rule holds it up: **nothing
+in the greeting may change the layout.** Every slot is reserved at its worst
+case across all six languages, so a state change can only alter ink, colour,
+glow and small motion; measured at the real window size, the Start button and
+every line above it sit on the identical pixel in all four states.
+
+On top of that geometry: text changes by **rolling** (out upward in 170ms, in
+from below over 260ms) with each element starting 50ms after the one before
+it, so a state change reads as one thing causing the next rather than as a
+simultaneous flash. The status dot is the instrument — a ring sweeping while
+the engine starts, a radar ping while it listens, breathing green once
+traffic lands, and one pulse per pickup. The Start/Stop pill is two stacked
+surfaces rather than two buttons: the ember face sits underneath and the gold
+**drains off it** over 440ms, retracing on the way back. Reaching Capturing
+plays a **wave** — a brightness-and-scale pulse passing up through dot, name,
+count, caption and chips — which brightens what is already there and hides
+nothing. Under `prefers-reduced-motion` every duration collapses to zero and
+the end states are unchanged.
+
+The reasoning, the measurements it came from and a playable before/after are
+in [`docs/design-transition-study.html`](docs/design-transition-study.html) —
+open it in a browser, no build step.
+
 **Capture starts by itself when the app opens** (default on — the app exists
 to be forgotten about; open it, play). The toggle in the gear popover turns
 that off, persisted in `settings.json` as `autoCapture`. Auto-start goes
@@ -328,6 +354,15 @@ each step proves an assumption the container build could not.
    engine repo root; the pre-zone-change heartbeat carries the phrase
    `not identified yet (change zone once)` in the character field; photon
    `outofboundread` warnings and `[debug]` event dumps are routine noise.
+   One line in that recording was read as noise for nine days and is now a
+   signal: the engine echoes **one line per pickup** as it writes it, so the
+   counter no longer waits on the once-a-minute heartbeat to move. The
+   heartbeat stays the reconciling truth — it resets the live delta every
+   time it arrives, so an optimistic miscount is bounded by one minute and
+   can never accumulate — and the log FILE remains the source of truth for
+   everything uploaded, so a mis-parse can only ever affect a number on
+   screen. The pattern is deliberately strict where the rest are liberal:
+   a missed pickup costs a second of lag, an invented one invents loot.
    Still unrecorded: the exact `ALBION NOT DETECTED` line — capture it once by
    running the recorder with the game closed:
    `sudo node tools/record-engine-output.mjs`

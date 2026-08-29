@@ -38,8 +38,7 @@ const EN = {
   statusHint: {
     idle: "Press Start before you head into content. Loot picked up near you is written to a log file your officers can settle from.",
     starting: "Getting the capture engine going.",
-    waiting:
-      "The logger is running, but no Albion traffic has reached it yet. The moment the game produces traffic it is picked up by itself — leaving this running through a game restart is fine.",
+    waiting: "Listening. No Albion traffic yet — it is picked up the moment the game sends any.",
     capturing: "Loot events near you are being written to the log.",
     capturingAs: (character: string): string => `Loot events near ${character} are being written to the log.`,
     stopping: "Asking the logger to finish writing and shut down.",
@@ -54,6 +53,7 @@ const EN = {
       "Albion isn't running, or is sitting on the login screen — get in game and move around a bit.",
       "A VPN or tunnel (NordVPN, ExitLag, …) is carrying the game's traffic where the logger cannot see it. Turn it off while capturing.",
       "GeForce Now / cloud gaming — the game runs on their computer, so its traffic never touches this one. Capture cannot work there.",
+      "Nothing is lost by waiting: leave this running through a game restart and the traffic is picked up by itself.",
     ],
   },
 
@@ -264,8 +264,7 @@ const UK: TStrings = {
   statusHint: {
     idle: "Натисніть «Почати запис», перш ніж іти в контент. Лут, підібраний поруч із вами, пишеться в лог-файл, з якого офіцери зроблять розподіл.",
     starting: "Запускаємо рушій захоплення.",
-    waiting:
-      "Логер працює, але трафік Albion до нього ще не дійшов. Щойно гра почне передавати дані, він підхопить їх сам — можна лишати запис увімкненим навіть через перезапуск гри.",
+    waiting: "Слухаємо. Трафіку Albion ще немає — щойно гра щось надішле, запис підхопить його сам.",
     capturing: "Лут поруч із вами записується в лог.",
     capturingAs: (character: string): string => `Лут поруч із ${character} записується в лог.`,
     stopping: "Просимо логер дописати файл і завершити роботу.",
@@ -279,6 +278,7 @@ const UK: TStrings = {
       "Albion не запущений або стоїть на екрані входу — зайдіть у гру й трохи порухайтесь.",
       "VPN чи тунель (NordVPN, ExitLag, …) веде трафік гри туди, де логер його не бачить. Вимкніть його на час запису.",
       "GeForce Now / хмарний ґеймінг — гра йде на їхньому комп'ютері, тож її трафік сюди не потрапляє. Запис там неможливий.",
+      "Очікування нічого не псує: можна лишити запис увімкненим навіть через перезапуск гри — трафік підхопиться сам.",
     ],
   },
 
@@ -466,8 +466,7 @@ const RU: TStrings = {
   statusHint: {
     idle: "Нажмите «Начать запись», прежде чем идти в контент. Лут, подобранный рядом с вами, пишется в лог-файл, по которому офицеры сделают делёж.",
     starting: "Запускаем движок захвата.",
-    waiting:
-      "Логгер работает, но трафик Albion до него ещё не дошёл. Как только игра начнёт передавать данные, он подхватит их сам — можно оставлять запись включённой даже через перезапуск игры.",
+    waiting: "Слушаем. Трафика Albion пока нет — как только игра что-то пришлёт, запись подхватит его сама.",
     capturing: "Лут рядом с вами записывается в лог.",
     capturingAs: (character: string): string => `Лут рядом с ${character} записывается в лог.`,
     stopping: "Просим логгер дописать файл и завершить работу.",
@@ -481,6 +480,7 @@ const RU: TStrings = {
       "Albion не запущен или стоит на экране входа — зайдите в игру и немного подвигайтесь.",
       "VPN или туннель (NordVPN, ExitLag, …) уводит трафик игры туда, где логгер его не видит. Выключите его на время записи.",
       "GeForce Now / облачный гейминг — игра идёт на их компьютере, поэтому её трафик сюда не попадает. Запись там невозможна.",
+      "Ожидание ничему не вредит: можно оставить запись включённой даже через перезапуск игры — трафик подхватится сам.",
     ],
   },
 
@@ -669,8 +669,7 @@ const DE: TStrings = {
   statusHint: {
     idle: "Drücke Start, bevor du in den Content gehst. Loot, der in deiner Nähe aufgehoben wird, landet in einer Log-Datei, aus der deine Offiziere abrechnen können.",
     starting: "Die Capture-Engine wird hochgefahren.",
-    waiting:
-      "Der Logger läuft, aber es ist noch kein Albion-Traffic angekommen. Sobald das Spiel Daten erzeugt, greift er sie von selbst auf — die Aufzeichnung darf auch über einen Spielneustart hinweg laufen.",
+    waiting: "Wir hören zu. Noch kein Albion-Traffic — sobald das Spiel etwas sendet, greift der Logger es auf.",
     capturing: "Loot-Ereignisse in deiner Nähe werden ins Log geschrieben.",
     capturingAs: (character: string): string => `Loot-Ereignisse bei ${character} werden ins Log geschrieben.`,
     stopping: "Der Logger schreibt zu Ende und fährt herunter.",
@@ -684,6 +683,7 @@ const DE: TStrings = {
       "Albion läuft nicht oder hängt im Login-Bildschirm — geh ins Spiel und beweg dich ein wenig.",
       "Ein VPN oder Tunnel (NordVPN, ExitLag, …) leitet den Spiel-Traffic dorthin, wo der Logger ihn nicht sieht. Schalte ihn während der Aufzeichnung aus.",
       "GeForce Now / Cloud-Gaming — das Spiel läuft auf deren Rechner, sein Traffic erreicht diesen hier nie. Aufzeichnung ist dort unmöglich.",
+      "Warten schadet nichts: Die Aufzeichnung darf über einen Spielneustart hinweg laufen — der Traffic wird von selbst aufgegriffen.",
     ],
   },
 
@@ -876,8 +876,7 @@ const FR: TStrings = {
   statusHint: {
     idle: "Appuyez sur Démarrer avant de partir en contenu. Le loot ramassé près de vous est écrit dans un fichier journal que vos officiers pourront régler.",
     starting: "Mise en route du moteur de capture.",
-    waiting:
-      "Le logger tourne, mais aucun trafic Albion ne lui est encore parvenu. Dès que le jeu produit du trafic, il le capte tout seul — le laisser tourner à travers un redémarrage du jeu ne pose aucun souci.",
+    waiting: "À l'écoute. Aucun trafic Albion pour l'instant — dès que le jeu en envoie, il est capté.",
     capturing: "Les événements de loot près de vous sont écrits dans le journal.",
     capturingAs: (character: string): string =>
       `Les événements de loot près de ${character} sont écrits dans le journal.`,
@@ -892,6 +891,7 @@ const FR: TStrings = {
       "Albion n'est pas lancé, ou reste sur l'écran de connexion — entrez en jeu et bougez un peu.",
       "Un VPN ou un tunnel (NordVPN, ExitLag, …) emmène le trafic du jeu là où le logger ne le voit pas. Coupez-le pendant la capture.",
       "GeForce Now / cloud gaming — le jeu tourne sur leur machine, son trafic n'atteint jamais celle-ci. La capture y est impossible.",
+      "Attendre ne coûte rien : laissez tourner à travers un redémarrage du jeu, le trafic sera capté tout seul.",
     ],
   },
 
@@ -1084,8 +1084,7 @@ const PT: TStrings = {
   statusHint: {
     idle: "Aperte Iniciar antes de partir para o conteúdo. O loot pego perto de você é escrito em um arquivo de log com que seus oficiais fazem o acerto.",
     starting: "Colocando o motor de captura para rodar.",
-    waiting:
-      "O logger está rodando, mas nenhum tráfego do Albion chegou até ele ainda. Assim que o jogo produzir tráfego, ele capta sozinho — pode deixar rodando mesmo através de um reinício do jogo.",
+    waiting: "Ouvindo. Nenhum tráfego do Albion ainda — assim que o jogo enviar algo, ele é captado.",
     capturing: "Eventos de loot perto de você estão sendo escritos no log.",
     capturingAs: (character: string): string => `Eventos de loot perto de ${character} estão sendo escritos no log.`,
     stopping: "Pedindo ao logger para terminar de escrever e encerrar.",
@@ -1099,6 +1098,7 @@ const PT: TStrings = {
       "O Albion não está aberto, ou está parado na tela de login — entre no jogo e se mexa um pouco.",
       "Uma VPN ou túnel (NordVPN, ExitLag, …) está levando o tráfego do jogo para onde o logger não vê. Desligue durante a captura.",
       "GeForce Now / cloud gaming — o jogo roda no computador deles, então o tráfego nunca chega neste aqui. A captura não funciona lá.",
+      "Esperar não custa nada: pode deixar rodando através de um reinício do jogo — o tráfego é captado sozinho.",
     ],
   },
 

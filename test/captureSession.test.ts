@@ -192,3 +192,82 @@ describe("capture session — file-poll fallback", () => {
     expect(fresh.logFile).toBe("/tmp/loot-events-old.txt");
   });
 });
+
+describe("capture session — live loot lines", () => {
+  const loot = (): TSessionEvent => {
+    return { type: "engine-line", at: at(), event: { kind: "loot" } };
+  };
+  const heartbeat = (linesWritten: number | null): TSessionEvent => {
+    return { type: "engine-line", at: at(), event: { kind: "heartbeat", character: "Bors", linesWritten } };
+  };
+
+  it("counts a pickup the moment it arrives, without waiting for a heartbeat", () => {
+    const s = run([{ type: "user-start", at: at() }, { type: "engine-spawned", at: at() }, loot(), loot(), loot()]);
+    expect(lootLinesOf(s)).toBe(3);
+    expect(s.lastLootAt).not.toBeNull();
+  });
+
+  it("treats a pickup as proof of traffic and starts capturing", () => {
+    const s = run([{ type: "user-start", at: at() }, { type: "engine-spawned", at: at() }, heartbeat(0), loot()]);
+    expect(s.status).toBe(ECaptureStatus.Capturing);
+    expect(s.albionSeen).toBe(true);
+  });
+
+  it("lets the heartbeat reconcile what was counted live, in both directions", () => {
+    const over = run([
+      { type: "user-start", at: at() },
+      { type: "engine-spawned", at: at() },
+      loot(),
+      loot(),
+      loot(),
+      heartbeat(2), // we counted one more than the engine wrote
+    ]);
+    expect(lootLinesOf(over)).toBe(2);
+
+    const under = run([
+      { type: "user-start", at: at() },
+      { type: "engine-spawned", at: at() },
+      loot(),
+      heartbeat(9), // lines we never saw echoed
+    ]);
+    expect(lootLinesOf(under)).toBe(9);
+  });
+
+  it("never accumulates a live miscount across heartbeats", () => {
+    const s = run([
+      { type: "user-start", at: at() },
+      { type: "engine-spawned", at: at() },
+      loot(),
+      loot(),
+      heartbeat(1),
+      loot(),
+      loot(),
+      heartbeat(2),
+      loot(),
+    ]);
+    // each heartbeat wipes the optimistic delta: 2 written + 1 seen live
+    expect(lootLinesOf(s)).toBe(3);
+  });
+
+  it("keeps live-counted lines when the engine restarts mid-run", () => {
+    const s = run([
+      { type: "user-start", at: at() },
+      { type: "engine-spawned", at: at() },
+      loot(),
+      loot(),
+      exitEvent({ willRestart: true, delayMs: 1000, attempt: 1 }),
+    ]);
+    expect(lootLinesOf(s)).toBe(2);
+    expect(s.linesSinceHeartbeat).toBe(0);
+  });
+
+  it("a heartbeat with no number leaves the live count alone", () => {
+    const s = run([
+      { type: "user-start", at: at() },
+      { type: "engine-spawned", at: at() },
+      loot(),
+      heartbeat(null),
+    ]);
+    expect(lootLinesOf(s)).toBe(1);
+  });
+});

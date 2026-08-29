@@ -92,6 +92,19 @@ export const reduceCaptureSession = (state: TCaptureState, ev: TSessionEvent): T
           }
           return next;
         }
+        case "loot": {
+          // A pickup is the strongest possible proof of traffic — stronger
+          // than the detection line, because loot is the thing we are here
+          // for. It counts immediately; the next heartbeat reconciles.
+          next.albionSeen = true;
+          next.lastDetectedAt = ev.at;
+          next.lastLootAt = ev.at;
+          next.linesSinceHeartbeat = next.linesSinceHeartbeat + 1;
+          if (next.status === ECaptureStatus.Starting || next.status === ECaptureStatus.Waiting) {
+            next.status = ECaptureStatus.Capturing;
+          }
+          return next;
+        }
         case "heartbeat": {
           if (line.character != null) {
             next.character = line.character;
@@ -100,6 +113,10 @@ export const reduceCaptureSession = (state: TCaptureState, ev: TSessionEvent): T
             next.heartbeatSeen = true;
             // Monotonic guard: a heartbeat can never take lines away.
             next.linesThisRun = Math.max(next.linesThisRun, line.linesWritten);
+            // …and it is the reconciling truth for what we counted live, so
+            // the optimistic delta starts again from here. An over- or
+            // under-count is bounded by one heartbeat and never accumulates.
+            next.linesSinceHeartbeat = 0;
           }
           // A heartbeat proves the engine is alive and past its startup.
           if (next.status === ECaptureStatus.Starting) {
@@ -133,6 +150,8 @@ export const reduceCaptureSession = (state: TCaptureState, ev: TSessionEvent): T
       }
       if (!next.heartbeatSeen) {
         next.linesThisRun = Math.max(next.linesThisRun, ev.lines);
+        // The poll counted the file itself; same reconciliation as a heartbeat.
+        next.linesSinceHeartbeat = 0;
       }
       return next;
     }
@@ -142,8 +161,9 @@ export const reduceCaptureSession = (state: TCaptureState, ev: TSessionEvent): T
       // happens next, lines already written stay counted.
       const rolled: TCaptureState = {
         ...state,
-        linesPrevRuns: state.linesPrevRuns + state.linesThisRun,
+        linesPrevRuns: state.linesPrevRuns + state.linesThisRun + state.linesSinceHeartbeat,
         linesThisRun: 0,
+        linesSinceHeartbeat: 0,
         heartbeatSeen: false,
         albionSeen: false,
         runStartedAt: null,

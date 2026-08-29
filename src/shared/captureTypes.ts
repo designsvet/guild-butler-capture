@@ -52,8 +52,19 @@ export type TCaptureState = {
   albionSeen: boolean;
   /** Detected character name; sticky across engine restarts within a session. */
   character: string | null;
-  /** Data lines the current engine run has written. */
+  /** Data lines the current engine run has written, as of the last heartbeat. */
   linesThisRun: number;
+  /**
+   * Loot lines counted from the engine's own live output SINCE that heartbeat.
+   *
+   * The heartbeat is only printed once a minute, so it alone makes the counter
+   * up to a minute stale. The engine also prints one line per pickup the
+   * moment it happens; those are counted here and the next heartbeat resets
+   * this to zero, so an optimistic miscount can never accumulate — the
+   * heartbeat stays the reconciling truth, this is only how the number moves
+   * between two of them.
+   */
+  linesSinceHeartbeat: number;
   /** Data lines rolled up from earlier runs of this session (engine restarts). */
   linesPrevRuns: number;
   /** Absolute path of the newest log file. Kept after Stop so Reveal still works. */
@@ -69,6 +80,8 @@ export type TCaptureState = {
   lastOutputAt: number | null;
   /** Last time ALBION DETECTED fired. */
   lastDetectedAt: number | null;
+  /** Last loot line seen, epoch ms — the renderer's cue to pulse. */
+  lastLootAt: number | null;
   /** Consecutive unexpected-exit count feeding the restart backoff display. */
   restartAttempt: number;
   /** Next relaunch is due this many ms after the exit (display only). */
@@ -86,6 +99,7 @@ export const initialCaptureState: TCaptureState = {
   albionSeen: false,
   character: null,
   linesThisRun: 0,
+  linesSinceHeartbeat: 0,
   linesPrevRuns: 0,
   logFile: null,
   errorKind: null,
@@ -94,6 +108,7 @@ export const initialCaptureState: TCaptureState = {
   runStartedAt: null,
   lastOutputAt: null,
   lastDetectedAt: null,
+  lastLootAt: null,
   restartAttempt: 0,
   restartDelayMs: null,
   heartbeatSeen: false,
@@ -102,7 +117,7 @@ export const initialCaptureState: TCaptureState = {
 
 /** What the session-total counter shows: every run's lines, current one included. */
 export const lootLinesOf = (state: TCaptureState): number => {
-  return state.linesPrevRuns + state.linesThisRun;
+  return state.linesPrevRuns + state.linesThisRun + state.linesSinceHeartbeat;
 };
 
 /** Can the user's ability to capture be established before Start? Probed at boot + on focus. */

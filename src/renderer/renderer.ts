@@ -105,6 +105,7 @@ const ui = {
   statFile: el<HTMLSpanElement>("stat-file"),
   revealBtn: el<HTMLButtonElement>("btn-reveal"),
   primaryBtn: el<HTMLButtonElement>("btn-primary"),
+  primaryText: el<HTMLSpanElement>("btn-primary-text"),
   errorPanel: el<HTMLDivElement>("error-panel"),
   errorTitle: el<HTMLParagraphElement>("error-title"),
   errorBody: el<HTMLParagraphElement>("error-body"),
@@ -210,8 +211,11 @@ const statusHintFor = (s: TCaptureState): string => {
       return STR.statusHint.waiting;
     }
     case ECaptureStatus.Capturing: {
-      // The greeting already says who — a hint repeating the name is noise.
-      return s.character != null ? "" : STR.statusHint.capturing;
+      // The slot is a fixed two lines in every state, so leaving it EMPTY
+      // here reads as something failing to load rather than as restraint —
+      // and this is the one state where a member wants reassurance that the
+      // file is actually being written.
+      return s.character != null ? STR.statusHint.capturingAs(s.character) : STR.statusHint.capturing;
     }
     case ECaptureStatus.Stopping: {
       return STR.statusHint.stopping;
@@ -311,6 +315,119 @@ const show = (element: HTMLElement, visible: boolean): void => {
   element.classList.toggle("hidden", !visible);
 };
 
+// --- motion (the 2026-08-29 transition study) --------------------------------
+//
+// One rule holds the whole thing up: NOTHING in the greeting may change the
+// layout. Every slot is reserved at its worst case, so "no jumps" is a
+// property of the structure and the motion below is free to be about the
+// content changing rather than about hiding a reflow.
+
+const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+/** Text out, in ms. Matches --gb-t-out; the CSS owns the easing. */
+const SWAP_OUT_MS = 170;
+/** Hover stays off this long after a Start/Stop swap under the cursor. */
+const PRIMARY_SETTLE_MS = 350;
+/** The capture beat's class lives this long — a touch past its last delay. */
+const WAVE_MS = 950;
+
+/**
+ * Swap an element's words by rolling them: out upward, in from below.
+ *
+ * `onSwap` runs at the instant the text changes, and anything that alters the
+ * element's SIZE has to happen there — set it earlier and the OLD words are
+ * drawn at the new words' dimensions for a frame (the placeholder briefly
+ * rendering at the character name's 30px is how this was found).
+ *
+ * `delay` staggers one element behind another: a state change used to land on
+ * every element in the same frame, which reads as a flash; 50ms apart it
+ * reads as one thing causing the next.
+ */
+const swapText = (node: HTMLElement, next: string, onSwap?: () => void, delay = 0): void => {
+  if (node.textContent === next) {
+    onSwap?.();
+    return;
+  }
+  if (REDUCED.matches) {
+    node.textContent = next;
+    onSwap?.();
+    return;
+  }
+  const start = (): void => {
+    node.classList.add("out");
+    window.setTimeout(() => {
+      node.textContent = next;
+      onSwap?.();
+      // park it below with no transition, then release so it rises in
+      node.classList.add("pre");
+      void node.offsetWidth;
+      node.classList.remove("out", "pre");
+    }, SWAP_OUT_MS);
+  };
+  if (delay > 0) {
+    window.setTimeout(start, delay);
+  } else {
+    start();
+  }
+};
+
+/** Measures the status label off-screen so its box can glide to a width. */
+const labelMeasurer = ((): HTMLSpanElement => {
+  const node = document.createElement("span");
+  node.setAttribute("aria-hidden", "true");
+  node.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap";
+  node.className = "status-label";
+  document.body.append(node);
+  return node;
+})();
+
+const setStatusLabel = (next: string): void => {
+  swapText(
+    ui.statusLabel,
+    next,
+    () => {
+      labelMeasurer.textContent = next;
+      ui.statusLabel.style.width = `${Math.ceil(labelMeasurer.getBoundingClientRect().width) + 1}px`;
+    },
+    50,
+  );
+};
+
+/**
+ * The counter rolls: the old number leaves upward, the new one rises in.
+ *
+ * Only for a small step, though. A ZvZ lands loot faster than the roll can
+ * play and the result is a slot machine, so a big jump is simply set.
+ */
+const MAX_ROLL_STEP = 3;
+let countShown = 0;
+
+const setCount = (next: number): void => {
+  // Take the LAST roll, not the first: two pickups inside one roll's 300ms
+  // leave the outgoing span still in the DOM, and rolling off a node that is
+  // already leaving stacks digits side by side instead of replacing them.
+  const rolls = ui.statLoot.querySelectorAll<HTMLElement>(".roll");
+  const current = rolls[rolls.length - 1];
+  if (current == null || next === countShown || !Number.isFinite(next)) {
+    return;
+  }
+  const step = Math.abs(next - countShown);
+  countShown = next;
+  if (REDUCED.matches || step > MAX_ROLL_STEP) {
+    current.textContent = String(next);
+    return;
+  }
+  const fresh = document.createElement("span");
+  fresh.className = "roll in";
+  fresh.textContent = String(next);
+  current.classList.add("out");
+  ui.statLoot.append(fresh);
+  window.setTimeout(() => {
+    current.remove();
+    fresh.classList.remove("in");
+  }, 300);
+};
+
 // --- the primary CTA ----------------------------------------------------------
 //
 // The button flips identity (Start <-> Stop) the moment the engine answers, and
@@ -321,9 +438,6 @@ const show = (element: HTMLElement, visible: boolean): void => {
 // cursor has had a beat to be a cursor again. Writes are change-only because
 // render() runs on a 1s clock — rewriting identical text would restart any
 // in-flight CSS transition every tick.
-
-/** Hover stays off this long after Start<->Stop swap under the cursor. */
-const PRIMARY_SETTLE_MS = 350;
 
 let primaryLast = { text: "", mode: "", busy: false };
 let primarySettleTimer: number | null = null;
@@ -355,7 +469,13 @@ const syncPrimary = (status: ECaptureStatus): void => {
   }
 
   if (text !== primaryLast.text) {
-    ui.primaryBtn.textContent = text;
+    swapText(ui.primaryText, text);
+  }
+  if (mode !== primaryLast.mode || busy !== primaryLast.busy) {
+    // one squash as the gold drains off the ember beneath it
+    ui.primaryBtn.classList.remove("morphing");
+    void ui.primaryBtn.offsetWidth;
+    ui.primaryBtn.classList.add("morphing");
   }
   if (mode !== primaryLast.mode) {
     ui.primaryBtn.dataset.mode = mode;
@@ -383,8 +503,8 @@ const render = (): void => {
     s.status === ECaptureStatus.Capturing;
 
   ui.statusDot.dataset.status = s.status;
-  ui.statusLabel.textContent = statusLabelFor(s.status);
-  ui.statusHint.textContent = statusHintFor(s);
+  setStatusLabel(statusLabelFor(s.status));
+  swapText(ui.statusHint, statusHintFor(s), undefined, 150);
   ui.hero.dataset.active = String(s.status === ECaptureStatus.Capturing);
   ui.hero.dataset.traffic = String(s.albionSeen);
 
@@ -395,17 +515,24 @@ const render = (): void => {
   // The greeting: the character's name in gold once known; the quiet
   // explanation (or a detecting note) in the same slot until then.
   const known = s.character != null;
-  ui.heroCharacter.dataset.known = String(known);
-  ui.heroCharacter.textContent = s.character ?? (running ? STR.stats.characterUnknown : STR.hero.noCharacter);
+  swapText(
+    ui.heroCharacter,
+    s.character ?? (running ? STR.stats.characterUnknown : STR.hero.noCharacter),
+    () => {
+      // with the text, never before it — the size changes with the state
+      ui.heroCharacter.dataset.known = String(known);
+    },
+    100,
+  );
 
-  ui.statLoot.textContent = String(lootLinesOf(s));
+  setCount(lootLinesOf(s));
   if (s.albionSeen) {
     const ref = s.lastOutputAt ?? s.lastDetectedAt ?? now;
-    ui.statTraffic.textContent = STR.stats.trafficSeenAgo(Math.max(0, Math.round((now - ref) / 1000)));
+    swapText(ui.statTraffic, STR.stats.trafficSeenAgo(Math.max(0, Math.round((now - ref) / 1000))), undefined, 200);
   } else {
-    ui.statTraffic.textContent = STR.stats.trafficNotSeen;
+    swapText(ui.statTraffic, STR.stats.trafficNotSeen, undefined, 200);
   }
-  ui.statFile.textContent = s.logFile != null ? basename(s.logFile) : STR.stats.logFileNone;
+  swapText(ui.statFile, s.logFile != null ? basename(s.logFile) : STR.stats.logFileNone, undefined, 200);
   ui.statFile.title = s.logFile ?? "";
   ui.revealBtn.disabled = s.logFile == null;
 
@@ -609,9 +736,9 @@ const rain = ((): { sync: (mode: TRainMode) => void; restyle: () => void } => {
     }
   };
 
-  const advance = (): void => {
+  const advance = (rate: number): void => {
     for (const col of columns) {
-      col.y -= col.speed;
+      col.y -= col.speed * rate;
       const span = col.items.length * LINE_H + 120;
       if (col.y < -span) {
         col.y += span;
@@ -626,6 +753,34 @@ const rain = ((): { sync: (mode: TRainMode) => void; restyle: () => void } => {
     }
   };
 
+  /**
+   * Speed is EASED, not switched. The still frame setting off at full pace
+   * (and stopping dead) was the one part of the rain that still snapped;
+   * ramping it means capture makes the card set sail and stopping lets it
+   * coast to rest. ~1.2s each way at 12fps.
+   */
+  const RAMP = 0.06;
+  let speed = 0;
+  let target = 0;
+
+  const runTimer = (): void => {
+    if (timer != null) {
+      return;
+    }
+    timer = window.setInterval(() => {
+      speed += (target - speed) * RAMP;
+      if (target === 0 && speed < 0.004) {
+        // coasted to a stop: leave the still frame standing
+        speed = 0;
+        stopTimer();
+        draw();
+        return;
+      }
+      advance(speed);
+      draw();
+    }, TICK_MS);
+  };
+
   const sync = (next: TRainMode): void => {
     // The 1s render clock calls this every tick; same mode + same size is a
     // no-op so a still frame is painted once, not sixty times a minute.
@@ -636,6 +791,8 @@ const rain = ((): { sync: (mode: TRainMode) => void; restyle: () => void } => {
     mode = next;
     if (next === "off") {
       stopTimer();
+      speed = 0;
+      target = 0;
       ctx?.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
       return;
     }
@@ -643,18 +800,11 @@ const rain = ((): { sync: (mode: TRainMode) => void; restyle: () => void } => {
     if (resized || columns.length === 0) {
       layout();
     }
-    if (next === "drift") {
-      if (timer == null) {
-        timer = window.setInterval(() => {
-          advance();
-          draw();
-        }, TICK_MS);
-      }
-      draw(); // first frame now, not a tick later
-    } else {
-      stopTimer();
-      draw(); // the still image
+    target = next === "drift" ? 1 : 0;
+    if (next === "drift" || speed > 0) {
+      runTimer();
     }
+    draw();
   };
 
   return {
@@ -1084,35 +1234,72 @@ void gbc.getUpdate().then((status) => {
   renderUpdateInline();
 });
 
-let igniteTimer: number | null = null;
+let waveTimer: number | null = null;
 
 /**
- * The ignite beat: when a session actually reaches Capturing, the hero plays
- * one orchestrated reveal (dot pulse -> name -> count bloom -> chips) and the
- * rain fades in behind it. Only on a genuine transition — a window reopened
- * over an already-running capture starts calm.
+ * The capture beat: one wave of energy passing up through the card — dot,
+ * label, name, count, caption, chips — while the rain lifts behind it. Only
+ * on a genuine transition; a window reopened over a running capture starts
+ * calm.
+ *
+ * It brightens and swells what is already there and hides NOTHING. The first
+ * version staggered opacity-0 entrances, so the instant capture began the
+ * hero went empty for a beat and then re-assembled itself. That blank frame
+ * was the whole reason this moment read as a flash instead of an arrival.
  */
-const maybeIgnite = (prev: ECaptureStatus | null, next: ECaptureStatus): void => {
+const maybeWave = (prev: ECaptureStatus | null, next: ECaptureStatus): void => {
   if (next !== ECaptureStatus.Capturing || prev === ECaptureStatus.Capturing || prev == null) {
     return;
   }
-  ui.hero.classList.remove("ignite");
-  // force a reflow so a rapid stop/start replays the animation
+  ui.hero.classList.remove("wave");
+  // force a reflow so a rapid stop/start replays it
   void ui.hero.offsetWidth;
-  ui.hero.classList.add("ignite");
-  if (igniteTimer != null) {
-    window.clearTimeout(igniteTimer);
+  ui.hero.classList.add("wave");
+  if (waveTimer != null) {
+    window.clearTimeout(waveTimer);
   }
-  igniteTimer = window.setTimeout(() => {
-    ui.hero.classList.remove("ignite");
-    igniteTimer = null;
-  }, 950);
+  waveTimer = window.setTimeout(() => {
+    ui.hero.classList.remove("wave");
+    waveTimer = null;
+  }, WAVE_MS);
+};
+
+/**
+ * A pickup, the moment the engine prints it. Throttled: a busy fight lands
+ * loot faster than the pulse plays, and a dot that never stops pulsing says
+ * nothing at all.
+ */
+const PULSE_THROTTLE_MS = 900;
+let lastPulseAt = 0;
+let pulseTimer: number | null = null;
+
+const maybePulse = (prev: number | null, next: number | null): void => {
+  if (next == null || next === prev || REDUCED.matches) {
+    return;
+  }
+  const now = Date.now();
+  if (now - lastPulseAt < PULSE_THROTTLE_MS) {
+    return;
+  }
+  lastPulseAt = now;
+  ui.statusDot.classList.remove("pulse");
+  void ui.statusDot.offsetWidth;
+  ui.statusDot.classList.add("pulse");
+  if (pulseTimer != null) {
+    window.clearTimeout(pulseTimer);
+  }
+  pulseTimer = window.setTimeout(() => {
+    ui.statusDot.classList.remove("pulse");
+    pulseTimer = null;
+  }, 450);
 };
 
 gbc.onState((next) => {
   const prev = state?.status ?? null;
+  const prevLoot = state?.lastLootAt ?? null;
   state = next;
-  maybeIgnite(prev, next.status);
+  maybeWave(prev, next.status);
+  maybePulse(prevLoot, next.lastLootAt);
   render();
 });
 
