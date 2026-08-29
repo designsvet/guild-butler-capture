@@ -499,6 +499,40 @@ unsigned updates). Set `GBC_NO_AUTO_UPDATE=1` to pin a machine to its build.
 - **Neither platform** can capture inside a VPN/tunnel or on cloud gaming —
   the app says so instead of logging nothing.
 
+### If a Windows member sees this
+
+```
+Error: The specified module could not be found.
+\\?\C:\Users\...\resources\engine\node_modules\cap\build\Release\cap.node
+  code: 'ERR_DLOPEN_FAILED'
+```
+
+**Npcap is not installed.** `cap.node` links against `wpcap.dll`, and Windows
+reports a missing *dependency* by naming the file it DID find — so the words
+npcap, wpcap and winpcap appear nowhere in the crash. Install
+[Npcap](https://npcap.com/#download) (defaults are fine) and reopen the app,
+or use the app's own **Install capture driver** button, which fetches and
+launches Npcap's signed installer.
+
+Reported by a member on v0.6.0, where this text was misread as an ABI mismatch
+and the card told them to run `pnpm engine:rebuild` — a command for a repo
+they do not have. Fixed in v0.6.1; the crash is pinned as a fixture
+(`REAL_WIN_NPCAP_MISSING`) so it cannot be misread again.
+
+### If nothing at all happens when a member runs the installer
+
+The app writes a log from its first moment. Ask for:
+
+```
+%APPDATA%\guild-butler-capture\logs\capture-app.log
+```
+
+If that file does not exist the app never started, which points at SmartScreen
+blocking the unsigned installer — the run button hides behind **More info →
+Run anyway**. The installer is one-click and launches the app itself, so
+"nothing happened" can also mean it is already installed and sitting in the
+Start menu.
+
 ## What members should expect it to see
 
 Measured against live traffic 2026-08-19 (the engine's `README-mac.md` is the
