@@ -401,6 +401,8 @@ const setStatusLabel = (next: string): void => {
  */
 const MAX_ROLL_STEP = 3;
 let countShown = 0;
+/** Whether the last render had traffic — the traffic chip's only roll cue. */
+let trafficWasSeen = false;
 
 const setCount = (next: number): void => {
   // Take the LAST roll, not the first: two pickups inside one roll's 300ms
@@ -526,11 +528,17 @@ const render = (): void => {
   );
 
   setCount(lootLinesOf(s));
-  if (s.albionSeen) {
-    const ref = s.lastOutputAt ?? s.lastDetectedAt ?? now;
-    swapText(ui.statTraffic, STR.stats.trafficSeenAgo(Math.max(0, Math.round((now - ref) / 1000))), undefined, 200);
+  // The traffic chip is a READOUT, not an event: it re-reads on the 1s clock,
+  // so rolling it makes the card twitch once a second forever. It rolls only
+  // when traffic itself starts or stops — every other update is a quiet set.
+  const trafficText = s.albionSeen
+    ? STR.stats.trafficSeenAgo(Math.max(0, Math.round((now - (s.lastOutputAt ?? s.lastDetectedAt ?? now)) / 1000)))
+    : STR.stats.trafficNotSeen;
+  if (s.albionSeen === trafficWasSeen) {
+    ui.statTraffic.textContent = trafficText;
   } else {
-    swapText(ui.statTraffic, STR.stats.trafficNotSeen, undefined, 200);
+    swapText(ui.statTraffic, trafficText, undefined, 200);
+    trafficWasSeen = s.albionSeen;
   }
   swapText(ui.statFile, s.logFile != null ? basename(s.logFile) : STR.stats.logFileNone, undefined, 200);
   ui.statFile.title = s.logFile ?? "";

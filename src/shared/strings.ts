@@ -81,7 +81,8 @@ const EN = {
     characterUnknown: "detecting…",
     loot: "Loot events this session",
     traffic: "Albion traffic",
-    trafficSeenAgo: (seconds: number): string => (seconds <= 2 ? "live" : `seen ${seconds}s ago`),
+    trafficSeenAgo: (seconds: number): string =>
+      seconds <= 45 ? "live" : `seen ${Math.max(1, Math.round(seconds / 60))}m ago`,
     trafficNotSeen: "not seen yet",
     logFile: "Log file",
     logFileNone: "created when capture starts",
@@ -306,7 +307,8 @@ const UK: TStrings = {
     characterUnknown: "визначається…",
     loot: "Подій луту за сесію",
     traffic: "Трафік Albion",
-    trafficSeenAgo: (seconds: number): string => (seconds <= 2 ? "щойно" : `${seconds} с тому`),
+    trafficSeenAgo: (seconds: number): string =>
+      seconds <= 45 ? "у ефірі" : `${Math.max(1, Math.round(seconds / 60))} хв тому`,
     trafficNotSeen: "ще не видно",
     logFile: "Лог-файл",
     logFileNone: "з'явиться після старту запису",
@@ -508,7 +510,8 @@ const RU: TStrings = {
     characterUnknown: "определяется…",
     loot: "Событий лута за сессию",
     traffic: "Трафик Albion",
-    trafficSeenAgo: (seconds: number): string => (seconds <= 2 ? "сейчас" : `${seconds} с назад`),
+    trafficSeenAgo: (seconds: number): string =>
+      seconds <= 45 ? "в эфире" : `${Math.max(1, Math.round(seconds / 60))} мин назад`,
     trafficNotSeen: "ещё не виден",
     logFile: "Лог-файл",
     logFileNone: "появится после старта записи",
@@ -711,7 +714,8 @@ const DE: TStrings = {
     characterUnknown: "wird erkannt…",
     loot: "Loot-Ereignisse diese Sitzung",
     traffic: "Albion-Traffic",
-    trafficSeenAgo: (seconds: number): string => (seconds <= 2 ? "live" : `vor ${seconds} s gesehen`),
+    trafficSeenAgo: (seconds: number): string =>
+      seconds <= 45 ? "live" : `vor ${Math.max(1, Math.round(seconds / 60))} min gesehen`,
     trafficNotSeen: "noch nicht gesehen",
     logFile: "Log-Datei",
     logFileNone: "entsteht beim Start der Aufzeichnung",
@@ -919,7 +923,8 @@ const FR: TStrings = {
     characterUnknown: "détection…",
     loot: "Événements de loot cette session",
     traffic: "Trafic Albion",
-    trafficSeenAgo: (seconds: number): string => (seconds <= 2 ? "en direct" : `vu il y a ${seconds} s`),
+    trafficSeenAgo: (seconds: number): string =>
+      seconds <= 45 ? "en direct" : `vu il y a ${Math.max(1, Math.round(seconds / 60))} min`,
     trafficNotSeen: "pas encore vu",
     logFile: "Fichier journal",
     logFileNone: "créé au démarrage de la capture",
@@ -1126,7 +1131,8 @@ const PT: TStrings = {
     characterUnknown: "detectando…",
     loot: "Eventos de loot nesta sessão",
     traffic: "Tráfego do Albion",
-    trafficSeenAgo: (seconds: number): string => (seconds <= 2 ? "ao vivo" : `visto há ${seconds}s`),
+    trafficSeenAgo: (seconds: number): string =>
+      seconds <= 45 ? "ao vivo" : `visto há ${Math.max(1, Math.round(seconds / 60))}min`,
     trafficNotSeen: "ainda não visto",
     logFile: "Arquivo de log",
     logFileNone: "criado quando a captura começa",
