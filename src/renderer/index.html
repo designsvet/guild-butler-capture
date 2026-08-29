@@ -7,18 +7,28 @@
       content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
     />
     <title>Guild Butler Capture</title>
+    <link rel="stylesheet" href="./fonts.css" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <!-- English in the markup is the no-JS fallback; the renderer overwrites
+         every string at boot from the active language's catalog. -->
+
+    <!-- The title bar IS this header: the window is frameless and this strip
+         is the drag region (traffic lights overlay it on macOS, the overlay
+         window controls sit at its right edge on Windows). -->
     <header class="app-header">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">⚔️</div>
-        <div>
-          <h1>Guild Butler Capture</h1>
-          <p class="tagline">Albion loot logging for your guild — no terminal required.</p>
-        </div>
-      </div>
+      <img class="brand-mark" src="./crest.png" alt="" width="30" height="30" />
+      <h1 class="brand-name">Guild Butler</h1>
+      <div class="header-spacer"></div>
       <span id="app-version" class="version"></span>
+      <button id="btn-settings" class="gear-btn" aria-label="Settings">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true">
+          <circle cx="8" cy="8" r="4.4"></circle>
+          <circle cx="8" cy="8" r="1.6"></circle>
+          <path d="M13 8 H15.2 M11.55 11.55 L13.1 13.1 M8 13 V15.2 M4.45 11.55 L2.9 13.1 M3 8 H0.8 M4.45 4.45 L2.9 2.9 M8 3 V0.8 M11.55 4.45 L13.1 2.9"></path>
+        </svg>
+      </button>
     </header>
 
     <div id="update-strip" class="card update-strip hidden">
@@ -28,18 +38,7 @@
     </div>
 
     <main>
-      <section class="card status-card">
-        <div class="status-row">
-          <span id="status-dot" class="status-dot" data-status="idle" aria-hidden="true"></span>
-          <span id="status-label" class="status-label">Not capturing</span>
-        </div>
-        <p id="status-hint" class="status-hint"></p>
-        <div id="waiting-hints" class="hints hidden">
-          <p id="waiting-hints-title" class="hints-title"></p>
-          <ul id="waiting-hints-list"></ul>
-        </div>
-      </section>
-
+      <!-- Fix cards replace the greeting zone when they apply. -->
       <section id="error-panel" class="card error-card hidden">
         <p id="error-title" class="error-title"></p>
         <p id="error-body" class="error-body"></p>
@@ -51,7 +50,7 @@
         </div>
         <p id="error-fix-note" class="fix-note hidden"></p>
         <details id="error-details" class="hidden">
-          <summary>Technical details</summary>
+          <summary id="error-details-summary">Technical details</summary>
           <pre id="error-detail-text"></pre>
         </details>
       </section>
@@ -69,38 +68,70 @@
         <p id="setup-fix-note" class="fix-note hidden"></p>
       </section>
 
-      <section class="card stats-card">
-        <dl class="stats">
-          <div class="stat">
-            <dt>Character</dt>
-            <dd id="stat-character">—</dd>
+      <!-- The greeting: status chip → the character's name → the count, over
+           the log rain. The whole zone flexes so the window never resizes. -->
+      <section id="hero" class="hero">
+        <canvas id="rain-canvas" class="rain-canvas" aria-hidden="true"></canvas>
+        <div id="hero-stack" class="hero-stack">
+          <span class="status-chip">
+            <span id="status-dot" class="status-dot" data-status="idle" aria-hidden="true">
+              <span class="dot-sweep"></span>
+              <span class="dot-ping"></span>
+            </span>
+            <span id="status-label" class="status-label swap">Not capturing</span>
+          </span>
+          <span id="hero-character" class="hero-character swap" data-known="false">—</span>
+          <span id="stat-loot" class="hero-count"><span class="roll">0</span></span>
+          <span id="stat-loot-label" class="hero-caption">Loot events this session</span>
+          <div class="hero-chips">
+            <span class="chip" id="traffic-chip">
+              <span id="traffic-dot" class="chip-dot" aria-hidden="true"></span>
+              <span id="stat-traffic" class="swap">not seen yet</span>
+            </span>
+            <span class="chip chip-log">
+              <span id="stat-file" class="chip-file swap"></span>
+              <button id="btn-reveal" class="btn tiny" disabled>Reveal</button>
+            </span>
           </div>
-          <div class="stat">
-            <dt>Loot events this session</dt>
-            <dd id="stat-loot">0</dd>
+          <p id="status-hint" class="status-hint hero-hint swap"></p>
+          <div id="waiting-hints" class="hints hidden">
+            <p id="waiting-hints-title" class="hints-title"></p>
+            <ul id="waiting-hints-list"></ul>
           </div>
-          <div class="stat">
-            <dt>Albion traffic</dt>
-            <dd id="stat-traffic">not seen yet</dd>
-          </div>
-          <div class="stat stat-file">
-            <dt>Log file</dt>
-            <dd class="file-row">
-              <span id="stat-file" class="file-name"></span>
-              <button id="btn-reveal" class="btn small" disabled>Reveal</button>
-            </dd>
-          </div>
-        </dl>
+        </div>
+        <div class="cta-row">
+          <button id="btn-primary" class="primary" data-mode="start">
+            <span class="pill-lay pill-ember" aria-hidden="true"></span>
+            <span class="pill-lay pill-gold" aria-hidden="true"></span>
+            <span class="pill-lay pill-shimmer" aria-hidden="true"></span>
+            <span class="pill-face"><span class="pill-square" aria-hidden="true"></span><span id="btn-primary-text" class="swap">Start capture</span></span>
+          </button>
+        </div>
       </section>
 
-      <section id="pairing-panel" class="card">
-        <p id="pairing-title" class="pairing-title"></p>
-
-        <!-- Not paired: the code goes here. -->
+      <!-- The bottom slot: pairing. One card, two exclusive faces. -->
+      <section id="pairing-panel" class="card pairing-card">
+        <!-- Not paired: the two-step onboarding. -->
         <div id="pairing-setup">
-          <p id="pairing-hint" class="status-hint"></p>
-          <div class="pairing-row">
-            <label id="pairing-code-label" class="pairing-label" for="pairing-code"></label>
+          <p id="pairing-title" class="pairing-title"></p>
+          <p id="pairing-intro" class="pairing-intro"></p>
+          <div class="pair-step">
+            <span class="step-badge" aria-hidden="true">1</span>
+            <span id="pairing-step1-label" class="step-text"></span>
+            <span class="cmd-chip">
+              <span class="cmd-text">/capture pair</span>
+              <button id="btn-copy-cmd" class="copy-btn" aria-label="Copy">
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+                  <rect x="4.5" y="4.5" width="8" height="8" rx="1.5"></rect>
+                  <path d="M9.5 4.5 V3 A1.5 1.5 0 0 0 8 1.5 H3 A1.5 1.5 0 0 0 1.5 3 v5 A1.5 1.5 0 0 0 3 9.5 h1.5"></path>
+                </svg>
+              </button>
+            </span>
+            <span id="copy-note" class="copy-note" role="status"></span>
+          </div>
+          <div class="pair-step">
+            <span class="step-badge" aria-hidden="true">2</span>
+            <span id="pairing-step2-label" class="step-text"></span>
             <input
               id="pairing-code"
               class="pairing-input"
@@ -109,43 +140,97 @@
               spellcheck="false"
               maxlength="9"
             />
-            <button id="btn-pair" class="btn accent"></button>
+            <button id="btn-pair" class="btn gold"></button>
           </div>
           <p id="pairing-error" class="fix-note hidden"></p>
         </div>
 
-        <!-- Paired: who, how it's going, and the way out. -->
+        <!-- Paired: the connected row; the chevron opens the details. -->
         <div id="pairing-connected" class="hidden">
-          <p id="pairing-as" class="pairing-as"></p>
-          <p id="pairing-upload-status" class="status-hint"></p>
-          <div class="pairing-row">
-            <label class="pairing-toggle">
-              <input id="pairing-upload-toggle" type="checkbox" checked />
-              <span id="pairing-upload-label"></span>
-            </label>
+          <div class="pair-row">
+            <span class="pair-dot" aria-hidden="true"></span>
+            <div class="pair-lines">
+              <span id="pairing-as" class="pairing-as"></span>
+              <span id="pairing-upload-status" class="pair-sub"></span>
+            </div>
+            <button id="btn-view-loot" class="btn small gold-ghost"></button>
+            <button id="btn-pairing-more" class="chev-btn" aria-expanded="false" aria-label="More options">
+              <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+                <path d="M2 3.5 L5 6.5 L8 3.5"></path>
+              </svg>
+            </button>
           </div>
-          <div class="error-actions">
-            <button id="btn-view-loot" class="btn small"></button>
+          <!-- Opens as an overlay ABOVE the row — the fixed window never re-flows. -->
+          <div id="pairing-details" class="pair-details" hidden>
+            <label class="switch-row" for="pairing-upload-toggle">
+              <span class="switch">
+                <input id="pairing-upload-toggle" type="checkbox" checked />
+                <span class="switch-track" aria-hidden="true"></span>
+              </span>
+              <span id="pairing-upload-label" class="switch-label"></span>
+            </label>
             <button id="btn-unpair" class="btn small"></button>
           </div>
         </div>
       </section>
-
-      <button id="btn-primary" class="primary" data-mode="start">Start capture</button>
-
-      <details class="advanced">
-        <summary>Advanced</summary>
-        <div class="advanced-row">
-          <span class="advanced-label">Engine</span>
-          <span id="adv-engine-path" class="advanced-value"></span>
-          <button id="btn-choose-engine" class="btn small">Choose engine folder…</button>
-        </div>
-      </details>
     </main>
 
-    <footer>
-      <p id="footer-credit"></p>
-    </footer>
+    <!-- The gear popover: configuration, not session. -->
+    <div id="settings-popover" class="settings-popover" hidden>
+      <label class="switch-row" for="auto-capture-toggle">
+        <span class="switch">
+          <input id="auto-capture-toggle" type="checkbox" checked />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+        <span id="auto-capture-label" class="switch-label">Start capturing when the app opens</span>
+      </label>
+      <div class="settings-row">
+        <span id="lang-label" class="settings-label">Language</span>
+        <div class="dd" id="lang-dd" data-open="false">
+          <button id="btn-lang" class="dd-btn" aria-haspopup="listbox" aria-expanded="false">
+            <span id="lang-current">System</span>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+              <path d="M2 3.5 L5 6.5 L8 3.5"></path>
+            </svg>
+          </button>
+          <div id="lang-menu" class="dd-menu" role="listbox" hidden></div>
+        </div>
+      </div>
+      <div class="settings-theme">
+        <span id="theme-label" class="settings-label">Theme</span>
+        <div class="theme-tiles">
+          <button id="theme-obsidian" class="theme-tile" data-theme-pick="obsidian" aria-pressed="true">
+            <span class="tile-preview tile-obsidian" aria-hidden="true"><span class="tp-a"></span><span class="tp-b"></span></span>
+            <span id="theme-obsidian-label" class="tile-label">Obsidian</span>
+            <span class="tile-check" aria-hidden="true">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.2 4.2 L3.2 6 L6.8 1.8"></path></svg>
+            </span>
+          </button>
+          <button id="theme-parchment" class="theme-tile" data-theme-pick="parchment" aria-pressed="false">
+            <span class="tile-preview tile-parchment" aria-hidden="true"><span class="tp-a"></span><span class="tp-b"></span></span>
+            <span id="theme-parchment-label" class="tile-label">Parchment</span>
+            <span class="tile-check" aria-hidden="true">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.2 4.2 L3.2 6 L6.8 1.8"></path></svg>
+            </span>
+          </button>
+        </div>
+      </div>
+      <div class="settings-divider"></div>
+      <div class="settings-row">
+        <div class="settings-lines">
+          <span id="updates-label" class="settings-label">Updates</span>
+          <span id="update-inline-status" class="settings-sub"></span>
+        </div>
+        <button id="btn-check-updates" class="btn small gold-ghost">Check for updates</button>
+      </div>
+      <div class="settings-divider"></div>
+      <div class="settings-advanced">
+        <span id="adv-caption" class="settings-caption">Advanced — engine</span>
+        <span id="adv-engine-path" class="adv-path"></span>
+        <button id="btn-choose-engine" class="btn small">Choose engine folder…</button>
+      </div>
+      <p id="footer-credit" class="settings-credit"></p>
+    </div>
 
     <script type="module" src="./renderer.js"></script>
   </body>

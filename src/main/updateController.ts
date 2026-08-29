@@ -78,6 +78,8 @@ export type TUpdateController = {
   status: () => TUpdateStatus;
   /** The Restart-now click. Refused while the engine runs. */
   restartNow: () => TRestartResult;
+  /** The gear popover's manual "Check for updates" — a no-op when disabled. */
+  checkNow: () => void;
   stop: () => void;
 };
 
@@ -159,6 +161,13 @@ export const createUpdateController = (deps: TUpdateDeps): TUpdateController => 
   return {
     start,
     status: () => status,
+    checkNow: () => {
+      // `check` reschedules the steady interval itself, so a manual check
+      // simply pulls the next one forward — no double timers.
+      if (deps.enabled && started) {
+        void check();
+      }
+    },
     restartNow: (): TRestartResult => {
       if (status.phase !== EUpdatePhase.Ready) {
         return { ok: false, reason: ERestartRefusal.NotReady };

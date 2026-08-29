@@ -37,6 +37,16 @@ export type TSettings = {
   pairing?: TPairing;
   /** Auto-upload while capturing. Default ON (owner ruling, 2026-08-20). */
   uploadEnabled?: boolean;
+  /**
+   * Start capture as soon as the app opens. Default ON (owner ask,
+   * 2026-08-29): the app exists to be forgotten about — open it, play. Read
+   * as `!== false` at use sites so absence means on, like uploadEnabled.
+   */
+  autoCapture?: boolean;
+  /** Language override (gear popover). Absent = follow the OS. */
+  language?: string;
+  /** Window look (gear popover). Absent = obsidian. */
+  theme?: string;
 };
 
 /**
@@ -90,6 +100,17 @@ export const loadSettings = (file: string): TSettings => {
     }
     if (typeof raw.uploadEnabled === "boolean") {
       out.uploadEnabled = raw.uploadEnabled;
+    }
+    if (typeof raw.autoCapture === "boolean") {
+      out.autoCapture = raw.autoCapture;
+    }
+    // Narrowed by the shared validators at the read sites; here only the
+    // string survives — a number or object is corruption, not a choice.
+    if (typeof raw.language === "string" && raw.language.length > 0) {
+      out.language = raw.language;
+    }
+    if (typeof raw.theme === "string" && raw.theme.length > 0) {
+      out.theme = raw.theme;
     }
     const pairing = readPairing(raw.pairing);
     if (pairing != null) {

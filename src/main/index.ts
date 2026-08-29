@@ -9,7 +9,7 @@
  * mismatch is detected and explained by the AbiMismatch error path.
  */
 
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import {
@@ -41,6 +41,7 @@ import {
   type TPairAttempt,
   type TPairingStatus,
   type TSetupStatus,
+  type TAppSettings,
 } from "../shared/captureTypes.js";
 import { defaultDeviceName, isValidPairCodeShape, normalizePairCode } from "../shared/pairing.js";
 import { IPC, NPCAP_URL } from "../shared/ipc.js";
@@ -58,6 +59,9 @@ import {
 import { installNpcap, parseSignatureOutput, type TSignatureCheck } from "./platform/npcapInstall.js";
 import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpcap.js";
 import { loadSettings, saveSettings, settingsFilePath } from "./settings.js";
+import { asLang, detectLang } from "../shared/i18n.js";
+import { asTheme, type TTheme } from "../shared/captureTypes.js";
+import { stringsFor } from "../shared/strings.js";
 import { decryptToken, encryptPairing, EStoreOutcome } from "./pairingStore.js";
 import { apiBase, EPairOutcome, pairDevice, sendFestivities } from "./uploadClient.js";
 import electronUpdater from "electron-updater";
@@ -467,13 +471,52 @@ const describeBpfDevices = async (): Promise<string> => {
   return parts.join(" ");
 };
 
+/** The renderer-visible settings view, with untrusted stored values narrowed. */
+const appSettings = (): TAppSettings => {
+  const s = loadSettings(SETTINGS_FILE);
+  return {
+    autoCapture: s.autoCapture !== false,
+    language: asLang(s.language),
+    theme: asTheme(s.theme) ?? "obsidian",
+  };
+};
+
+/** The app's language: the stored override, else the OS. */
+const appLang = (): ReturnType<typeof detectLang> => {
+  return asLang(loadSettings(SETTINGS_FILE).language) ?? detectLang(app.getLocale());
+};
+
+/** Windows overlay window-controls, tinted to match the active theme's title bar. */
+const overlayFor = (theme: TTheme): { color: string; symbolColor: string; height: number } => {
+  return theme === "parchment"
+    ? { color: "#ece3cf", symbolColor: "#6b6353", height: 48 }
+    : { color: "#0c0b0f", symbolColor: "#a7a39b", height: 48 };
+};
+
 const createWindow = (): void => {
+  const theme = appSettings().theme;
   win = new BrowserWindow({
-    width: 620,
-    height: 720,
-    minWidth: 480,
-    minHeight: 560,
-    backgroundColor: "#14161b",
+    // ONE window size for every state (owner ruling, 2026-08-29): the hero
+    // zone flexes inside; idle gives its room to the pairing card. Content
+    // size, not outer size — the merged title bar is part of the content.
+    width: 660,
+    height: 620,
+    useContentSize: true,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    // Merged OS chrome: the app's own 48px header IS the title bar. macOS
+    // keeps its traffic lights over the app surface; Windows gets overlay
+    // window controls in the same strip. Anywhere else (dev on Linux) the
+    // normal frame stays — the CSS drag region is inert there.
+    ...(process.platform === "darwin"
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 18, y: 18 } }
+      : process.platform === "win32"
+        ? { titleBarStyle: "hidden" as const, titleBarOverlay: overlayFor(theme) }
+        : {}),
+    // Matches --gb-bg so the flash before first paint is the brand ground,
+    // not a grey rectangle.
+    backgroundColor: theme === "parchment" ? "#f3ecdd" : "#0a0a0c",
     title: "Guild Butler Capture",
     webPreferences: {
       preload: join(APP_ROOT, "dist", "preload", "index.cjs"),
@@ -494,13 +537,16 @@ const createWindow = (): void => {
       return;
     }
     event.preventDefault();
+    // The one main-process surface with words on it follows the app language —
+    // the stored override when there is one, the OS otherwise.
+    const qc = stringsFor(appLang()).quitConfirm;
     const choice = dialog.showMessageBoxSync(win as BrowserWindow, {
       type: "question",
-      buttons: ["Stop and quit", "Keep capturing"],
+      buttons: [qc.quit, qc.cancel],
       defaultId: 1,
       cancelId: 1,
-      title: "Stop capturing?",
-      message: "Capture is still running. Quit and stop logging loot?",
+      title: qc.title,
+      message: qc.message,
     });
     if (choice === 0) {
       quitConfirmed = true;
@@ -668,6 +714,54 @@ const registerIpc = (): void => {
     return { setup: await getSetup(), install };
   });
 
+  ipcMain.handle(IPC.settingsGet, (): TAppSettings => {
+    return appSettings();
+  });
+  ipcMain.handle(IPC.settingsSetAutoCapture, (_event, enabled: unknown): TAppSettings => {
+    const settings = loadSettings(SETTINGS_FILE);
+    saveSettings(SETTINGS_FILE, { ...settings, autoCapture: enabled !== false });
+    return appSettings();
+  });
+  ipcMain.handle(IPC.settingsSetLanguage, (_event, lang: unknown): TAppSettings => {
+    const settings = loadSettings(SETTINGS_FILE);
+    const narrowed = asLang(lang);
+    if (narrowed == null) {
+      // "System" (or garbage): drop the override so the OS decides again.
+      delete settings.language;
+    } else {
+      settings.language = narrowed;
+    }
+    saveSettings(SETTINGS_FILE, settings);
+    return appSettings();
+  });
+  ipcMain.handle(IPC.settingsSetTheme, (_event, theme: unknown): TAppSettings => {
+    const settings = loadSettings(SETTINGS_FILE);
+    const narrowed = asTheme(theme) ?? "obsidian";
+    saveSettings(SETTINGS_FILE, { ...settings, theme: narrowed });
+    if (process.platform === "win32") {
+      try {
+        win?.setTitleBarOverlay(overlayFor(narrowed));
+      } catch {
+        // overlay retint is cosmetic; never let it fail the theme switch
+      }
+    }
+    return appSettings();
+  });
+  ipcMain.handle(IPC.updateCheck, async () => {
+    if (updaterEnabled(process.platform, app.isPackaged, process.env)) {
+      updates.checkNow();
+    } else {
+      // The manual backup Boris asked for still does something useful where
+      // the updater is off (unsigned mac, dev builds): open the download page.
+      await shell.openExternal(`${apiBase(loadSettings(SETTINGS_FILE).apiBase)}/download`);
+    }
+    return updates.status();
+  });
+  ipcMain.handle(IPC.appCopyText, (_event, text: unknown): void => {
+    if (typeof text === "string" && text.length > 0 && text.length <= 200) {
+      clipboard.writeText(text);
+    }
+  });
   ipcMain.handle(IPC.updateGet, () => updates.status());
   ipcMain.handle(IPC.updateRestart, () => updates.restartNow());
   ipcMain.handle(IPC.pairingGet, () => pairingStatus());

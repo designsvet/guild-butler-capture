@@ -67,6 +67,73 @@ extracted (its own repo):          staged (inside the Raid-Bot repo):
 
 Any other location: Advanced → “Choose engine folder…” in the app.
 
+## Languages & appearance
+
+The app speaks the bot's six languages — English, Українська, Русский,
+Deutsch, Français, Português — and follows the **operating system's** language
+by default: `detectLang` reads the OS locale and anything unrecognised falls
+back to English. The gear popover carries a picker whose default, "System", is
+exactly that detection — choosing a language stores it in `settings.json` and
+re-renders live, quit dialog included. Catalogs live in
+`src/shared/strings.ts`, where every language is type-checked against the
+English shape, so a missing key anywhere is a compile error rather than a
+runtime fallback. Same provenance caveat as the bot: EN and UK are written
+with care, the rest are machine-quality and welcome a native proofread.
+
+The screen itself is the Guild Butler design system — the dashboard's token
+layer (`styles.css` carries the same `--gb-*` names and values) with the three
+brand fonts **bundled** as woff2 subsets (latin + latin-ext + cyrillic, OFL
+licences beside the files in `src/renderer/fonts/`). Bundled rather than
+fetched because the CSP forbids remote anything and a capture tool must render
+identically offline.
+
+Two window looks, named like the kill-card grounds: **Obsidian** (dark, the
+default) and **Parchment** — preview tiles in the gear popover, stored as
+`settings.json` `theme`. The whole palette is CSS tokens, so the layout never
+forks; on Windows the overlay window-controls retint with the theme. The
+window itself is **frameless with the OS chrome merged in**: the 48px header
+is the drag region, macOS keeps its traffic lights over it (`hiddenInset`),
+Windows gets overlay controls, and the window is ONE fixed size in every
+state — the greeting zone flexes instead of the frame. While capturing, the
+greeting sits over the **log rain**: a canvas of loot lines drifting at ~12
+fps, paused on blur/hidden, disabled under reduced-motion, and only ever
+drawn during a live session.
+
+### How it moves
+
+The four states — idle, starting, waiting, capturing — are one continuous
+run, and the interface treats them that way. One rule holds it up: **nothing
+in the greeting may change the layout.** Every slot is reserved at its worst
+case across all six languages, so a state change can only alter ink, colour,
+glow and small motion; measured at the real window size, the Start button and
+every line above it sit on the identical pixel in all four states.
+
+On top of that geometry: text changes by **rolling** (out upward in 170ms, in
+from below over 260ms) with each element starting 50ms after the one before
+it, so a state change reads as one thing causing the next rather than as a
+simultaneous flash. The status dot is the instrument — a ring sweeping while
+the engine starts, a radar ping while it listens, breathing green once
+traffic lands, and one pulse per pickup. The Start/Stop pill is two stacked
+surfaces rather than two buttons: the ember face sits underneath and the gold
+**drains off it** over 440ms, retracing on the way back. Reaching Capturing
+plays a **wave** — a brightness-and-scale pulse passing up through dot, name,
+count, caption and chips — which brightens what is already there and hides
+nothing. Under `prefers-reduced-motion` every duration collapses to zero and
+the end states are unchanged.
+
+The reasoning, the measurements it came from and a playable before/after are
+in [`docs/design-transition-study.html`](docs/design-transition-study.html) —
+open it in a browser, no build step.
+
+**Capture starts by itself when the app opens** (default on — the app exists
+to be forgotten about; open it, play). The toggle in the gear popover turns
+that off, persisted in `settings.json` as `autoCapture`. Auto-start goes
+through exactly the button's code path, so a machine with permissions missing
+lands on the fix card — which on a first run is the right first thing to see.
+The popover also carries a manual **Check for updates** — the backup to
+auto-update; where the updater is off (unsigned mac, dev builds) it opens the
+download page instead.
+
 ## Development
 
 Every command runs from INSIDE this folder (while staged, that is
@@ -287,6 +354,15 @@ each step proves an assumption the container build could not.
    engine repo root; the pre-zone-change heartbeat carries the phrase
    `not identified yet (change zone once)` in the character field; photon
    `outofboundread` warnings and `[debug]` event dumps are routine noise.
+   One line in that recording was read as noise for nine days and is now a
+   signal: the engine echoes **one line per pickup** as it writes it, so the
+   counter no longer waits on the once-a-minute heartbeat to move. The
+   heartbeat stays the reconciling truth — it resets the live delta every
+   time it arrives, so an optimistic miscount is bounded by one minute and
+   can never accumulate — and the log FILE remains the source of truth for
+   everything uploaded, so a mis-parse can only ever affect a number on
+   screen. The pattern is deliberately strict where the rest are liberal:
+   a missed pickup costs a second of lag, an invented one invents loot.
    Still unrecorded: the exact `ALBION NOT DETECTED` line — capture it once by
    running the recorder with the game closed:
    `sudo node tools/record-engine-output.mjs`

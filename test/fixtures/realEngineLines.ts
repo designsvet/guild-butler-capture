@@ -26,6 +26,13 @@ export const REAL = {
    */
   heartbeatWithHeld: "[status] character: Bors · lines written: 4 · held: 1",
   /**
+   * One pickup, echoed as it is written to the log. Recorded in the same
+   * session as the rest. Read as NOISE until 2026-08-29, when it became the
+   * live counter's source — the heartbeat's minute of lag was the whole
+   * reason the number sat still while loot was landing.
+   */
+  lootPickup: "05:42:00 UTC: {UA} [VITRYLA] Bors looted 1x Expert's Rune from @MOB_MORGANA_CROSSBOWMAN_CHAMPION.",
+  /**
    * The daily bonus rotation (raid-bot ADR 0102), recorded 2026-08-28 on Europe — the FIRST
    * real `FestivitiesUpdate`, which also confirmed the Photon event code is **518**.
    *
@@ -55,7 +62,6 @@ export const REAL_NOISE: readonly string[] = [
   "Join the Discord server: https://discord.gg/fvNMF2abXr (Ctrl + click to open).",
   "AO Loot Logger Viewer can be found here: https://loot-logger.ddns.net/ao-loot-logger-viewer (Ctrl + click to open).",
   "\tCURRENT SERVER: Europe (Europe)",
-  "05:42:00 UTC: {UA} [VITRYLA] Bors looted 1x Expert's Rune from @MOB_MORGANA_CROSSBOWMAN_CHAMPION.",
   "2026-08-20T05:41:26.792Z [warn]: error parsing photon packet outofboundread [",
   "2026-08-20T05:41:26.793Z [warn]: packet [ 'E9 71 2D D5 01 01 00 00 20 CB EF E2 16 63 06 BE' ]",
   "2026-08-20T05:40:41.502Z [debug]: EvNewSimpleItem [",
