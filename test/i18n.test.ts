@@ -48,13 +48,20 @@ describe("i18n catalogs", () => {
           // (character, device, detail) both get exercised.
           const withString = fn(ARG, 42);
           const withNumber = fn(7, 42);
+          // A formatter may legitimately have a THRESHOLD below which the
+          // number is not rendered at all — the traffic chip says "live"
+          // rather than counting seconds nobody wants to watch — so a small
+          // probe alone cannot distinguish that from a dropped placeholder.
+          // 7 minutes' worth of seconds clears every such threshold.
+          const withBigNumber = fn(420, 42);
           expect(String(withString).trim().length, path).toBeGreaterThan(0);
           expect(String(withNumber).trim().length, path).toBeGreaterThan(0);
+          expect(String(withBigNumber).trim().length, path).toBeGreaterThan(0);
           // A translation that dropped its placeholder would render the same
           // sentence for every character/device/detail — catch it here. Only
           // asserted when the marker went in as the first arg and the function
           // actually uses a string there.
-          if (withString.includes(ARG) || withNumber.includes("7")) {
+          if (withString.includes(ARG) || withNumber.includes("7") || withBigNumber.includes("7")) {
             return;
           }
           throw new Error(`${path}: neither a string nor a numeric argument survives into the output`);

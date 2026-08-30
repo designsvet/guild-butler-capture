@@ -212,6 +212,12 @@ input {
   font-size: 19px;
   letter-spacing: 0.01em;
   color: var(--gb-ink);
+  /* Optical, not layout: flex centres the BOX, and this serif's ink sits ~2px
+     above its own box centre, so the title read high against the traffic
+     lights even though every box measured centred. Measured off the rendered
+     pixels, not guessed. */
+  position: relative;
+  top: 1.5px;
 }
 
 .header-spacer {

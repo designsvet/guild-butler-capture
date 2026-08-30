@@ -13,6 +13,28 @@ export const MAX_BATCH_LINES = 500;
 /** The bot's own per-line cap (`MAX_LINE_LENGTH`). Cross-repo constant. */
 export const MAX_LINE_LENGTH = 2000;
 
+/**
+ * The bot's own batch BYTE cap (`MAX_BATCH_BYTES`). Cross-repo constant.
+ *
+ * The line caps above are counted in `String.length` — UTF-16 code units — and
+ * an HTTP body is counted in bytes. For ASCII loot lines those are the same
+ * number and nobody noticed; for a Russian capture they differ by 2x, so a
+ * batch legal by `MAX_BATCH_LINES x MAX_LINE_LENGTH` could be twice the
+ * server's body limit and be refused before any rule ran. Packing to this
+ * budget is what makes "the client never sends something the server must
+ * refuse" true in every alphabet.
+ */
+export const MAX_BATCH_BYTES = 512 * 1024;
+
+/** What these lines weigh on the wire, before JSON overhead. */
+export const encodedBatchBytes = (lines: readonly string[]): number => {
+  let total = 0;
+  for (const line of lines) {
+    total += Buffer.byteLength(line, "utf8");
+  }
+  return total;
+};
+
 export type TUploadCursor = {
   /** Run id minted at Start capture (and again whenever the file changes). */
   run: string;
@@ -84,11 +106,33 @@ export type TBatch = { from: number; lines: string[] };
  * than what it managed to store. A client that skipped lines locally would
  * drift out of step with the offsets already recorded.
  */
-export const nextBatch = (sentThrough: number, lines: readonly string[]): TBatch | null => {
+export const nextBatch = (
+  sentThrough: number,
+  lines: readonly string[],
+  /**
+   * Line ceiling for THIS attempt. Below `MAX_BATCH_LINES` only while the
+   * uploader is backing off from a refusal — see `uploader.ts`.
+   */
+  maxLines: number = MAX_BATCH_LINES,
+): TBatch | null => {
   if (sentThrough >= lines.length) {
     return null;
   }
-  const slice = lines.slice(sentThrough, sentThrough + MAX_BATCH_LINES).map(clampLine);
+  const ceiling = Math.max(1, Math.min(maxLines, MAX_BATCH_LINES));
+  const slice: string[] = [];
+  let bytes = 0;
+  for (const raw of lines.slice(sentThrough, sentThrough + ceiling)) {
+    const line = clampLine(raw);
+    const weight = Buffer.byteLength(line, "utf8");
+    // Always send at least one line: a batch of nothing would stall the cursor
+    // forever. A clamped line cannot exceed the budget on its own, so this
+    // guard is for totality rather than for a case that can happen.
+    if (slice.length > 0 && bytes + weight > MAX_BATCH_BYTES) {
+      break;
+    }
+    slice.push(line);
+    bytes += weight;
+  }
   return { from: sentThrough, lines: slice };
 };
 

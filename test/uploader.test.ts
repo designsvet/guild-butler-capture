@@ -428,3 +428,82 @@ describe("retryDelayMs", () => {
     expect(retryDelayMs(-5)).toBe(5_000);
   });
 });
+
+describe("a refusal shrinks the batch instead of parking the device", () => {
+  /**
+   * Found by the 2026-08-30 audit. `Blocked` had no exit — the guards at the
+   * top of every tick return from it, nothing clears it, and the member's only
+   * signal is one line in the app. A device that hit one refusal stopped
+   * uploading for the rest of the session, silently, and a whole raid could go
+   * missing that way.
+   *
+   * Nearly every refusal we can provoke is about the batch being too big for
+   * the route, so halving is the cheapest thing that could make the next
+   * attempt work. The sibling branch for `NotDeployed` already reasoned exactly
+   * this way ("it heals by itself... rather than parking in a dead state they
+   * must clear"); this is that reasoning applied where it was missing.
+   */
+  const REFUSE = { status: 400, body: { error: "batch_too_large" } };
+
+  it("halves the batch and retries rather than going Blocked", async () => {
+    const { uploader, h } = harness();
+    h.file.text = Array.from({ length: 40 }, (_, i) => `line-${i}`).join("\n");
+    h.setReply(() => REFUSE);
+
+    await uploader.tick();
+    expect(h.calls[0]?.count).toBe(40);
+    expect(uploader.status().state).toBe(EUploaderState.Retrying);
+
+    h.clock.now += 60_000;
+    await uploader.tick();
+    expect(h.calls[1]?.count).toBe(20);
+    expect(uploader.status().state).toBe(EUploaderState.Retrying);
+  });
+
+  it("succeeds as soon as a smaller batch fits, and goes back to full size", async () => {
+    const { uploader, h } = harness();
+    h.file.text = Array.from({ length: 40 }, (_, i) => `line-${i}`).join("\n");
+    let refuse = true;
+    h.setReply((from) =>
+      refuse ? REFUSE : { status: 200, body: { accepted: 1, duplicate: 0, rejected: 0, nextFrom: from } },
+    );
+
+    await uploader.tick();
+    refuse = false;
+    h.clock.now += 60_000;
+    await uploader.tick();
+
+    expect(h.calls[1]?.count).toBe(20);
+    // The next pass is back at full width — the refusal is behind us and a
+    // permanently halved uploader would be its own slow leak.
+    h.file.text += "\nmore";
+    await uploader.tick();
+    expect(h.calls[2]?.count).toBeGreaterThan(1);
+    expect(uploader.status().lastError).toBeNull();
+  });
+
+  it("parks only when ONE line is still refused — then the batch is not the problem", async () => {
+    const { uploader, h } = harness();
+    h.file.text = "a\nb\nc\nd";
+    h.setReply(() => REFUSE);
+
+    for (let i = 0; i < 12 && uploader.status().state !== EUploaderState.Blocked; i += 1) {
+      h.clock.now += 60_000;
+      await uploader.tick();
+    }
+
+    expect(uploader.status().state).toBe(EUploaderState.Blocked);
+    expect(h.calls[h.calls.length - 1]?.count).toBe(1);
+    expect(h.logs.some((l) => l.includes("even one line at a time"))).toBe(true);
+  });
+
+  it("still parks immediately on Unauthorized — that one really does need a human", async () => {
+    const { uploader, h } = harness();
+    h.file.text = "a\nb";
+    h.setReply(() => ({ status: 401, body: {} }));
+
+    await uploader.tick();
+    expect(uploader.status().state).toBe(EUploaderState.Unauthorized);
+    expect(h.calls).toHaveLength(1);
+  });
+});

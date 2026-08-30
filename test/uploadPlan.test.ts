@@ -5,6 +5,8 @@ import {
   clampLine,
   ENewRunReason,
   MAX_BATCH_LINES,
+  encodedBatchBytes,
+  MAX_BATCH_BYTES,
   MAX_LINE_LENGTH,
   newRunReason,
   nextBatch,
@@ -133,5 +135,36 @@ describe("advanceCursor", () => {
   it("takes the server's word when it is AHEAD of us", () => {
     // Another device, or an earlier run of this one, got further. Believe it.
     expect(advanceCursor(100, batch, 900)).toBe(900);
+  });
+});
+
+describe("a batch is packed by bytes, not by characters", () => {
+  /**
+   * `MAX_BATCH_LINES x MAX_LINE_LENGTH` is a million *characters*, and the
+   * server's body limit is counted in bytes. For ASCII loot lines those are the
+   * same number, which is why this went unnoticed; for a Russian capture — and
+   * the bot ships a Russian fixture — they differ by 2x, so a batch legal by
+   * every rule could be refused by the transport before one of them ran.
+   */
+  it("stops adding lines once the byte budget is reached", () => {
+    // Each line is 1000 Cyrillic chars = 2000 bytes on the wire.
+    const lines = Array.from({ length: MAX_BATCH_LINES }, () => "ц".repeat(1000));
+    const batch = nextBatch(0, lines);
+    expect(batch).not.toBeNull();
+    expect(batch!.lines.length).toBeLessThan(MAX_BATCH_LINES);
+    expect(encodedBatchBytes(batch!.lines)).toBeLessThanOrEqual(MAX_BATCH_BYTES);
+  });
+
+  it("packs an ordinary ASCII capture at the full line count", () => {
+    const lines = Array.from({ length: MAX_BATCH_LINES }, () => "x".repeat(120));
+    expect(nextBatch(0, lines)?.lines).toHaveLength(MAX_BATCH_LINES);
+  });
+
+  it("honours a smaller ceiling, which is how a refusal backs off", () => {
+    const lines = Array.from({ length: 40 }, (_, i) => `line-${i}`);
+    expect(nextBatch(0, lines, 10)?.lines).toHaveLength(10);
+    expect(nextBatch(0, lines, 1)?.lines).toHaveLength(1);
+    // Never zero: a batch of nothing would stall the cursor for good.
+    expect(nextBatch(0, lines, 0)?.lines).toHaveLength(1);
   });
 });

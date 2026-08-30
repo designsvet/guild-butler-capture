@@ -216,12 +216,32 @@ const parseFestivities = (line: string): TEngineEvent => {
  *   NODE_MODULE_VERSION / ERR_DLOPEN lines are unambiguous and must win.
  * - Npcap before permission: Npcap's own errors sometimes contain "access".
  */
+//
+// ORDER IS THE RULE HERE, and getting it wrong reached a real member: a bare
+// `ERR_DLOPEN_FAILED` used to be listed as evidence of an ABI mismatch, and it
+// is not evidence of anything. A .node fails to load both when it was built
+// for another ABI *and* when a library it links against is missing — and on
+// Windows the second is far more common, because `cap.node` links wpcap.dll
+// and Npcap is a separate install we are not allowed to bundle.
+//
+// Windows words that as "The specified module could not be found", naming the
+// addon it DID find rather than the dependency it did not, so nothing in the
+// text says "npcap" at all. The member was shown "built for a different
+// runtime — run pnpm engine:rebuild from the README": wrong, and impossible
+// for someone who has never seen the repo. The specific pattern therefore
+// comes FIRST, and the ABI rule keeps only markers that genuinely mean ABI.
 const FATAL_RULES: ReadonlyArray<{ kind: EEngineErrorKind; re: RegExp }> = [
+  // EXPLICIT ABI evidence still outranks everything: a line carrying
+  // NODE_MODULE_VERSION is an ABI mismatch even when the path beside it says
+  // npcap. What was removed from this rule is the bare ERR_DLOPEN_FAILED.
   {
     kind: EEngineErrorKind.AbiMismatch,
-    re: /NODE_MODULE_VERSION|ERR_DLOPEN_FAILED|was compiled against a different Node\.js version/i,
+    re: /NODE_MODULE_VERSION|was compiled against a different Node\.js version/i,
   },
-  { kind: EEngineErrorKind.NpcapMissing, re: /wpcap\.dll|npcap|winpcap/i },
+  {
+    kind: EEngineErrorKind.NpcapMissing,
+    re: /wpcap\.dll|npcap|winpcap|specified module could not be found|specified procedure could not be found/i,
+  },
   {
     kind: EEngineErrorKind.Permission,
     re: /operation not permitted|permission denied|EPERM|EACCES|\/dev\/bpf|BIOC[A-Z]+|must be run as root|(?:need|requires?|try)\s+(?:running\s+(?:as|with)\s+)?(?:root|sudo)/i,
