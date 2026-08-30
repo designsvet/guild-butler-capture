@@ -46,14 +46,23 @@ const EN = {
       `The capture engine stopped unexpectedly. It restarts by itself in ${seconds}s — your log file and counts are safe.`,
   },
 
-  /** Shown under Waiting once nothing has been detected for a while. */
+  /**
+   * Shown once Waiting has gone on a while. `toggle` is ONE line in the greeting
+   * at a reserved height; the rest opens as an overlay above the hero. It used to
+   * inject four list items straight into a flex-centred, `overflow: hidden` hero
+   * inside a window pinned to 660x620 and not resizable — the stack grew taller
+   * than its container, so it centred and clipped at BOTH ends: the status line
+   * off the top, the button off the bottom, the pairing bar over what was left.
+   * Three items, not four: the fourth ("nothing is lost by waiting") is
+   * reassurance the hero line already gives.
+   */
   waitingHints: {
-    title: "Still nothing? The usual reasons:",
+    toggle: "Nothing after a few minutes?",
+    title: "Three things it's usually one of",
     items: [
-      "Albion isn't running, or is sitting on the login screen — get in game and move around a bit.",
-      "A VPN or tunnel (NordVPN, ExitLag, …) is carrying the game's traffic where the logger cannot see it. Turn it off while capturing.",
-      "GeForce Now / cloud gaming — the game runs on their computer, so its traffic never touches this one. Capture cannot work there.",
-      "Nothing is lost by waiting: leave this running through a game restart and the traffic is picked up by itself.",
+      { lead: "Albion isn't in game yet", body: "Sitting on the login screen sends nothing. Get in and move around." },
+      { lead: "A VPN or tunnel is on", body: "NordVPN, ExitLag and friends carry the traffic where this can't see it." },
+      { lead: "You're on cloud gaming", body: "GeForce Now runs the game on their computer. Capture can't work there." },
     ],
   },
 
@@ -274,12 +283,12 @@ const UK: TStrings = {
   },
 
   waitingHints: {
-    title: "Досі нічого? Найчастіші причини:",
+    toggle: "Нічого за кілька хвилин?",
+    title: "Зазвичай це одне з трьох",
     items: [
-      "Albion не запущений або стоїть на екрані входу — зайдіть у гру й трохи порухайтесь.",
-      "VPN чи тунель (NordVPN, ExitLag, …) веде трафік гри туди, де логер його не бачить. Вимкніть його на час запису.",
-      "GeForce Now / хмарний ґеймінг — гра йде на їхньому комп'ютері, тож її трафік сюди не потрапляє. Запис там неможливий.",
-      "Очікування нічого не псує: можна лишити запис увімкненим навіть через перезапуск гри — трафік підхопиться сам.",
+      { lead: "Albion ще не в грі", body: "На екрані входу гра нічого не шле. Зайдіть і трохи порухайтесь." },
+      { lead: "Увімкнено VPN чи тунель", body: "NordVPN, ExitLag і подібні ведуть трафік туди, де його не видно." },
+      { lead: "Ви на хмарному ґеймінгу", body: "GeForce Now запускає гру на своєму комп'ютері. Запис там неможливий." },
     ],
   },
 
@@ -477,12 +486,12 @@ const RU: TStrings = {
   },
 
   waitingHints: {
-    title: "Всё ещё ничего? Обычные причины:",
+    toggle: "Ничего за несколько минут?",
+    title: "Обычно это одно из трёх",
     items: [
-      "Albion не запущен или стоит на экране входа — зайдите в игру и немного подвигайтесь.",
-      "VPN или туннель (NordVPN, ExitLag, …) уводит трафик игры туда, где логгер его не видит. Выключите его на время записи.",
-      "GeForce Now / облачный гейминг — игра идёт на их компьютере, поэтому её трафик сюда не попадает. Запись там невозможна.",
-      "Ожидание ничему не вредит: можно оставить запись включённой даже через перезапуск игры — трафик подхватится сам.",
+      { lead: "Albion ещё не в игре", body: "На экране входа игра ничего не шлёт. Зайдите и немного подвигайтесь." },
+      { lead: "Включён VPN или туннель", body: "NordVPN, ExitLag и подобные уводят трафик туда, где его не видно." },
+      { lead: "Вы на облачном гейминге", body: "GeForce Now запускает игру на своём компьютере. Запись там невозможна." },
     ],
   },
 
@@ -681,12 +690,12 @@ const DE: TStrings = {
   },
 
   waitingHints: {
-    title: "Immer noch nichts? Die üblichen Gründe:",
+    toggle: "Nach ein paar Minuten nichts?",
+    title: "Meist ist es eines von drei Dingen",
     items: [
-      "Albion läuft nicht oder hängt im Login-Bildschirm — geh ins Spiel und beweg dich ein wenig.",
-      "Ein VPN oder Tunnel (NordVPN, ExitLag, …) leitet den Spiel-Traffic dorthin, wo der Logger ihn nicht sieht. Schalte ihn während der Aufzeichnung aus.",
-      "GeForce Now / Cloud-Gaming — das Spiel läuft auf deren Rechner, sein Traffic erreicht diesen hier nie. Aufzeichnung ist dort unmöglich.",
-      "Warten schadet nichts: Die Aufzeichnung darf über einen Spielneustart hinweg laufen — der Traffic wird von selbst aufgegriffen.",
+      { lead: "Albion ist noch nicht im Spiel", body: "Im Login-Bildschirm sendet das Spiel nichts. Geh rein und beweg dich." },
+      { lead: "Ein VPN oder Tunnel ist an", body: "NordVPN, ExitLag und Co. leiten den Traffic dorthin, wo er nicht sichtbar ist." },
+      { lead: "Du bist im Cloud-Gaming", body: "GeForce Now lässt das Spiel auf deren Rechner laufen. Aufzeichnung ist dort unmöglich." },
     ],
   },
 
@@ -890,12 +899,12 @@ const FR: TStrings = {
   },
 
   waitingHints: {
-    title: "Toujours rien ? Les raisons habituelles :",
+    toggle: "Rien après quelques minutes ?",
+    title: "C'est en général l'une de ces trois",
     items: [
-      "Albion n'est pas lancé, ou reste sur l'écran de connexion — entrez en jeu et bougez un peu.",
-      "Un VPN ou un tunnel (NordVPN, ExitLag, …) emmène le trafic du jeu là où le logger ne le voit pas. Coupez-le pendant la capture.",
-      "GeForce Now / cloud gaming — le jeu tourne sur leur machine, son trafic n'atteint jamais celle-ci. La capture y est impossible.",
-      "Attendre ne coûte rien : laissez tourner à travers un redémarrage du jeu, le trafic sera capté tout seul.",
+      { lead: "Albion n'est pas encore en jeu", body: "Sur l'écran de connexion, le jeu n'envoie rien. Entrez et bougez un peu." },
+      { lead: "Un VPN ou un tunnel est actif", body: "NordVPN, ExitLag et consorts emmènent le trafic là où il est invisible." },
+      { lead: "Vous êtes en cloud gaming", body: "GeForce Now fait tourner le jeu sur leur machine. La capture y est impossible." },
     ],
   },
 
@@ -1098,12 +1107,12 @@ const PT: TStrings = {
   },
 
   waitingHints: {
-    title: "Ainda nada? Os motivos de sempre:",
+    toggle: "Nada depois de alguns minutos?",
+    title: "Costuma ser uma destas três",
     items: [
-      "O Albion não está aberto, ou está parado na tela de login — entre no jogo e se mexa um pouco.",
-      "Uma VPN ou túnel (NordVPN, ExitLag, …) está levando o tráfego do jogo para onde o logger não vê. Desligue durante a captura.",
-      "GeForce Now / cloud gaming — o jogo roda no computador deles, então o tráfego nunca chega neste aqui. A captura não funciona lá.",
-      "Esperar não custa nada: pode deixar rodando através de um reinício do jogo — o tráfego é captado sozinho.",
+      { lead: "O Albion ainda não está em jogo", body: "Na tela de login o jogo não envia nada. Entre e se mexa um pouco." },
+      { lead: "Uma VPN ou túnel está ligada", body: "NordVPN, ExitLag e afins levam o tráfego para onde não dá para ver." },
+      { lead: "Você está em cloud gaming", body: "O GeForce Now roda o jogo no computador deles. A captura não funciona lá." },
     ],
   },
 

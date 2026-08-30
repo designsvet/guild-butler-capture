@@ -899,24 +899,94 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
   color: var(--gb-muted);
 }
 
-.hints {
+/* The affordance's SLOT. Reserved at its worst case (one line, all six
+   languages) and occupied in every state, so appearing after the quiet
+   threshold moves nothing above or below it. The old block injected four list
+   items into the flex-centred hero instead, and grew it past its own
+   `overflow: hidden` — clipping the status line off the top and the button off
+   the bottom of a window that cannot be resized to compensate. */
+.hint-slot {
+  height: 24px;
   margin-top: 6px;
-  font-size: 12px;
-  color: var(--gb-muted);
-  text-align: left;
-}
-
-.hints-title {
-  margin: 0 0 4px 0;
-  font-weight: 600;
-}
-
-.hints ul {
-  margin: 0;
-  padding-left: 18px;
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  justify-content: center;
+}
+
+.hint-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--gb-gold);
+  border-bottom: 1px dotted var(--gb-line-strong);
+  padding-bottom: 2px;
+  animation: dd-open 0.2s ease;
+}
+
+.hint-toggle svg {
+  transition: transform 0.25s ease;
+}
+
+.hint-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* The reasons, OVER the greeting rather than inside it — same device and same
+   upward direction as `.pair-details`, for the same reason. Anchored to the
+   bottom of `.hero-stack`, NOT of `.hero`: at the hero's bottom it grew up
+   across the CTA, and "turn your VPN off" is advice you act on by pressing
+   Stop, so that button has to stay reachable while this is open. */
+.hint-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--gb-popover);
+  border: 1px solid var(--gb-line-strong);
+  border-radius: 12px;
+  box-shadow: 0 -18px 40px -20px rgba(0, 0, 0, 0.9);
+  animation: dd-open 0.16s ease;
+}
+
+html[data-theme="parchment"] .hint-sheet {
+  box-shadow: 0 -18px 40px -22px rgba(80, 60, 20, 0.45);
+}
+
+.hint-sheet-title {
+  margin: 0 0 10px 0;
+  font-family: var(--gb-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gb-gold-deep);
+}
+
+.hint-sheet-list {
+  margin: 0;
+  display: grid;
+  gap: 9px;
+}
+
+.hint-sheet-list dt {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gb-ink);
+}
+
+.hint-sheet-list dd {
+  margin: 1px 0 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--gb-muted);
 }
 
 /* --- the CTA (inside the hero, right under the greeting) -------------------- */

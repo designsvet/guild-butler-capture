@@ -94,9 +94,34 @@
             </span>
           </div>
           <p id="status-hint" class="status-hint hero-hint swap"></p>
-          <div id="waiting-hints" class="hints hidden">
-            <p id="waiting-hints-title" class="hints-title"></p>
-            <ul id="waiting-hints-list"></ul>
+          <!-- A SLOT, not a growth. The row is laid out at its reserved height in
+               every state and only its contents appear, so the greeting above and
+               the CTA below keep their pixel whether the affordance shows or not.
+               The reasons themselves open OVER the greeting (below), never in it. -->
+          <div class="hint-slot">
+            <button
+              id="btn-waiting-hints"
+              class="hint-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="waiting-hints"
+              hidden
+            >
+              <span id="btn-waiting-hints-text"></span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+                <path d="M2 3.5 L5 6.5 L8 3.5"></path>
+              </svg>
+            </button>
+          </div>
+          <!-- Opens as an overlay, the same device the pairing row uses. Anchored to
+               the bottom of the GREETING, not of the hero: at the hero's bottom it
+               would grow up across the CTA, and "turn your VPN off" is advice you
+               follow by pressing Stop — the button has to stay reachable. It is
+               absolutely positioned either way, so the fixed 660x620 window never
+               re-flows, whatever six languages do to the copy. -->
+          <div id="waiting-hints" class="hint-sheet" hidden>
+            <p id="waiting-hints-title" class="hint-sheet-title"></p>
+            <dl id="waiting-hints-list" class="hint-sheet-list"></dl>
           </div>
         </div>
         <div class="cta-row">

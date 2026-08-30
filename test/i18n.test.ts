@@ -15,7 +15,21 @@ type TNode = Record<string, unknown>;
 const walk = (node: TNode, path: string, visit: (path: string, value: unknown) => void): void => {
   for (const [key, value] of Object.entries(node)) {
     const here = `${path}.${key}`;
-    if (value != null && typeof value === "object" && !Array.isArray(value)) {
+    if (Array.isArray(value)) {
+      // The array itself still reaches the visitor (that is what asserts it is
+      // non-empty), and any entry that is a record of its own is DESCENDED into
+      // rather than stringified — the waiting reasons are `{ lead, body }`, and
+      // `String(item)` on one yields "[object Object]": non-empty, and asserting
+      // nothing at all.
+      visit(here, value);
+      for (const [i, item] of value.entries()) {
+        if (item != null && typeof item === "object") {
+          walk(item as TNode, `${here}[${i}]`, visit);
+        }
+      }
+      continue;
+    }
+    if (value != null && typeof value === "object") {
       walk(value as TNode, here, visit);
     } else {
       visit(here, value);
@@ -38,6 +52,10 @@ describe("i18n catalogs", () => {
         if (Array.isArray(value)) {
           expect(value.length, path).toBeGreaterThan(0);
           for (const item of value) {
+            // Record entries arrive here again field by field, courtesy of `walk`.
+            if (item != null && typeof item === "object") {
+              continue;
+            }
             expect(String(item).trim().length, path).toBeGreaterThan(0);
           }
           return;
