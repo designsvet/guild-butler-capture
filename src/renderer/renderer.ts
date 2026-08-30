@@ -96,9 +96,11 @@ const ui = {
   statusLabel: el<HTMLSpanElement>("status-label"),
   heroCharacter: el<HTMLSpanElement>("hero-character"),
   statusHint: el<HTMLParagraphElement>("status-hint"),
+  hintsToggle: el<HTMLButtonElement>("btn-waiting-hints"),
+  hintsToggleText: el<HTMLSpanElement>("btn-waiting-hints-text"),
   hints: el<HTMLDivElement>("waiting-hints"),
   hintsTitle: el<HTMLParagraphElement>("waiting-hints-title"),
-  hintsList: el<HTMLUListElement>("waiting-hints-list"),
+  hintsList: el<HTMLDListElement>("waiting-hints-list"),
   statLoot: el<HTMLSpanElement>("stat-loot"),
   statLootLabel: el<HTMLSpanElement>("stat-loot-label"),
   statTraffic: el<HTMLSpanElement>("stat-traffic"),
@@ -315,6 +317,19 @@ const show = (element: HTMLElement, visible: boolean): void => {
   element.classList.toggle("hidden", !visible);
 };
 
+/**
+ * The waiting reasons, as an overlay over the hero.
+ *
+ * Declared up here rather than beside its click handler because `render` calls
+ * it to close the sheet, and `render` runs off a 1s interval and off every state
+ * push — a `const` further down the module would still be in its temporal dead
+ * zone the first time one of those fired.
+ */
+const setWaitingHints = (open: boolean): void => {
+  ui.hints.hidden = !open;
+  ui.hintsToggle.setAttribute("aria-expanded", String(open));
+};
+
 // --- motion (the 2026-08-29 transition study) --------------------------------
 //
 // One rule holds the whole thing up: NOTHING in the greeting may change the
@@ -512,7 +527,14 @@ const render = (): void => {
 
   const waitingLong =
     s.status === ECaptureStatus.Waiting && s.runStartedAt != null && now - s.runStartedAt > WAITING_HINTS_AFTER_MS;
-  show(ui.hints, waitingLong);
+  // Only the one-line affordance is shown or hidden here; it lives in a slot that
+  // is laid out either way, so this moves nothing. The reasons open over the hero
+  // on a click, and close by themselves the moment they stop applying — traffic
+  // arriving with the sheet open would otherwise leave it covering a working card.
+  ui.hintsToggle.hidden = !waitingLong;
+  if (!waitingLong && !ui.hints.hidden) {
+    setWaitingHints(false);
+  }
 
   // The greeting: the character's name in gold once known; the quiet
   // explanation (or a detecting note) in the same slot until then.
@@ -927,12 +949,15 @@ ui.errorChooseEngine.addEventListener("click", () => {
  * language picker re-runs it live, so nothing here may append twice.
  */
 const applyStatic = (): void => {
+  ui.hintsToggleText.textContent = STR.waitingHints.toggle;
   ui.hintsTitle.textContent = STR.waitingHints.title;
   ui.hintsList.replaceChildren();
   for (const hint of STR.waitingHints.items) {
-    const li = document.createElement("li");
-    li.textContent = hint;
-    ui.hintsList.append(li);
+    const dt = document.createElement("dt");
+    dt.textContent = hint.lead;
+    const dd = document.createElement("dd");
+    dd.textContent = hint.body;
+    ui.hintsList.append(dt, dd);
   }
   ui.statLootLabel.textContent = STR.stats.loot;
   ui.setupInstallNpcap.textContent = STR.buttons.installNpcap;
@@ -1113,9 +1138,17 @@ ui.pairMore.addEventListener("click", (event) => {
   setPairDetails(ui.pairDetails.hidden);
 });
 
+ui.hintsToggle.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setWaitingHints(ui.hints.hidden);
+});
+
 document.addEventListener("click", (event) => {
   if (!ui.pairDetails.hidden && !ui.pairDetails.contains(event.target as Node)) {
     setPairDetails(false);
+  }
+  if (!ui.hints.hidden && !ui.hints.contains(event.target as Node)) {
+    setWaitingHints(false);
   }
 });
 
@@ -1337,6 +1370,10 @@ document.addEventListener("keydown", (event) => {
     }
     if (!ui.pairDetails.hidden) {
       setPairDetails(false);
+      return;
+    }
+    if (!ui.hints.hidden) {
+      setWaitingHints(false);
       return;
     }
     setPopover(false);

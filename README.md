@@ -139,6 +139,21 @@ The reasoning, the measurements it came from and a playable before/after are
 in [`docs/design-transition-study.html`](docs/design-transition-study.html) —
 open it in a browser, no build step.
 
+**The waiting hints obey the same rule** (fixed 2026-08-30). They used to be
+four list items injected straight into that greeting, which is `flex: 1`,
+centred and `overflow: hidden` inside a window that cannot be resized — so the
+stack outgrew its container and the whole thing **clipped at both ends**: the
+status line off the top, the Start button off the bottom, the pairing bar over
+what was left. It read as a styling bug and it was an arithmetic one; the block
+had simply never been given a reserved slot like everything else in the
+greeting. Now the greeting carries **one line at a fixed height** — *Nothing
+after a few minutes?* — and the three reasons open as an overlay above it,
+anchored to the bottom of the greeting so the Start/Stop pill stays reachable
+(one of the reasons is "turn your VPN off", which you act on by pressing Stop).
+Verified by driving the renderer at the real 660×620 in all six languages: the
+status chip and the button land on the same pixel in every language, open or
+closed.
+
 **Capture starts by itself when the app opens** (default on — the app exists
 to be forgotten about; open it, play). The toggle in the gear popover turns
 that off, persisted in `settings.json` as `autoCapture`. Auto-start goes
@@ -418,9 +433,13 @@ each step proves an assumption the container build could not.
    - The app log has the installer's exact outcome and a `/dev/bpf*` snapshot:
      `~/Library/Application Support/guild-butler-capture/logs/capture-app.log`
      in dev (`Guild Butler Capture` instead once packaged).
-4. **The two real failure modes.** Albion closed → Waiting with the hint list
-   after ~90 s, never an error. Then start the game mid-session → Capturing by
-   itself. Quit the game → back to Waiting, counts kept.
+4. **The two real failure modes.** Albion closed → Waiting, and after ~90 s the
+   *Nothing after a few minutes?* line appears in the greeting — never an error,
+   and nothing above or below it moves when it does. Open it: the three reasons
+   sit over the card with the Start/Stop button still visible underneath, and
+   they close on Escape, an outside click, or the line again. Then start the game
+   mid-session → Capturing by itself, and the reasons close themselves. Quit the
+   game → back to Waiting, counts kept.
 5. **Engine kill resilience.** `kill -9` the engine process — the app must
    show “restarting”, relaunch it, and keep the session count.
 6. **Stop flushes.** Stop capture, open the log file — the last pickups must
@@ -436,6 +455,10 @@ each step proves an assumption the container build could not.
    that (AdminOnly registry probe).
 9. **VPN reality check.** Turn on a VPN (or ExitLag) — traffic goes dark; the
    Waiting hints must be the story the member sees. GeForce Now: same.
+10. **View my loot.** Press it while paired — the browser must land on the
+    dashboard's **Loot** tab, not on Overview. A second press opening a second
+    browser tab is expected and not a bug: nothing outside a browser can focus a
+    tab it already has.
 
 ## Sending loot to your guild (v0.3.0+)
 

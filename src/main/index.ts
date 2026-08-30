@@ -842,11 +842,22 @@ const registerIpc = (): void => {
   ipcMain.handle(IPC.pairingOpenLoot, async () => {
     const settings = loadSettings(SETTINGS_FILE);
     const guildId = settings.pairing?.guildId;
+    // `tab=loot` lands them ON the Loot tab. Without it the dashboard follows the
+    // guild and stops on Overview, so every press of this button ended with the
+    // member hunting for the tab themselves — the actual complaint, reported
+    // 2026-08-30. The dashboard validates the value against its own tab ids and
+    // ignores anything else, so an old build sending a renamed id degrades to
+    // today's behaviour rather than breaking.
+    //
+    // What this does NOT fix, and cannot: `shell.openExternal` hands a URL to the
+    // system browser, which opens a new tab every time. Nothing outside a browser
+    // can name or focus a tab already open in it.
+    //
     // Without a guild the deep link has no target — send them to the app root
     // rather than a 404 that reads as the feature being broken.
     const url =
       guildId != null && guildId.length > 0
-        ? `${apiBase(settings.apiBase)}/?guild=${encodeURIComponent(guildId)}`
+        ? `${apiBase(settings.apiBase)}/?guild=${encodeURIComponent(guildId)}&tab=loot`
         : apiBase(settings.apiBase);
     await shell.openExternal(url);
   });
