@@ -99,7 +99,21 @@ greeting sits over the **log rain**: a canvas of loot lines drifting at ~12
 fps, paused on blur/hidden, disabled under reduced-motion, and only ever
 drawn during a live session.
 
-### How it moves
+### Uploads recover from a refusal
+
+If the bot refuses a batch — most often because the batch was too big for the
+route in an alphabet where characters and bytes are not the same number — the
+app now **halves what it sends and tries again**, all the way down to a single
+line. Only when one line on its own is still refused does it stop and say so.
+
+Before v0.6.2 the first refusal parked the uploader for the rest of the session:
+it kept capturing to the log file, uploaded nothing, and the only sign was one
+line in the app. A member could finish a whole raid that way and lose it.
+
+Batches are also packed by **encoded bytes** rather than character count, so a
+Russian or Ukrainian capture is bounded the same way an English one is.
+
+## How it moves
 
 The four states — idle, starting, waiting, capturing — are one continuous
 run, and the interface treats them that way. One rule holds it up: **nothing

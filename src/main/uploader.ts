@@ -19,7 +19,15 @@ import {
   type TFetchLike,
   type TUploadResult,
 } from "./uploadClient.js";
-import { advanceCursor, ENewRunReason, newRunReason, nextBatch, splitLines, type TUploadCursor } from "./uploadPlan.js";
+import {
+  advanceCursor,
+  ENewRunReason,
+  MAX_BATCH_LINES,
+  newRunReason,
+  nextBatch,
+  splitLines,
+  type TUploadCursor,
+} from "./uploadPlan.js";
 
 export enum EUploaderState {
   /** No pairing — nothing to do, and not an error. */
@@ -104,6 +112,24 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
   let cursor: TUploadCursor | null = null;
   let running = false;
   let nextAttemptAt = 0;
+  /**
+   * Line ceiling for the next attempt. Shrinks on a refusal, resets on a send.
+   *
+   * A refusal used to park this uploader in `Blocked` for good — see
+   * `onFailure`. Most refusals are about the SIZE of the batch (a body over the
+   * route's limit, a cap that drifted between the two repos), and sending less
+   * is the cheapest thing that could possibly make the next attempt succeed.
+   */
+  let batchCap = MAX_BATCH_LINES;
+  /**
+   * How many lines the LAST attempt actually carried.
+   *
+   * The retry halves this rather than `batchCap`, and the difference is the
+   * whole fix: a 40-line file refused under a 500-line ceiling would have been
+   * "halved" to 250 and re-sent at exactly 40, four times over, before anything
+   * moved. Shrinking what was really sent is the only version that converges.
+   */
+  let lastBatchLines = MAX_BATCH_LINES;
 
   const set = (patch: Partial<TUploaderStatus>): void => {
     status = { ...status, ...patch };
@@ -120,7 +146,23 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
       return;
     }
     if (!isRetryable(result.outcome)) {
-      deps.log(`[upload] refused: ${result.outcome} ${result.detail ?? ""}`.trim());
+      // A refusal is not automatically fatal, and treating it as one is how a
+      // member's whole raid could go missing behind one line in the UI. The
+      // sibling branch above already got this right for NotDeployed — "it heals
+      // by itself, so keep trying rather than parking in a dead state they must
+      // clear" — and the same is true here: nearly every refusal we can
+      // actually provoke is about the batch being too big for the route, which
+      // a smaller batch fixes. So halve and try again, all the way down to a
+      // single line; only when ONE line is still refused is the batch not the
+      // problem and a human needed.
+      if (lastBatchLines > 1) {
+        batchCap = Math.max(1, Math.floor(lastBatchLines / 2));
+        nextAttemptAt = deps.now() + retryDelayMs(failures);
+        deps.log(`[upload] refused: ${result.outcome} — retrying with ${batchCap} line(s)`.trim());
+        set({ state: EUploaderState.Retrying, failures, lastError: result.outcome });
+        return;
+      }
+      deps.log(`[upload] refused even one line at a time: ${result.outcome} ${result.detail ?? ""}`.trim());
       set({ state: EUploaderState.Blocked, failures, lastError: result.outcome });
       return;
     }
@@ -189,13 +231,14 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
       if (active == null) {
         return;
       }
-      const batch = nextBatch(active.sentThrough, lines);
+      const batch = nextBatch(active.sentThrough, lines, batchCap);
       if (batch == null) {
         set({ state: EUploaderState.UpToDate, failures: 0, lastError: null });
         return;
       }
 
       set({ state: EUploaderState.Sending });
+      lastBatchLines = batch.lines.length;
       const result = await uploadBatch(deps.fetchLike, deps.base, token, active.run, file, batch);
       if (result.outcome !== EUploadOutcome.Accepted) {
         onFailure(result);
@@ -203,6 +246,9 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
       }
       active.sentThrough = advanceCursor(active.sentThrough, batch, result.reply.nextFrom);
       nextAttemptAt = 0;
+      // Back to full size: whatever the refusal was about, it is behind us.
+      batchCap = MAX_BATCH_LINES;
+      lastBatchLines = MAX_BATCH_LINES;
       set({
         state: active.sentThrough >= lines.length ? EUploaderState.UpToDate : EUploaderState.Sending,
         sentTotal: status.sentTotal + result.reply.accepted,
