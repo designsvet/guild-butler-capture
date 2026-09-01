@@ -44,6 +44,15 @@ export type TEngineEvent =
   | { kind: "character"; name: string }
   | { kind: "log-file"; file: string }
   | { kind: "festivities"; server: string | null; code: number | null; entries: TFestivityEntry[] }
+  | {
+      kind: "energy";
+      server: string | null;
+      guildName: string;
+      allianceTag: string | null;
+      albionGuildId: string | null;
+      total: number;
+      changed: boolean;
+    }
   | { kind: "fatal"; errorKind: EEngineErrorKind; line: string }
   | { kind: "noise"; line: string };
 
@@ -121,6 +130,16 @@ const LOG_FILE_RE = /(loot-events-[\w.:-]+\.txt)/i;
  * magnitudes that is tens of microseconds, invisible in a countdown measured in days.
  */
 const FESTIVITIES_MARK_RE = /\[festivities\]/i;
+const ENERGY_MARK_RE = /\[energy\]/i;
+
+/**
+ * The wire scales a guild's siphoned energy by 10000, and the engine passes that through
+ * unconverted for the same reason it passes ticks through: the wire's own encoding is the
+ * reader's to interpret, and a scale applied in two places will one day disagree with itself.
+ * So the division happens HERE, once, in the module whose job is knowing what the engine
+ * prints. 1,291 energy arrives as 12910000.
+ */
+const ENERGY_SCALE = 10_000;
 
 /** .NET ticks (100ns since 0001-01-01) at the Unix epoch. */
 const NET_EPOCH_TICKS = 621_355_968_000_000_000;
@@ -168,6 +187,46 @@ const parseFestivities = (line: string): TEngineEvent => {
       server: typeof obj.server === "string" ? obj.server : null,
       code: typeof obj.code === "number" ? obj.code : null,
       entries,
+    };
+  } catch {
+    return { kind: "noise", line };
+  }
+};
+
+/**
+ * One guild-energy reading (raid-bot ADR 0022).
+ *
+ * Refused rather than rounded when the raw value is not a whole number of energy units. A
+ * fraction means the scale is not what this build believes it is — a game patch, a different
+ * currency in slot 0 — and a reading that is quietly 10000x wrong would be written into a
+ * guild's history as fact and differenced from for weeks.
+ */
+const parseEnergy = (line: string): TEngineEvent => {
+  const jsonStart = line.indexOf("{");
+  if (jsonStart < 0) {
+    return { kind: "noise", line };
+  }
+  try {
+    const obj = JSON.parse(line.slice(jsonStart)) as Record<string, unknown>;
+    const raw = obj.totalRaw;
+    if (typeof obj.guildName !== "string" || obj.guildName.length === 0) {
+      return { kind: "noise", line };
+    }
+    if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0 || raw % ENERGY_SCALE !== 0) {
+      return { kind: "noise", line };
+    }
+    return {
+      kind: "energy",
+      server: typeof obj.server === "string" ? obj.server : null,
+      guildName: obj.guildName,
+      allianceTag: typeof obj.allianceTag === "string" ? obj.allianceTag : null,
+      // Null until someone opens the guild screen in this session — the engine cannot get the
+      // guild's own id from the state event, which carries the ALLIANCE id. The bot checks the
+      // name against its binding when the id is absent, so this must stay honestly null rather
+      // than fall back to something that merely looks like an id.
+      albionGuildId: typeof obj.albionGuildId === "string" && obj.albionGuildId.length > 0 ? obj.albionGuildId : null,
+      total: raw / ENERGY_SCALE,
+      changed: obj.changed === true,
     };
   } catch {
     return { kind: "noise", line };
@@ -243,6 +302,9 @@ export const parseEngineLine = (raw: string): TEngineEvent => {
   }
   if (FESTIVITIES_MARK_RE.test(line)) {
     return parseFestivities(line);
+  }
+  if (ENERGY_MARK_RE.test(line)) {
+    return parseEnergy(line);
   }
   if (DEBUG_TAG_RE.test(line)) {
     return { kind: "noise", line };

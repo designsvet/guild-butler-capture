@@ -59,7 +59,7 @@ import { installNpcap, parseSignatureOutput, type TSignatureCheck } from "./plat
 import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpcap.js";
 import { loadSettings, saveSettings, settingsFilePath } from "./settings.js";
 import { decryptToken, encryptPairing, EStoreOutcome } from "./pairingStore.js";
-import { apiBase, EPairOutcome, pairDevice, sendFestivities } from "./uploadClient.js";
+import { apiBase, EPairOutcome, pairDevice, sendEnergyReading, sendFestivities } from "./uploadClient.js";
 import electronUpdater from "electron-updater";
 
 import { createUpdateController, updaterEnabled, type TUpdateController } from "./updateController.js";
@@ -115,6 +115,9 @@ const dispatch = (ev: TSessionEvent): void => {
   state = reduceCaptureSession(state, ev);
   if (ev.type === "engine-line" && ev.event.kind === "festivities") {
     forwardFestivities(ev.event);
+  }
+  if (ev.type === "engine-line" && ev.event.kind === "energy") {
+    forwardEnergy(ev.event);
   }
   if (ev.type === "engine-exit") {
     appLog(`engine exit fatal=${ev.fatal ?? "none"} willRestart=${ev.willRestart} attempt=${ev.attempt}`);
@@ -205,6 +208,34 @@ const forwardFestivities = (event: Extract<TEngineEvent, { kind: "festivities" }
     entries: event.entries,
   }).then((result) => {
     appLog(`festivities ${result.outcome} server=${event.server} entries=${event.entries.length}`);
+  });
+};
+
+/**
+ * Send one guild siphoned-energy reading (raid-bot ADR 0022).
+ *
+ * Read time is stamped HERE rather than on the bot, because the reading is a fact about a
+ * moment and the upload can be delayed by a slow network — a history that is differenced to
+ * derive territory income would attribute that delay to the guild's territories.
+ *
+ * Unlike the rotation, this is one guild's private number: it goes nowhere without the
+ * pairing, and the bot refuses a reading whose guild does not match what that Discord server
+ * is bound to. No retry, for the reason in sendEnergyReading.
+ */
+const forwardEnergy = (event: Extract<TEngineEvent, { kind: "energy" }>): void => {
+  const settings = loadSettings(SETTINGS_FILE);
+  const token = decryptToken(safeStorage, settings.pairing);
+  if (token == null) {
+    return;
+  }
+  void sendEnergyReading(fetch, settings.apiBase ?? "", token, {
+    server: event.server,
+    guildName: event.guildName,
+    albionGuildId: event.albionGuildId,
+    total: event.total,
+    readAt: Date.now(),
+  }).then((result) => {
+    appLog(`energy ${result.outcome} guild=${event.guildName} total=${event.total} changed=${event.changed}`);
   });
 };
 

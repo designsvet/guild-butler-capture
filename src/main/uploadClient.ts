@@ -233,6 +233,72 @@ export const uploadBatch = async (
  * login sends the rotation again, and a stale snapshot the bot already holds is worth more than
  * a retry queue for data that refreshes itself.
  */
+/**
+ * Post one guild siphoned-energy reading (raid-bot ADR 0022).
+ *
+ * Shaped like `sendFestivities` — same token, same outcome vocabulary, no cursor, no retry —
+ * with one difference that matters: a rotation is the same fact for everyone on a server, while
+ * this is ONE GUILD'S private number. The bot decides whose by the pairing, and refuses a
+ * reading whose guild does not match what that Discord server is bound to.
+ *
+ * Dropped on failure, deliberately. The engine re-reads the total continuously, so the next
+ * line is minutes away at worst — and a retry queue would be the wrong shape anyway: replaying
+ * an hour-old reading as if it were current puts a flat stretch into a history whose whole
+ * purpose is to be differenced.
+ */
+export const sendEnergyReading = async (
+  fetchLike: TFetchLike,
+  base: string,
+  token: string,
+  payload: {
+    server: string | null;
+    guildName: string;
+    albionGuildId: string | null;
+    total: number;
+    readAt: number;
+  },
+): Promise<TUploadResult> => {
+  let res: Awaited<ReturnType<TFetchLike>>;
+  try {
+    res = await fetchLike(`${apiBase(base)}/control/capture/energy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    return { outcome: EUploadOutcome.Unreachable, detail: err instanceof Error ? err.message : null };
+  }
+
+  const text = await res.text().catch(() => "");
+  const body = parseJson(text);
+  if (res.status === 401) {
+    return { outcome: EUploadOutcome.Unauthorized, detail: null };
+  }
+  if (res.status === 429) {
+    return { outcome: EUploadOutcome.RateLimited, detail: null };
+  }
+  if (isMissingEndpoint(res.status)) {
+    return { outcome: EUploadOutcome.NotDeployed, detail: String(res.status) };
+  }
+  if (res.status >= 500) {
+    return { outcome: EUploadOutcome.ServerError, detail: String(res.status) };
+  }
+  if (!res.ok) {
+    return { outcome: EUploadOutcome.Rejected, detail: typeof body?.error === "string" ? body.error : null };
+  }
+  return {
+    outcome: EUploadOutcome.Accepted,
+    reply: {
+      accepted: body?.stored === true ? 1 : 0,
+      // Not an error: a reading the bot already holds, or one inside its rate window. The
+      // engine emits far more readings than a history needs.
+      duplicate: body?.stored === true ? 0 : 1,
+      rejected: 0,
+      nextFrom: null,
+    },
+  };
+};
+
 export const sendFestivities = async (
   fetchLike: TFetchLike,
   base: string,
