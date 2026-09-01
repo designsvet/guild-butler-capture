@@ -69,6 +69,17 @@ export const REAL = {
    * This app does not consume the line — it is here because the id it carries is what makes
    * `energy.albionGuildId` non-null, and a fixture is how that stays true.
    */
+  /**
+   * One page of the guild's energy log — the engine's real output over the first three rows of
+   * a page recorded verbatim on 2026-09-01. The screen's own log had these three at the top:
+   * Generiess −10, KoNonG +6, ggpussy +99.
+   *
+   * The ticks carry SUB-SECOND precision (…20.338180) while the game's copyable log — the one
+   * an officer pastes — is written to whole seconds. The adapter floors for that reason; this
+   * fixture is where the unfloored input is pinned.
+   */
+  energyLog:
+    "[energy-log] {\"server\":null,\"code\":159,\"albionGuildId\":\"dnLn5L8lRuS8---yM3vKLQ\",\"rows\":[{\"playerName\":\"Generiess\",\"type\":3,\"note\":\"\",\"amountRaw\":-100000,\"ticks\":639238458190780000},{\"playerName\":\"KoNonG\",\"type\":2,\"note\":\"\",\"amountRaw\":60000,\"ticks\":639238452583926100},{\"playerName\":\"ggpussy\",\"type\":2,\"note\":\"\",\"amountRaw\":990000,\"ticks\":639238428329135600}]}",
   energyDrain:
     '[energy-drain] {"server":null,"code":414,"albionGuildId":"dnLn5L8lRuS8---yM3vKLQ",' +
     '"territories":5,"controlCost":11}',

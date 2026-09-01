@@ -246,6 +246,74 @@ export const uploadBatch = async (
  * an hour-old reading as if it were current puts a flat stretch into a history whose whole
  * purpose is to be differenced.
  */
+/**
+ * Post one page of the guild's energy log (raid-bot ADR 0022).
+ *
+ * Unlike a reading — one number, cheap to lose, re-read seconds later — a page is the only
+ * copy this session will offer of those rows: the client fetches each page once, as the log
+ * is scrolled, and nothing re-asks. It is still not retried here, because the bot's mirror is
+ * append-and-deduplicate and the next fetch of the same log re-delivers everything; a queue
+ * would buy resilience against exactly the failure (bot down) that the next scroll fixes.
+ *
+ * The bot refuses a page whose guild does not match the pairing's binding, and refuses one
+ * from a device whose owner may not paste the log by hand — the same gate, at the same width.
+ */
+export const sendEnergyLogPage = async (
+  fetchLike: TFetchLike,
+  base: string,
+  token: string,
+  payload: {
+    server: string | null;
+    albionGuildId: string | null;
+    rows: ReadonlyArray<{ playerName: string; type: number; amount: number; happenedAt: number }>;
+  },
+): Promise<TUploadResult> => {
+  let res: Awaited<ReturnType<TFetchLike>>;
+  try {
+    res = await fetchLike(`${apiBase(base)}/control/capture/energy-log`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    return { outcome: EUploadOutcome.Unreachable, detail: err instanceof Error ? err.message : null };
+  }
+
+  const text = await res.text().catch(() => "");
+  const body = parseJson(text);
+  if (res.status === 401) {
+    return { outcome: EUploadOutcome.Unauthorized, detail: null };
+  }
+  if (res.status === 403) {
+    // The device's owner may not put rows into this guild's energy mirror. Not retryable and
+    // not a bug: an ordinary member's capture is trusted for readings, not for balances.
+    return { outcome: EUploadOutcome.Rejected, detail: "forbidden" };
+  }
+  if (res.status === 429) {
+    return { outcome: EUploadOutcome.RateLimited, detail: null };
+  }
+  if (isMissingEndpoint(res.status)) {
+    return { outcome: EUploadOutcome.NotDeployed, detail: String(res.status) };
+  }
+  if (res.status >= 500) {
+    return { outcome: EUploadOutcome.ServerError, detail: String(res.status) };
+  }
+  if (!res.ok) {
+    return { outcome: EUploadOutcome.Rejected, detail: typeof body?.error === "string" ? body.error : null };
+  }
+  return {
+    outcome: EUploadOutcome.Accepted,
+    reply: {
+      accepted: typeof body?.stored === "number" ? body.stored : 0,
+      // Rows the mirror already held. The common case by far: the log is re-read whole every
+      // time somebody opens it, so only the newest rows of a page are ever new.
+      duplicate: typeof body?.known === "number" ? body.known : 0,
+      rejected: typeof body?.refused === "number" ? body.refused : 0,
+      nextFrom: null,
+    },
+  };
+};
+
 export const sendEnergyReading = async (
   fetchLike: TFetchLike,
   base: string,

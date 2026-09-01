@@ -37,6 +37,26 @@ export type TFestivityEntry = {
   endMs: number;
 };
 
+/**
+ * One row of the guild's energy log, in this app's units: silver-style scaling divided out,
+ * ticks turned into epoch milliseconds and FLOORED TO THE SECOND.
+ *
+ * The flooring is not tidiness. The game's own copyable log — the one an officer pastes into
+ * Discord — is written to the second, and the bot de-duplicates its mirror on
+ * (timestamp, player, kind, amount). Ticks carry sub-second precision, so an unfloored row
+ * would never match the same row pasted by a human, and a guild running both paths would
+ * store everything twice.
+ *
+ * `type` stays a number on purpose. This module's job is units; what a 2 or a 3 MEANS is the
+ * bot's, where the rest of the log vocabulary already lives.
+ */
+export type TEnergyLogRow = {
+  playerName: string;
+  type: number;
+  amount: number;
+  happenedAt: number;
+};
+
 export type TEngineEvent =
   | { kind: "albion-detected" }
   | { kind: "albion-lost" }
@@ -44,6 +64,7 @@ export type TEngineEvent =
   | { kind: "character"; name: string }
   | { kind: "log-file"; file: string }
   | { kind: "festivities"; server: string | null; code: number | null; entries: TFestivityEntry[] }
+  | { kind: "energy-log"; server: string | null; albionGuildId: string | null; rows: TEnergyLogRow[] }
   | {
       kind: "energy";
       server: string | null;
@@ -140,6 +161,11 @@ const ENERGY_MARK_RE = /\[energy\]/i;
  * prints. 1,291 energy arrives as 12910000.
  */
 const ENERGY_SCALE = 10_000;
+const ENERGY_LOG_MARK_RE = /\[energy-log\]/i;
+const MAX_LOG_ROWS = 5_000;
+
+/** Epoch ms for a .NET tick, floored to the second — see TEnergyLogRow for why. */
+const ticksToSecondMs = (ticks: number): number => Math.floor((ticks - NET_EPOCH_TICKS) / 10_000_000) * 1000;
 
 /** .NET ticks (100ns since 0001-01-01) at the Unix epoch. */
 const NET_EPOCH_TICKS = 621_355_968_000_000_000;
@@ -234,6 +260,60 @@ const parseEnergy = (line: string): TEngineEvent => {
 };
 
 /**
+ * One page of the guild's energy log (raid-bot ADR 0022).
+ *
+ * A malformed ROW voids the page rather than being skipped. The bot appends these to a mirror
+ * it de-duplicates by content, so a page that quietly arrives short leaves a hole no later
+ * fetch will notice — the rows around it are already held, and nothing re-asks for the gap.
+ */
+const parseEnergyLog = (line: string): TEngineEvent => {
+  const jsonStart = line.indexOf("{");
+  if (jsonStart < 0) {
+    return { kind: "noise", line };
+  }
+  try {
+    const obj = JSON.parse(line.slice(jsonStart)) as Record<string, unknown>;
+    const rawRows = Array.isArray(obj.rows) ? obj.rows : [];
+    if (rawRows.length === 0 || rawRows.length > MAX_LOG_ROWS) {
+      return { kind: "noise", line };
+    }
+    const rows: TEnergyLogRow[] = [];
+    for (const raw of rawRows) {
+      const row = raw as Record<string, unknown>;
+      const amountRaw = row.amountRaw;
+      const ticks = row.ticks;
+      if (
+        typeof row.playerName !== "string" ||
+        row.playerName.length === 0 ||
+        typeof row.type !== "number" ||
+        !Number.isInteger(row.type) ||
+        typeof amountRaw !== "number" ||
+        !Number.isInteger(amountRaw) ||
+        amountRaw % ENERGY_SCALE !== 0 ||
+        typeof ticks !== "number" ||
+        !Number.isFinite(ticks)
+      ) {
+        return { kind: "noise", line };
+      }
+      rows.push({
+        playerName: row.playerName,
+        type: row.type,
+        amount: amountRaw / ENERGY_SCALE,
+        happenedAt: ticksToSecondMs(ticks),
+      });
+    }
+    return {
+      kind: "energy-log",
+      server: typeof obj.server === "string" ? obj.server : null,
+      albionGuildId: typeof obj.albionGuildId === "string" && obj.albionGuildId.length > 0 ? obj.albionGuildId : null,
+      rows,
+    };
+  } catch {
+    return { kind: "noise", line };
+  }
+};
+
+/**
  * Failure classification, most-specific first. Order matters twice:
  * - ABI before Npcap: a native-module load failure on Windows says "The
  *   specified module could not be found", which mentions no driver — but
@@ -302,6 +382,12 @@ export const parseEngineLine = (raw: string): TEngineEvent => {
   }
   if (FESTIVITIES_MARK_RE.test(line)) {
     return parseFestivities(line);
+  }
+  // The two patterns are disjoint — /\[energy\]/ needs the closing bracket, so it does not
+  // match "[energy-log]" — but the more specific one is tested first anyway, so that stays
+  // true if either pattern is ever loosened.
+  if (ENERGY_LOG_MARK_RE.test(line)) {
+    return parseEnergyLog(line);
   }
   if (ENERGY_MARK_RE.test(line)) {
     return parseEnergy(line);

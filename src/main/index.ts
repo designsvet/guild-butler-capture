@@ -59,7 +59,14 @@ import { installNpcap, parseSignatureOutput, type TSignatureCheck } from "./plat
 import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpcap.js";
 import { loadSettings, saveSettings, settingsFilePath } from "./settings.js";
 import { decryptToken, encryptPairing, EStoreOutcome } from "./pairingStore.js";
-import { apiBase, EPairOutcome, pairDevice, sendEnergyReading, sendFestivities } from "./uploadClient.js";
+import {
+  apiBase,
+  EPairOutcome,
+  pairDevice,
+  sendEnergyLogPage,
+  sendEnergyReading,
+  sendFestivities,
+} from "./uploadClient.js";
 import electronUpdater from "electron-updater";
 
 import { createUpdateController, updaterEnabled, type TUpdateController } from "./updateController.js";
@@ -118,6 +125,9 @@ const dispatch = (ev: TSessionEvent): void => {
   }
   if (ev.type === "engine-line" && ev.event.kind === "energy") {
     forwardEnergy(ev.event);
+  }
+  if (ev.type === "engine-line" && ev.event.kind === "energy-log") {
+    forwardEnergyLog(ev.event);
   }
   if (ev.type === "engine-exit") {
     appLog(`engine exit fatal=${ev.fatal ?? "none"} willRestart=${ev.willRestart} attempt=${ev.attempt}`);
@@ -236,6 +246,31 @@ const forwardEnergy = (event: Extract<TEngineEvent, { kind: "energy" }>): void =
     readAt: Date.now(),
   }).then((result) => {
     appLog(`energy ${result.outcome} guild=${event.guildName} total=${event.total} changed=${event.changed}`);
+  });
+};
+
+/**
+ * Send one page of the guild's energy log (raid-bot ADR 0022).
+ *
+ * No read-time stamp here, unlike a reading: every row carries the game's own timestamp, and
+ * when this page reached us says nothing about when the rows happened.
+ *
+ * A page with no guild id is still sent. The bot has a binding to check it against and will
+ * refuse it; deciding here would put half the attribution rule in the client, where it cannot
+ * be audited and cannot be fixed without a release.
+ */
+const forwardEnergyLog = (event: Extract<TEngineEvent, { kind: "energy-log" }>): void => {
+  const settings = loadSettings(SETTINGS_FILE);
+  const token = decryptToken(safeStorage, settings.pairing);
+  if (token == null) {
+    return;
+  }
+  void sendEnergyLogPage(fetch, settings.apiBase ?? "", token, {
+    server: event.server,
+    albionGuildId: event.albionGuildId,
+    rows: event.rows,
+  }).then((result) => {
+    appLog(`energy-log ${result.outcome} rows=${event.rows.length}`);
   });
 };
 
