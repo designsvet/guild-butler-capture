@@ -46,6 +46,50 @@ export const REAL = {
     '{"kind":1,"category":"ACTIVITIES","uniqueName":"MISTS","startTicks":639234216000000000,"endTicks":639236808000000000},' +
     '{"kind":2,"category":"GENERAL","uniqueName":"COMMON_BOW","startTicks":639235080000000000,"endTicks":639235944000000000}' +
     "]}",
+  /**
+   * The guild's siphoned-energy total (raid-bot ADR 0022). Produced by running the engine's
+   * handler over a payload recorded VERBATIM from the live client on 2026-09-01 (VITRYLA,
+   * Europe, guild screen open beside it) — so the numbers are checkable against a screenshot:
+   * the screen read **1,291** energy, 5 alliance territories, 11/20 control cost.
+   *
+   * `totalRaw` is unconverted, like the ticks above: the wire scales energy by 10000 and this
+   * app's adapter is the thing that divides. `currencies` carries the whole map because key 0
+   * is the only one ever observed, and a guild holding something else must not vanish silently.
+   *
+   * `server` is null here because region detection had not fired in the replay; a live line
+   * carries "europe".
+   */
+  energy:
+    '[energy] {"server":null,"code":103,"guildName":"VITRYLA","allianceTag":"UA",' +
+    '"albionGuildId":"dnLn5L8lRuS8---yM3vKLQ","currencies":{"0":12910000},' +
+    '"totalRaw":12910000,"changed":true}',
+  /**
+   * The same line before anyone has opened the guild screen. The state event carries the
+   * ALLIANCE id, not the guild's, so the engine has nothing to stamp — and the adapter must
+   * keep this honestly null rather than invent something id-shaped.
+   */
+  energyUnidentified:
+    '[energy] {"server":"europe","code":103,"guildName":"VITRYLA","allianceTag":"UA",' +
+    '"albionGuildId":null,"currencies":{"0":12910000},"totalRaw":12910000,"changed":false}',
+  /**
+   * The guild screen's drain block, and the only place the guild's own id is known to arrive.
+   * This app does not consume the line — it is here because the id it carries is what makes
+   * `energy.albionGuildId` non-null, and a fixture is how that stays true.
+   */
+  /**
+   * One page of the guild's energy log — the engine's real output over the first three rows of
+   * a page recorded verbatim on 2026-09-01. The screen's own log had these three at the top:
+   * Generiess −10, KoNonG +6, ggpussy +99.
+   *
+   * The ticks carry SUB-SECOND precision (…20.338180) while the game's copyable log — the one
+   * an officer pastes — is written to whole seconds. The adapter floors for that reason; this
+   * fixture is where the unfloored input is pinned.
+   */
+  energyLog:
+    "[energy-log] {\"server\":null,\"code\":159,\"albionGuildId\":\"dnLn5L8lRuS8---yM3vKLQ\",\"rows\":[{\"playerName\":\"Generiess\",\"type\":3,\"note\":\"\",\"amountRaw\":-100000,\"ticks\":639238458190780000},{\"playerName\":\"KoNonG\",\"type\":2,\"note\":\"\",\"amountRaw\":60000,\"ticks\":639238452583926100},{\"playerName\":\"ggpussy\",\"type\":2,\"note\":\"\",\"amountRaw\":990000,\"ticks\":639238428329135600}]}",
+  energyDrain:
+    '[energy-drain] {"server":null,"code":414,"albionGuildId":"dnLn5L8lRuS8---yM3vKLQ",' +
+    '"territories":5,"controlCost":11}',
 } as const;
 
 /**
