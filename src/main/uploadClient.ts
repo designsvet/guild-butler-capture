@@ -265,6 +265,7 @@ export const sendEnergyLogPage = async (
   payload: {
     server: string | null;
     albionGuildId: string | null;
+    logType: number | null;
     rows: ReadonlyArray<{ playerName: string; type: number; amount: number; happenedAt: number }>;
   },
 ): Promise<TUploadResult> => {
@@ -300,6 +301,13 @@ export const sendEnergyLogPage = async (
   }
   if (!res.ok) {
     return { outcome: EUploadOutcome.Rejected, detail: typeof body?.error === "string" ? body.error : null };
+  }
+  // A 200 does NOT mean stored. The bot answers an ordinary refusal — wrong guild, not the
+  // energy log, tracking off — with a 200 and a reason, and reading only the status turns that
+  // into "accepted" in the log. A whole page can then vanish while the app reports success,
+  // which is exactly how a missing field went unnoticed through a staging pass.
+  if (typeof body?.reason === "string" && (body?.stored ?? 0) === 0) {
+    return { outcome: EUploadOutcome.Rejected, detail: body.reason };
   }
   return {
     outcome: EUploadOutcome.Accepted,

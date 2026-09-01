@@ -272,9 +272,13 @@ const forwardEnergyLog = (event: Extract<TEngineEvent, { kind: "energy-log" }>):
   void sendEnergyLogPage(fetch, settings.apiBase ?? "", token, {
     server: event.server,
     albionGuildId: event.albionGuildId,
+    logType: event.logType,
     rows: event.rows,
   }).then((result) => {
-    appLog(`energy-log ${result.outcome} rows=${event.rows.length}`);
+    // The reason, when there is one: "energy-log Accepted rows=101" was printed for a whole
+    // page the bot had thrown away, and that is how the missing logType hid for a day.
+    const why = "detail" in result && result.detail ? ` (${result.detail})` : "";
+    appLog(`energy-log ${result.outcome} rows=${event.rows.length}${why}`);
   });
 };
 

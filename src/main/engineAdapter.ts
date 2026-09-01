@@ -66,7 +66,16 @@ export type TEngineEvent =
   | { kind: "character"; name: string }
   | { kind: "log-file"; file: string }
   | { kind: "festivities"; server: string | null; code: number | null; entries: TFestivityEntry[] }
-  | { kind: "energy-log"; server: string | null; albionGuildId: string | null; rows: TEnergyLogRow[] }
+  | {
+      kind: "energy-log";
+      server: string | null;
+      albionGuildId: string | null;
+      /** WHICH of the guild's logs this page is. The game serves several through one
+       *  request in an identical shape, so the bot refuses a page that cannot name itself —
+       *  dropping this field here means every page is refused, silently. */
+      logType: number | null;
+      rows: TEnergyLogRow[];
+    }
   | {
       kind: "energy";
       server: string | null;
@@ -341,6 +350,7 @@ const parseEnergyLog = (line: string): TEngineEvent => {
       kind: "energy-log",
       server: typeof obj.server === "string" ? obj.server : null,
       albionGuildId: typeof obj.albionGuildId === "string" && obj.albionGuildId.length > 0 ? obj.albionGuildId : null,
+      logType: typeof obj.logType === "number" && Number.isInteger(obj.logType) ? obj.logType : null,
       rows,
     };
   } catch {

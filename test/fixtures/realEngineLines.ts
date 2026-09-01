@@ -84,9 +84,14 @@ export const REAL = {
    * The ticks carry SUB-SECOND precision (…20.338180) while the game's copyable log — the one
    * an officer pastes — is written to whole seconds. The adapter floors for that reason; this
    * fixture is where the unfloored input is pinned.
+   *
+   * RE-RECORDED 2026-09-01 after the engine started stamping `logType`. The first version of
+   * this line predated that field, so no test here could notice the adapter was dropping it —
+   * and every log page was silently refused for a day. A stale fixture does not fail; it
+   * agrees with whatever the code does.
    */
   energyLog:
-    "[energy-log] {\"server\":null,\"code\":159,\"albionGuildId\":\"dnLn5L8lRuS8---yM3vKLQ\",\"rows\":[{\"playerName\":\"Generiess\",\"type\":3,\"note\":\"\",\"amountRaw\":-100000,\"ticks\":639238458190780000},{\"playerName\":\"KoNonG\",\"type\":2,\"note\":\"\",\"amountRaw\":60000,\"ticks\":639238452583926100},{\"playerName\":\"ggpussy\",\"type\":2,\"note\":\"\",\"amountRaw\":990000,\"ticks\":639238428329135600}]}",
+    "[energy-log] {\"server\":null,\"code\":159,\"albionGuildId\":\"dnLn5L8lRuS8---yM3vKLQ\",\"logType\":2,\"rows\":[{\"playerName\":\"Generiess\",\"type\":3,\"note\":\"\",\"amountRaw\":-100000,\"ticks\":639238458190780000},{\"playerName\":\"KoNonG\",\"type\":2,\"note\":\"\",\"amountRaw\":60000,\"ticks\":639238452583926100},{\"playerName\":\"ggpussy\",\"type\":2,\"note\":\"\",\"amountRaw\":990000,\"ticks\":639238428329135600}]}",
   energyDrain:
     '[energy-drain] {"server":null,"code":414,"albionGuildId":"dnLn5L8lRuS8---yM3vKLQ",' +
     '"territories":5,"controlCost":11}',
