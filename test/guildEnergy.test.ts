@@ -199,6 +199,8 @@ describe("the adapter reads a log page", () => {
     expect(event).toMatchObject({
       kind: "energy-log",
       albionGuildId: "dnLn5L8lRuS8---yM3vKLQ",
+      // Read off the engine line and carried through — see the upload test below for why.
+      logType: 2,
     });
     const rows = (event as { rows: Array<{ playerName: string; type: number; amount: number; happenedAt: number }> })
       .rows;
@@ -250,6 +252,7 @@ describe("posting a log page", () => {
   const payload = {
     server: "europe",
     albionGuildId: "dnLn5L8lRuS8---yM3vKLQ",
+    logType: 2,
     rows: [{ playerName: "Generiess", type: 3, amount: -10, happenedAt: 1788249019000 }],
   };
 
@@ -269,6 +272,39 @@ describe("posting a log page", () => {
     expect(result.outcome === EUploadOutcome.Accepted && result.reply.duplicate).toBe(98);
     const [url] = fetchLike.mock.calls[0] as unknown as [string];
     expect(url).toContain("/control/capture/energy-log");
+  });
+
+  it("sends the log type, the field that says WHICH log this is", async () => {
+    // It was missing for a day. The engine emitted it, the bot required it, and this app in
+    // between dropped it — so every page arrived unable to name itself and was refused. The
+    // whole point of asserting the BODY rather than the outcome is that the outcome was fine.
+    const fetchLike = vi.fn(async () => res(200, { stored: 1, known: 0, refused: 0 }));
+
+    await sendEnergyLogPage(fetchLike as never, "https://bot.example", "tok", payload);
+
+    const [, init] = fetchLike.mock.calls[0] as unknown as [string, { body: string }];
+    expect(JSON.parse(init.body).logType).toBe(2);
+  });
+
+  it("reports a 200 that stored NOTHING as a refusal, with the reason", async () => {
+    // A 200 does not mean stored. Reading only the status printed "Accepted rows=101" for a
+    // page the bot had thrown away, which is how the missing field hid through a staging pass.
+    const fetchLike = vi.fn(async () => res(200, { stored: 0, known: 0, refused: 0, reason: "not_the_energy_log" }));
+
+    const result = await sendEnergyLogPage(fetchLike as never, "https://bot.example", "tok", payload);
+
+    expect(result).toEqual({ outcome: EUploadOutcome.Rejected, detail: "not_the_energy_log" });
+  });
+
+  it("still counts a page of already-held rows as accepted", async () => {
+    // The common case: re-reading the log stores nothing NEW and carries no reason. That must
+    // not read as a refusal, or every normal re-scroll would look broken.
+    const fetchLike = vi.fn(async () => res(200, { stored: 0, known: 101, refused: 0 }));
+
+    const result = await sendEnergyLogPage(fetchLike as never, "https://bot.example", "tok", payload);
+
+    expect(result.outcome).toBe(EUploadOutcome.Accepted);
+    expect(result.outcome === EUploadOutcome.Accepted && result.reply.duplicate).toBe(101);
   });
 
   it("treats a refusal to accept balance rows as final, not as something to retry", async () => {
