@@ -44,7 +44,7 @@ import {
   type TAppSettings,
 } from "../shared/captureTypes.js";
 import { defaultDeviceName, isValidPairCodeShape, normalizePairCode } from "../shared/pairing.js";
-import { IPC, NPCAP_URL } from "../shared/ipc.js";
+import { IPC, NPCAP_URL, PRIVACY_URL } from "../shared/ipc.js";
 import { reduceCaptureSession, type TSessionEvent } from "./captureSession.js";
 import { resolveEngine, type TResolvedEngine } from "./engineLocator.js";
 import { createEngineSupervisor, type TEngineSupervisor } from "./engineSupervisor.js";
@@ -934,6 +934,9 @@ const registerIpc = (): void => {
 
   ipcMain.handle(IPC.setupOpenNpcapPage, async () => {
     await shell.openExternal(NPCAP_URL);
+  });
+  ipcMain.handle(IPC.appOpenPrivacy, async () => {
+    await shell.openExternal(PRIVACY_URL);
   });
   ipcMain.handle(IPC.setupPickEnginePath, async () => {
     const result = win == null ? null : await dialog.showOpenDialog(win, { properties: ["openDirectory"] });

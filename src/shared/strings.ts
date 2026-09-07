@@ -246,6 +246,7 @@ const EN = {
 
   footer: {
     engineCredit: "Capture engine: ao-loot-logger (GPL-3.0, open source)",
+    privacy: "Privacy policy",
   },
 };
 
@@ -456,6 +457,7 @@ const UK: TStrings = {
 
   footer: {
     engineCredit: "Рушій захоплення: ao-loot-logger (GPL-3.0, відкритий код)",
+    privacy: "Політика конфіденційності",
   },
 };
 
@@ -660,6 +662,7 @@ const RU: TStrings = {
 
   footer: {
     engineCredit: "Движок захвата: ao-loot-logger (GPL-3.0, открытый код)",
+    privacy: "Политика конфиденциальности",
   },
 };
 
@@ -868,6 +871,7 @@ const DE: TStrings = {
 
   footer: {
     engineCredit: "Capture-Engine: ao-loot-logger (GPL-3.0, Open Source)",
+    privacy: "Datenschutzerklärung",
   },
 };
 
@@ -1077,6 +1081,7 @@ const FR: TStrings = {
 
   footer: {
     engineCredit: "Moteur de capture : ao-loot-logger (GPL-3.0, open source)",
+    privacy: "Politique de confidentialité",
   },
 };
 
@@ -1281,6 +1286,7 @@ const PT: TStrings = {
 
   footer: {
     engineCredit: "Motor de captura: ao-loot-logger (GPL-3.0, código aberto)",
+    privacy: "Política de privacidade",
   },
 };
 

@@ -62,6 +62,7 @@ type TGbc = {
   unpair: () => Promise<TPairingStatus>;
   setUpload: (enabled: boolean) => Promise<TPairingStatus>;
   openLoot: () => Promise<void>;
+  openPrivacy: () => Promise<void>;
   onPairing: (listener: (status: TPairingStatus) => void) => () => void;
   getUpdate: () => Promise<TUpdateStatus>;
   updateRestart: () => Promise<TRestartResult>;
@@ -169,6 +170,7 @@ const ui = {
   advEngine: el<HTMLSpanElement>("adv-engine-path"),
   advChoose: el<HTMLButtonElement>("btn-choose-engine"),
   credit: el<HTMLParagraphElement>("footer-credit"),
+  privacyBtn: el<HTMLButtonElement>("btn-privacy"),
 };
 
 let state: TCaptureState | null = null;
@@ -986,6 +988,7 @@ const applyStatic = (): void => {
   ui.checkUpdatesBtn.textContent = STR.settings.checkUpdates;
   ui.advCaption.textContent = STR.settings.advancedEngine;
   ui.credit.textContent = STR.footer.engineCredit;
+  ui.privacyBtn.textContent = STR.footer.privacy;
   // The picker names each language in ITSELF; only "System" translates.
   rebuildLangMenu();
   ui.copyCmdBtn.setAttribute("aria-label", STR.pairing.copy);
@@ -1124,6 +1127,10 @@ ui.pairUploadToggle.addEventListener("change", () => {
 
 ui.viewLootBtn.addEventListener("click", () => {
   void gbc.openLoot();
+});
+
+ui.privacyBtn.addEventListener("click", () => {
+  void gbc.openPrivacy();
 });
 
 // The details are an overlay above the row (the fixed window never re-flows),
