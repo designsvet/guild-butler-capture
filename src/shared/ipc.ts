@@ -54,9 +54,18 @@ export const IPC = {
   updateCheck: "update:check",
   /** invoke(text) → void. Copy a short string to the OS clipboard (the /capture pair chip). */
   appCopyText: "app:copy-text",
+  /** invoke → void. Open the privacy policy, at its capture-app section, in the system browser. */
+  appOpenPrivacy: "app:open-privacy",
 } as const;
 
 export const NPCAP_URL = "https://npcap.com/#download";
+
+/**
+ * The privacy policy, opened at its capture-app section. On the marketing site, not the API
+ * host: the policy is one page for the bot, the dashboard and this app, and someone asking
+ * "what does this send?" should land on the paragraph that answers it.
+ */
+export const PRIVACY_URL = "https://guild-butler.com/legal/?tab=privacy#p-capture";
 
 /** The Discord command the pairing card offers to copy — never localized. */
 export const PAIR_COMMAND = "/capture pair";

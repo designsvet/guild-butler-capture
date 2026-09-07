@@ -1850,3 +1850,24 @@ html[data-theme="parchment"] .dd-menu {
   font-size: 10px;
   color: var(--gb-dim);
 }
+
+/* The privacy-policy link under the credit: a button styled as a link, because the
+   renderer has no navigation — it asks main to hand the URL to the system browser. */
+.settings-links {
+  margin: 4px 0 0;
+  font-size: 10px;
+}
+.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--gb-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.linklike:hover,
+.linklike:focus-visible {
+  color: var(--gb-gold, inherit);
+}

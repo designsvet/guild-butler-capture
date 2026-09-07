@@ -26,6 +26,7 @@ const CH = {
   pairingUnpair: "pairing:unpair",
   pairingSetUpload: "pairing:set-upload",
   pairingOpenLoot: "pairing:open-loot",
+  appOpenPrivacy: "app:open-privacy",
   pairingChanged: "pairing:changed",
   updateGet: "update:get",
   updateRestart: "update:restart",
@@ -55,6 +56,7 @@ export type TGbcBridge = {
   unpair: () => Promise<unknown>;
   setUpload: (enabled: boolean) => Promise<unknown>;
   openLoot: () => Promise<void>;
+  openPrivacy: () => Promise<void>;
   onPairing: (listener: (status: unknown) => void) => () => void;
   getUpdate: () => Promise<unknown>;
   updateRestart: () => Promise<unknown>;
@@ -92,6 +94,7 @@ const bridge: TGbcBridge = {
   unpair: () => ipcRenderer.invoke(CH.pairingUnpair),
   setUpload: (enabled) => ipcRenderer.invoke(CH.pairingSetUpload, enabled),
   openLoot: () => ipcRenderer.invoke(CH.pairingOpenLoot) as Promise<void>,
+  openPrivacy: () => ipcRenderer.invoke(CH.appOpenPrivacy) as Promise<void>,
   onPairing: (listener) => {
     const wrapped = (_event: unknown, status: unknown): void => {
       listener(status);
