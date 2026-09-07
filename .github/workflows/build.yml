@@ -44,9 +44,9 @@ on:
         type: string
         default: "designsvet/ao-loot-logger"
       engine_ref:
-        description: "Engine branch / tag / sha"
+        description: "Engine branch / tag / sha (blank = the pinned SHA below)"
         type: string
-        default: "protocol18"
+        default: ""
       release_version:
         description: "Publish a release as v<this>, e.g. 0.2.0 (blank = just build)"
         type: string
@@ -56,11 +56,23 @@ on:
     tags: ["v*"]
   pull_request:
 
-permissions:
-  contents: write
+# Default-deny. Each job below grants only what it needs, so a job added later
+# starts with nothing rather than inheriting write access to the whole repo.
+#
+# Residual, stated plainly rather than left to be discovered: `permissions:` is
+# job-level at finest and accepts no expressions, so the two jobs that publish a
+# release still carry `contents: write` on their PULL_REQUEST runs. Closing that
+# needs the publish steps split into their own job gated on the release tag —
+# a real refactor of the draft-first publish + tagless-draft cleanup below, not a
+# config line. Until then the mitigation is the SHA pins: a compromised action is
+# how that write would actually be reached (CVE-2025-30066).
+permissions: {}
 
 jobs:
   build:
+    # Creates the release, pushes the version-bump commit, prunes tagless drafts.
+    permissions:
+      contents: write
     outputs:
       # The mac job needs all three: the tag to upload against, and the sha so
       # it packages the version-bump commit rather than the commit that
@@ -92,12 +104,12 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: ${{ inputs.engine_repo || 'designsvet/ao-loot-logger' }}
-          ref: ${{ inputs.engine_ref || 'protocol18' }}
+          ref: ${{ inputs.engine_ref || 'd7a89ead4b0b2ff12eb2ebfa1e67998bef0e5b8d' }} # protocol18, pinned
           path: engine-src
 
       # House rule (test/ciWorkflow.test.ts): pnpm/action-setup BEFORE
       # setup-node, with a per-runner dest.
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
@@ -277,7 +289,7 @@ jobs:
         # below retry once from a clean slate. Both attempts failing fails
         # the job, so a real breakage still shows red.
         continue-on-error: true
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           # action-gh-release creates the tag itself at target_commitish, so
           # cutting a release never needs a tag push.
@@ -302,7 +314,7 @@ jobs:
 
       - name: Publish GitHub Release (retry after a severed upload)
         if: steps.rel.outputs.tag != '' && steps.publish1.outcome == 'failure'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ steps.rel.outputs.tag }}
           target_commitish: ${{ steps.bump.outputs.sha || github.sha }}
@@ -316,6 +328,9 @@ jobs:
   # release the `build` job has already published.
   # ---------------------------------------------------------------------------
   macos:
+    # `gh release upload` attaches the DMG to the release `build` published.
+    permissions:
+      contents: write
     needs: build
     # Apple Silicon (macos-14 and later are arm64). Intel Macs get no build:
     # a universal binary would need the engine's `cap` native module built for
@@ -338,10 +353,10 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: ${{ inputs.engine_repo || 'designsvet/ao-loot-logger' }}
-          ref: ${{ inputs.engine_ref || 'protocol18' }}
+          ref: ${{ inputs.engine_ref || 'd7a89ead4b0b2ff12eb2ebfa1e67998bef0e5b8d' }} # protocol18, pinned
           path: engine-src
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
