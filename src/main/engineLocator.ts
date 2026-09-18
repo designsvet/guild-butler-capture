@@ -17,11 +17,18 @@ export type TResolvedEngine = {
   /** The engine repo root (where its package.json and node_modules live). */
   root: string;
   /**
-   * Spawn cwd and the log-file directory. The engine writes its log to
-   * `process.cwd()` (verified in the fork's src/index.js), so for a BUNDLED
-   * engine — whose root sits inside the read-only install dir — this is a
-   * per-user captures folder instead of the root. Dev layouts keep root, so
-   * the log keeps landing next to the engine exactly like the manual runs.
+   * Spawn cwd and the log-file directory. Started by this app
+   * (ELECTRON_RUN_AS_NODE=1), the engine writes its loot log to its working
+   * folder (`logDir` in the engine's src/loot-logger.js), so for a BUNDLED
+   * engine — whose root sits inside the installed app — this is a per-user
+   * captures folder instead of the root. Dev layouts keep root, so the log
+   * keeps landing next to the engine exactly like the manual runs.
+   *
+   * This comment used to say it was so, citing src/index.js, while the engine
+   * wrote beside itself: every bundle built before designsvet/ao-loot-logger#11
+   * put its loot logs INSIDE the installed app (on macOS breaking the bundle's
+   * signature seal, measured 2026-09-18), and the tracker watching this folder
+   * never saw them. Only the engine's announced path kept uploads working.
    */
   workDir: string;
   /** Which rule found it: "settings" | "bundled" | "sibling". */
