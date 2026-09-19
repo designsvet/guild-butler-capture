@@ -222,7 +222,9 @@ child with ignored stdin never gets), compiles `cap` for this app's Electron
 ABI (cap vendors its own WinPcap SDK — no external download), assembles
 `engine-dist/` via `tools/prepare-engine-dist.mjs`, and ships it as
 `resources/engine` — where the locator finds it and captures into the user's
-data folder (the install dir is never written).
+data folder, so the install dir is never written. (Bundles built before
+designsvet/ao-loot-logger#11 did write there: the engine put its loot log
+beside itself, inside the installed app.)
 
 For testers, two things to know:
 

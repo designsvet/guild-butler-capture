@@ -23,8 +23,9 @@
 # with `--config electron-builder.win-ci.yml` (extends this file + adds the
 # engine as extraResources), so local builds without an engine-dist keep
 # working unchanged. The locator prefers <resources>/engine in packaged
-# builds and captures into the user's data dir (the install dir is
-# read-only; the engine writes to cwd).
+# builds and captures into the user's data dir: started by this app, the
+# engine writes its loot log to cwd (designsvet/ao-loot-logger#11 — bundles
+# built before it wrote into <resources>/engine, inside the installed app).
 #
 # Npcap is deliberately NOT bundled: redistribution needs the paid OEM licence,
 # so the app links members to the official installer instead.
@@ -73,8 +74,8 @@ win:
   artifactName: GuildButlerCapture-Setup-${version}.${ext}
 
 # One-click per-user install (LocalAppData): no admin prompt for guildmates,
-# and the install dir is per-user — the bundled engine still never writes
-# there (captures go to the user's data dir).
+# and the install dir is per-user. The bundled engine must never write there:
+# an update replaces it. Captures go to the user's data dir (see above).
 nsis:
   oneClick: true
   perMachine: false

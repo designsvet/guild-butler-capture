@@ -64,8 +64,9 @@ describe("engine locator", () => {
   });
 
   it("a bundled engine captures into the user's data dir — its root is read-only", () => {
-    // The engine writes its log to cwd (fork src/index.js), and a packaged
-    // install dir must never be the cwd; dev layouts keep root as the workDir.
+    // Started by this app, the engine writes its log to cwd (logDir in the
+    // engine's src/loot-logger.js, since designsvet/ao-loot-logger#11), and a
+    // packaged install dir must never be the cwd; dev layouts keep root.
     const found = resolveEngine(
       deps(["/res/engine/src/index.js"], { resourcesPath: "/res", dataDir: "/home/user/.gbc" }),
     );
