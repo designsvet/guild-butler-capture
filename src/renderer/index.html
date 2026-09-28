@@ -7,6 +7,13 @@
       content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
     />
     <title>Guild Butler Capture</title>
+    <!-- The design system (@guild-butler/design-system, ADR 0145), copied into
+         ./ds/ by tools/build-static.mjs — every ./ds/ link here is what it
+         copies. Tokens first, then the surfaces (ADR 0150), then the app's own
+         sheet, which reads them. base.css and controls.css are not linked yet:
+         their resets and control classes arrive with the controls step. -->
+    <link rel="stylesheet" href="./ds/tokens.css" />
+    <link rel="stylesheet" href="./ds/surfaces.css" />
     <link rel="stylesheet" href="./fonts.css" />
     <link rel="stylesheet" href="./styles.css" />
   </head>

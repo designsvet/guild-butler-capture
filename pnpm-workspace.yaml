@@ -15,3 +15,10 @@ allowBuilds:
   electron: true
   # esbuild ships vitest's transform binary via its postinstall
   esbuild: true
+
+# pnpm 11 refuses a version younger than a day (minimumReleaseAge). The design
+# system is our own package (Raid-Bot's packages/design-system, ADR 0145), and
+# it is adopted here the day it is published — so that one exact version is let
+# through. Version-pinned on purpose: the next bump meets the gate again.
+minimumReleaseAgeExclude:
+  - '@guild-butler/design-system@0.7.0'
