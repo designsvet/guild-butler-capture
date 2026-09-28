@@ -28,11 +28,15 @@
 
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const dest = join(root, "dist", "web", "renderer");
+// GBC_DIST_DIR points the output somewhere else — test/designSystem.test.ts
+// runs this very script into a temp dir, so a test run never restamps the
+// real dist/ (the build time in the window is how a stale build is spotted).
+const dist = process.env.GBC_DIST_DIR ? resolve(process.env.GBC_DIST_DIR) : join(root, "dist");
+const dest = join(dist, "web", "renderer");
 mkdirSync(dest, { recursive: true });
 
 cpSync(join(root, "src", "renderer"), dest, {
@@ -59,5 +63,5 @@ for (const file of dsFiles) {
 // Stamp the build so the window and the app log can say WHICH build is
 // running — package.json's version is static across dev builds, and the first
 // hardware pass spent a round-trip on a stale instance nobody could identify.
-writeFileSync(join(root, "dist", "buildstamp.json"), JSON.stringify({ builtAt: new Date().toISOString() }));
+writeFileSync(join(dist, "buildstamp.json"), JSON.stringify({ builtAt: new Date().toISOString() }));
 console.log(`static → ${dest} (design system: ${dsFiles.join(", ") || "none"})`);
