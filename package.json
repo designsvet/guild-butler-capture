@@ -20,7 +20,7 @@
     "dev:mock": "pnpm build && cross-env-shell GBC_MOCK_ENGINE=1 \"electron .\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:layout": "pnpm build && electron tools/layout-check.cjs",
+    "check:layout": "pnpm build && electron --no-sandbox tools/layout-check.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.preload.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.test.json",
     "engine:rebuild": "node tools/engine-rebuild.mjs",
     "package:mac": "pnpm build && electron-builder --mac",

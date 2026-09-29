@@ -20,7 +20,8 @@
  * the title bar, the waiting reasons or the connected details over the pill, the
  * pairing pitch clamped, anything wider than the window.
  *
- * Plain CommonJS, run by Electron itself: `electron tools/layout-check.cjs`.
+ * Plain CommonJS, run by Electron itself: `electron --no-sandbox tools/layout-check.cjs` (what
+ * `pnpm check:layout` runs after a build — the flag is for Linux CI, harmless elsewhere).
  * OUT=<dir> also writes a PNG per scenario — the quickest way to look at all of
  * them. Exits 1 on any failure.
  */
@@ -40,9 +41,9 @@ const TITLE_BAR = 48; // .app-header
 
 // Final frames, not mid-transition ones: every duration collapses to zero.
 app.commandLine.appendSwitch("force-prefers-reduced-motion");
-// CI runs as root in a container-like runner, where Chromium's sandbox cannot start.
-app.commandLine.appendSwitch("no-sandbox");
 app.commandLine.appendSwitch("disable-gpu");
+// No sandbox switch here: on Linux CI Chromium checks its SUID sandbox helper before any of this
+// runs, and aborts. `pnpm check:layout` passes --no-sandbox on the command line instead.
 
 const LANGS = ["en", "uk", "ru", "de", "fr", "pt"]; // src/shared/i18n.ts SUPPORTED_LANGS
 const STATES = ["idle", "waiting", "waitingLong", "capturing", "health"];
