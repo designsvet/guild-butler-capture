@@ -26,6 +26,7 @@
     "package:win": "pnpm build && electron-builder --win"
   },
   "devDependencies": {
+    "@guild-butler/design-system": "0.7.0",
     "@types/node": "^22.10.5",
     "cross-env": "^7.0.3",
     "electron": "^37.0.0",

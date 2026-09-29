@@ -12,6 +12,9 @@ importers:
         specifier: ^6.3.9
         version: 6.8.9
     devDependencies:
+      '@guild-butler/design-system':
+        specifier: 0.7.0
+        version: 0.7.0
       '@types/node':
         specifier: ^22.10.5
         version: 22.20.1
@@ -207,6 +210,9 @@ packages:
 
   '@gar/promisify@1.1.3':
     resolution: {integrity: sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==}
+
+  '@guild-butler/design-system@0.7.0':
+    resolution: {integrity: sha512-/9SuQu9DVkZ9OY7AbTpzLcX2E8MFcwtR0jL4ttWNXDzWFbnxam2fawX1C4z2Ln+YNilXFFHr4Ge6OGPNaCuuvQ==}
 
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
@@ -461,6 +467,7 @@ packages:
   '@xmldom/xmldom@0.9.11':
     resolution: {integrity: sha512-tW8bcK3hsG0/uqSnNz6TK4BkcuZSezoU7DlnYssILmZDktPnSHHuDJJFM0AJv+13gz2r0iGdrj6qqKeUnxXEDg==}
     engines: {node: '>=14.6'}
+    deprecated: this version has critical issues, please update to the latest version
 
   abbrev@1.1.1:
     resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}
@@ -2015,6 +2022,8 @@ snapshots:
     optional: true
 
   '@gar/promisify@1.1.3': {}
+
+  '@guild-butler/design-system@0.7.0': {}
 
   '@isaacs/cliui@8.0.2':
     dependencies:

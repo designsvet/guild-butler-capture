@@ -3,44 +3,37 @@
  * laid out as the "focused HUD" (Direction B of the 2026-08-29 concept
  * canvas): merged OS chrome, a greeting hero over the log rain, one pill CTA
  * in the eye path, pairing anchored at the bottom, configuration behind the
- * gear. Tokens are lifted verbatim from web/ (app.guild-butler.com).
+ * gear.
  *
- * Two themes, named like the kill-card grounds (ADR 0074): Obsidian is the
- * :root default; Parchment overrides ONLY tokens under [data-theme] so the
- * layout never forks. Every color used anywhere below must be a token.
+ * The tokens are the design system's, not copies of it:
+ * @guild-butler/design-system (ADR 0145), pinned in package.json and linked
+ * before this sheet as ds/tokens.css and ds/surfaces.css (tools/build-static.mjs
+ * copies them out of the package). This file declares only what the package
+ * does not — the app-local block below. test/designSystem.test.ts fails if a
+ * package token is declared here again, or a retired one (ADR 0150) comes back.
+ *
+ * Two themes, named like the kill-card grounds (ADR 0074). "obsidian" and
+ * "parchment" stay the stored setting's words; the page wears the package's
+ * attribute, <html data-theme="dark"> or "light" (renderer.ts applyTheme).
+ * Parchment overrides ONLY tokens, so the layout never forks. Every colour used
+ * anywhere below must be a token.
+ *
+ * Surfaces follow ADR 0150's five heights, one recipe each: the ground; cards
+ * (.gb-card — C1, a lit top edge and no border); wells for values and fields;
+ * and vellum overlays (.gb-overlay) for the four things that open over the
+ * page. Status is not a surface, and lines are neutral: gold is kept for the
+ * chosen outline and links.
  */
 
+/* --- app-local tokens ----------------------------------------------------------
+   The app's own chrome, CTA and ambience — nothing here is a name tokens.css
+   defines, except the three faces (see Typography). Values carried over from
+   the 0.8.x sheet unchanged. */
+
 :root {
-  /* — Brand palette — */
-  --gb-gold: #e6c36c;
-  --gb-gold-bright: #f2dc93;
-  --gb-gold-deep: #c9a24a;
-  --gb-gold-ink: #1b1503;
-  --gb-grad-gold: linear-gradient(180deg, #f8e6a0 0%, #efce79 50%, #e4be64 100%);
-
-  /* — Surfaces — */
-  --gb-bg: #0a0a0c;
+  /* — The merged title bar. src/main/index.ts overlayFor tints the Windows
+     window controls to these same two values. — */
   --gb-titlebar: #0c0b0f;
-  --gb-card: linear-gradient(180deg, #141319, #0f0e13);
-  --gb-card-top: #141319;
-  --gb-inset: #16151b;
-  --gb-popover: #141319;
-
-  /* — Hairlines — */
-  --gb-line: rgba(230, 195, 108, 0.12);
-  --gb-line-soft: rgba(230, 195, 108, 0.08);
-  --gb-line-strong: rgba(230, 195, 108, 0.26);
-
-  /* — Text — */
-  --gb-ink: #f4f1ea;
-  --gb-muted: #a7a39b;
-  --gb-faint: #8c887f;
-  --gb-dim: #7e7a70;
-
-  /* — Status — */
-  --gb-green: #5fbf6a;
-  --gb-amber: #c9a24a;
-  --gb-red: #b5562c;
 
   /* — The stop CTA's ember treatment — */
   --gb-stop-bg: rgba(181, 86, 44, 0.1);
@@ -49,19 +42,23 @@
   --gb-stop-bg-hover: rgba(181, 86, 44, 0.18);
   --gb-stop-line-hover: rgba(224, 122, 70, 0.75);
 
-  /* — Interaction washes (hover fills for ghost controls) — */
+  /* — The .btn family's hover fills. They go with the controls step, when
+     .btn becomes the package's .gbtn. — */
   --gb-wash: rgba(244, 241, 234, 0.05);
   --gb-wash-strong: rgba(244, 241, 234, 0.09);
-  --gb-gold-wash: rgba(230, 195, 108, 0.1);
 
-  /* — The log rain (canvas reads this at start) — */
+  /* — The log rain (the canvas reads these at start) — */
   --gb-rain: rgba(230, 195, 108, 0.16);
   --gb-rain-dim: rgba(230, 195, 108, 0.1);
 
   /* — Hero count when the session is cold — */
   --gb-count-dim: rgba(230, 195, 108, 0.35);
 
-  /* — Typography — */
+  /* — Typography — the one deliberate override of package tokens. The
+     package names Rubik / Onest / IBM Plex Mono (Q40), which this app does not
+     bundle yet: the CSP is font-src 'self', so faces must ship inside the app,
+     and the new ones arrive with plan step P6. Until then the app keeps the
+     faces it bundles (fonts.css). P6 deletes these three lines. — */
   --gb-font-display: "Cormorant Garamond", Georgia, serif;
   --gb-font-body: "Manrope", system-ui, -apple-system, sans-serif;
   --gb-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -77,38 +74,10 @@
   --gb-t-morph: 440ms;
   --gb-t-beat: 700ms;
   --gb-t-ramp: 1200ms;
-
-  /* — Radii / shadow — */
-  --gb-r-sm: 8px;
-  --gb-r: 11px;
-  --gb-r-lg: 14px;
-  --gb-shadow-card: 0 24px 50px -24px rgba(0, 0, 0, 0.8);
 }
 
-html[data-theme="parchment"] {
-  --gb-gold: #8f6d1e;
-  --gb-gold-bright: #a07d2d;
-  --gb-gold-deep: #7e611f;
-
-  --gb-bg: #f3ecdd;
+[data-theme="light"] {
   --gb-titlebar: #ece3cf;
-  --gb-card: linear-gradient(180deg, #faf5e9, #f0e7d4);
-  --gb-card-top: #faf5e9;
-  --gb-inset: #ece3cf;
-  --gb-popover: #faf5e9;
-
-  --gb-line: rgba(140, 105, 40, 0.22);
-  --gb-line-soft: rgba(140, 105, 40, 0.14);
-  --gb-line-strong: rgba(160, 125, 45, 0.4);
-
-  --gb-ink: #2a2416;
-  --gb-muted: #6b6353;
-  --gb-faint: #857b66;
-  --gb-dim: #857b66;
-
-  --gb-green: #3f8f4a;
-  --gb-amber: #a07d2d;
-  --gb-red: #a04a20;
 
   --gb-stop-bg: rgba(181, 86, 44, 0.07);
   --gb-stop-line: rgba(150, 60, 25, 0.5);
@@ -118,13 +87,10 @@ html[data-theme="parchment"] {
 
   --gb-wash: rgba(42, 36, 22, 0.05);
   --gb-wash-strong: rgba(42, 36, 22, 0.09);
-  --gb-gold-wash: rgba(143, 109, 30, 0.1);
 
   --gb-rain: rgba(140, 105, 40, 0.15);
   --gb-rain-dim: rgba(140, 105, 40, 0.09);
   --gb-count-dim: rgba(143, 109, 30, 0.4);
-
-  --gb-shadow-card: 0 18px 40px -24px rgba(80, 60, 20, 0.4);
 }
 
 /* --- base --------------------------------------------------------------- */
@@ -161,8 +127,10 @@ input {
 }
 
 :focus-visible {
-  outline: 2px solid var(--gb-gold);
-  outline-offset: 2px;
+  /* Steel, not gold (ADR 0145 D1): a gold ring reads as "chosen". An outline,
+     not a box-shadow ring, so it survives forced-colours mode. */
+  outline: var(--gb-focus-width) solid var(--gb-focus);
+  outline-offset: var(--gb-focus-offset);
 }
 
 .hidden {
@@ -185,7 +153,7 @@ input {
   flex-shrink: 0;
   padding: 0 14px 0 18px;
   background: var(--gb-titlebar);
-  border-bottom: 1px solid var(--gb-line-soft);
+  border-bottom: 1px solid var(--gb-divider);
   -webkit-app-region: drag;
 }
 
@@ -238,22 +206,18 @@ input {
   justify-content: center;
   width: 30px;
   height: 30px;
+  /* A neutral lifted control (ADR 0145's paint, rule 8): on parchment its
+     stroke is a real border, on dark the lit edge is the edge. */
   border-radius: var(--gb-r-sm);
-  border: 1px solid var(--gb-line-strong);
-  background: var(--gb-inset);
-  color: var(--gb-gold);
+  border: 1px solid var(--gb-lift-line);
+  background: var(--gb-lift);
+  box-shadow: var(--gb-lift-edge);
+  color: var(--gb-gold-text);
   padding: 0;
 }
 
-.gear-btn {
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease;
-}
-
 .gear-btn:hover {
-  border-color: var(--gb-gold);
-  background: var(--gb-gold-wash);
+  background: var(--gb-lift-hover);
 }
 
 .gear-btn svg {
@@ -288,14 +252,10 @@ input {
   }
 }
 
-/* --- cards (shared chrome) ----------------------------------------------- */
-
-.card {
-  background: var(--gb-card);
-  border: 1px solid var(--gb-line);
-  border-radius: var(--gb-r-lg);
-  box-shadow: var(--gb-shadow-card);
-}
+/* --- cards -----------------------------------------------------------------
+   Every card is the package's .gb-card (C1: no border, a lit top edge, a soft
+   drop; flat white on parchment; radius 12). Each one below sets only its own
+   padding and layout. Nothing sits card-in-card. */
 
 /* --- update strip --------------------------------------------------------- */
 
@@ -306,8 +266,6 @@ input {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  border-color: var(--gb-line-strong);
-  background: var(--gb-inset);
 }
 
 .update-strip .status-hint {
@@ -336,13 +294,8 @@ main {
   gap: 10px;
 }
 
-.error-card {
-  border-left: 3px solid var(--gb-red);
-}
-
-.setup-card {
-  border-left: 3px solid var(--gb-amber);
-}
+/* No coloured left bar on either (ADR 0150 rule 6: status is not a surface) —
+   the title, the list's own marks and the actions say what is wrong. */
 
 .error-title {
   margin: 0;
@@ -404,10 +357,7 @@ main {
 
 #error-detail-text {
   margin: 8px 0 0 0;
-  padding: 10px 12px;
-  background: var(--gb-inset);
-  border: 1px solid var(--gb-line-soft);
-  border-radius: var(--gb-r-sm);
+  padding: 10px 12px; /* a well (.gb-well in the markup) — the press is its edge */
   font-family: var(--gb-font-mono);
   font-size: 10.5px;
   line-height: 1.5;
@@ -699,7 +649,7 @@ main {
 }
 
 .hero[data-active="true"] .status-label {
-  color: var(--gb-green);
+  color: var(--gb-green-text);
 }
 
 /* The character's name is the greeting; without one the same slot carries
@@ -751,11 +701,11 @@ main {
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: 0.01em;
-  color: var(--gb-gold);
+  color: var(--gb-gold-text); /* --gb-gold is the fill; its text twin darkens to bronze on parchment */
   text-shadow: 0 0 26px rgba(230, 195, 108, 0.25);
 }
 
-html[data-theme="parchment"] .hero-character[data-known="true"] {
+[data-theme="light"] .hero-character[data-known="true"] {
   text-shadow: none;
 }
 
@@ -801,11 +751,11 @@ html[data-theme="parchment"] .hero-character[data-known="true"] {
 }
 
 .hero[data-active="true"] .hero-count {
-  color: var(--gb-gold);
+  color: var(--gb-gold-text);
   text-shadow: 0 0 34px rgba(230, 195, 108, 0.3);
 }
 
-html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
+[data-theme="light"] .hero[data-active="true"] .hero-count {
   text-shadow: none;
 }
 
@@ -833,8 +783,8 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
   font-size: 12px;
   font-weight: 600;
   color: var(--gb-faint);
-  background: var(--gb-inset);
-  border: 1px solid var(--gb-line-soft);
+  /* a well (.gb-well in the markup): a reading pressed into the ground, pill-cut */
+  border: 1px solid transparent;
   border-radius: 999px;
   padding: 6px 12px;
   min-width: 0;
@@ -849,7 +799,7 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
 }
 
 .hero[data-traffic="true"] #traffic-chip {
-  color: var(--gb-green);
+  color: var(--gb-green-text);
 }
 
 .hero[data-traffic="true"] .chip-dot {
@@ -923,8 +873,8 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
   cursor: pointer;
   font-family: inherit;
   font-size: 12px;
-  color: var(--gb-gold);
-  border-bottom: 1px dotted var(--gb-line-strong);
+  color: var(--gb-gold-text);
+  border-bottom: 1px dotted var(--gb-outline);
   padding-bottom: 2px;
   animation: dd-open 0.2s ease;
 }
@@ -949,16 +899,8 @@ html[data-theme="parchment"] .hero[data-active="true"] .hero-count {
   bottom: 0;
   z-index: 20;
   text-align: left;
-  padding: 14px 16px;
-  background: var(--gb-popover);
-  border: 1px solid var(--gb-line-strong);
-  border-radius: 12px;
-  box-shadow: 0 -18px 40px -20px rgba(0, 0, 0, 0.9);
+  padding: 14px 16px; /* vellum: .gb-overlay in the markup draws the surface */
   animation: dd-open 0.16s ease;
-}
-
-html[data-theme="parchment"] .hint-sheet {
-  box-shadow: 0 -18px 40px -22px rgba(80, 60, 20, 0.45);
 }
 
 .hint-sheet-title {
@@ -1226,18 +1168,21 @@ html[data-theme="parchment"] .hint-sheet {
   padding: 0 14px;
 }
 
+/* .tiny and .gold-ghost wore a gold outline on a surface; lines are neutral
+   (ADR 0150 rule 3), so both take the kit's neutral outline — at rest and on
+   hover, where they used to turn gold. */
 .btn.tiny {
   font-size: 11.5px;
   min-height: 24px;
   padding: 0 11px;
-  color: var(--gb-gold);
-  border-color: var(--gb-line-strong);
+  color: var(--gb-ink);
+  border-color: var(--gb-outline);
 }
 
 .btn.tiny:hover:not(:disabled) {
-  color: var(--gb-gold-bright);
-  border-color: var(--gb-gold);
-  background: var(--gb-gold-wash);
+  color: var(--gb-ink);
+  border-color: var(--gb-outline-hover);
+  background: var(--gb-wash);
 }
 
 .btn.accent,
@@ -1261,14 +1206,14 @@ html[data-theme="parchment"] .hint-sheet {
 }
 
 .btn.gold-ghost {
-  color: var(--gb-gold);
-  border-color: var(--gb-line-strong);
+  color: var(--gb-ink);
+  border-color: var(--gb-outline);
 }
 
 .btn.gold-ghost:hover:not(:disabled) {
-  color: var(--gb-gold-bright);
-  border-color: var(--gb-gold);
-  background: var(--gb-gold-wash);
+  color: var(--gb-ink);
+  border-color: var(--gb-outline-hover);
+  background: var(--gb-wash);
 }
 
 /* --- pairing (the bottom slot) ---------------------------------------------- */
@@ -1310,12 +1255,11 @@ html[data-theme="parchment"] .hint-sheet {
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 50%;
-  background: var(--gb-inset);
-  border: 1px solid var(--gb-line-strong);
+  border-radius: 50%; /* a well (.gb-well in the markup), cut round */
+  border: 1px solid transparent;
   font-size: 12px;
   font-weight: 700;
-  color: var(--gb-gold);
+  color: var(--gb-ink);
   flex-shrink: 0;
 }
 
@@ -1329,9 +1273,7 @@ html[data-theme="parchment"] .hint-sheet {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  background: var(--gb-inset);
-  border: 1px solid var(--gb-line);
-  border-radius: var(--gb-r-sm);
+  border: 1px solid transparent; /* a well (.gb-well in the markup) */
   padding: 6px 7px 6px 12px;
 }
 
@@ -1349,9 +1291,9 @@ html[data-theme="parchment"] .hint-sheet {
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  border: 1px solid var(--gb-line-strong);
+  border: 1px solid var(--gb-outline);
   background: transparent;
-  color: var(--gb-gold);
+  color: var(--gb-ink);
   padding: 0;
 }
 
@@ -1363,23 +1305,25 @@ html[data-theme="parchment"] .hint-sheet {
 }
 
 .copy-btn:hover {
-  color: var(--gb-gold-bright);
-  border-color: var(--gb-gold);
-  background: var(--gb-gold-wash);
+  color: var(--gb-ink);
+  border-color: var(--gb-outline-hover);
+  background: var(--gb-wash);
 }
 
 .copy-note {
   font-size: 12px;
   font-weight: 600;
-  color: var(--gb-green);
+  color: var(--gb-green-text);
 }
 
 .pairing-input {
   width: 132px;
   padding: 8px 13px;
-  background: var(--gb-inset);
-  border: 1px solid var(--gb-line);
+  /* a field: a well with a real border and the sunk shadow */
+  background: var(--gb-well);
+  border: 1px solid var(--gb-outline);
   border-radius: var(--gb-r-sm);
+  box-shadow: var(--gb-sunk);
   font-family: var(--gb-font-mono);
   font-size: 14px;
   letter-spacing: 0.08em;
@@ -1391,10 +1335,7 @@ html[data-theme="parchment"] .hint-sheet {
   color: var(--gb-dim);
 }
 
-.pairing-input:focus {
-  outline: none;
-  border-color: var(--gb-gold);
-}
+/* No focus rule of its own: the steel :focus-visible ring above is the one. */
 
 #btn-pair {
   padding: 9px 20px;
@@ -1475,17 +1416,9 @@ html[data-theme="parchment"] .hint-sheet {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 11px 14px;
-  background: var(--gb-popover);
-  border: 1px solid var(--gb-line-strong);
-  border-radius: 10px;
-  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.85);
+  padding: 11px 14px; /* vellum: .gb-overlay in the markup draws the surface */
   animation: dd-open 0.16s ease;
   white-space: nowrap;
-}
-
-html[data-theme="parchment"] .pair-details {
-  box-shadow: 0 18px 40px -16px rgba(80, 60, 20, 0.5);
 }
 
 /* --- switches ---------------------------------------------------------------- */
@@ -1518,8 +1451,10 @@ html[data-theme="parchment"] .pair-details {
   width: 30px;
   height: 18px;
   border-radius: 999px;
-  background: var(--gb-inset);
-  border: 1px solid var(--gb-line-strong);
+  /* off, it sits in a well with a light ring; the on-state keeps the app's
+     gold until the controls step brings the package's steel switch */
+  background: var(--gb-well);
+  border: 1px solid var(--gb-control-off-line);
   padding: 1px;
   transition: background 0.15s ease;
 }
@@ -1544,8 +1479,8 @@ html[data-theme="parchment"] .pair-details {
 }
 
 .switch input:focus-visible + .switch-track {
-  outline: 2px solid var(--gb-gold);
-  outline-offset: 2px;
+  outline: var(--gb-focus-width) solid var(--gb-focus);
+  outline-offset: var(--gb-focus-offset);
 }
 
 .switch-label {
@@ -1553,7 +1488,13 @@ html[data-theme="parchment"] .pair-details {
   color: var(--gb-muted);
 }
 
-/* --- the gear popover --------------------------------------------------------- */
+/* --- the gear popover ---------------------------------------------------------
+   Vellum, and a HOST (.gb-overlay gb-overlay--host in the markup): the
+   language menu opens inside it, and Chrome will not blur a backdrop-filter
+   nested in another one — the menu would show the rows under it sharp. So the
+   host draws its fill, border, shadow and blur on a layer behind its content,
+   and the menu inside blurs normally. A host must be positioned (it is fixed)
+   and must not scroll. */
 
 .settings-popover {
   position: fixed;
@@ -1564,15 +1505,7 @@ html[data-theme="parchment"] .pair-details {
   flex-direction: column;
   gap: 13px;
   width: 300px;
-  background: var(--gb-popover);
-  border: 1px solid var(--gb-line-strong);
-  border-radius: var(--gb-r);
-  box-shadow: 0 24px 50px -18px rgba(0, 0, 0, 0.9);
   padding: 15px 17px;
-}
-
-html[data-theme="parchment"] .settings-popover {
-  box-shadow: 0 24px 50px -22px rgba(80, 60, 20, 0.55);
 }
 
 .settings-row {
@@ -1614,10 +1547,12 @@ html[data-theme="parchment"] .settings-popover {
   gap: 8px;
   min-height: 30px;
   padding: 0 10px 0 12px;
-  background: var(--gb-inset);
+  /* it shows a value, so it is a field: a well with a real border */
+  background: var(--gb-well);
   color: var(--gb-ink);
-  border: 1px solid var(--gb-line-strong);
+  border: 1px solid var(--gb-outline);
   border-radius: var(--gb-r-sm);
+  box-shadow: var(--gb-sunk);
   font-size: 12px;
   font-weight: 600;
   max-width: 170px;
@@ -1627,8 +1562,7 @@ html[data-theme="parchment"] .settings-popover {
 }
 
 .dd-btn:hover {
-  border-color: var(--gb-gold);
-  background: var(--gb-gold-wash);
+  border-color: var(--gb-outline-hover);
 }
 
 .dd-btn svg {
@@ -1650,16 +1584,8 @@ html[data-theme="parchment"] .settings-popover {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 5px;
-  background: var(--gb-popover);
-  border: 1px solid var(--gb-line-strong);
-  border-radius: 10px;
-  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.85);
+  padding: 5px; /* vellum: .gb-overlay in the markup draws the surface */
   animation: dd-open 0.16s ease;
-}
-
-html[data-theme="parchment"] .dd-menu {
-  box-shadow: 0 18px 40px -16px rgba(80, 60, 20, 0.5);
 }
 
 @keyframes dd-open {
@@ -1673,37 +1599,30 @@ html[data-theme="parchment"] .dd-menu {
   }
 }
 
+/* A menu row is the package's .gb-overlay-item (renderer.ts sets both
+   classes): ink-2 words, the neutral hover wash, the chosen row the chosen
+   wash with gold words. Menu text is never muted or dim — vellum lets a bright
+   thing under it glow through. This keeps only the app's geometry: the check
+   column, and a radius nested inside the menu's (12 − 5). */
 .dd-item {
-  display: flex;
-  align-items: center;
   gap: 8px;
   padding: 7px 12px 7px 9px;
-  border: none;
-  background: transparent;
   border-radius: 7px;
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--gb-muted);
-  text-align: left;
   transition:
     background-color 0.12s ease,
     color 0.12s ease;
 }
 
-.dd-item:hover {
-  background: var(--gb-wash);
-  color: var(--gb-ink);
-}
-
 .dd-item .dd-check {
   width: 14px;
-  color: var(--gb-gold);
+  color: var(--gb-gold-text);
   visibility: hidden;
   flex-shrink: 0;
 }
 
 .dd-item[aria-selected="true"] {
-  color: var(--gb-gold);
   font-weight: 600;
 }
 
@@ -1728,16 +1647,17 @@ html[data-theme="parchment"] .dd-menu {
   display: flex;
   flex-direction: column;
   padding: 0;
-  border: 1px solid var(--gb-line-strong);
+  border: 1px solid var(--gb-outline);
   border-radius: 10px;
   overflow: hidden;
   background: transparent;
   text-align: left;
 }
 
+/* Chosen: the gold outline (the one gold line rule 3 keeps), and the label
+   below turns to the chosen wash with gold words. No halo. */
 .theme-tile[aria-pressed="true"] {
-  border: 1.5px solid var(--gb-gold);
-  box-shadow: 0 0 0 3px rgba(230, 195, 108, 0.12);
+  border-color: var(--gb-gold-outline);
 }
 
 .tile-preview {
@@ -1752,8 +1672,10 @@ html[data-theme="parchment"] .dd-menu {
   background: #0a0a0c;
 }
 
+/* The parchment ground, drawn inside a dark page too — the package's light
+   --gb-bg, which no token can reach from the other theme. */
 .tile-parchment {
-  background: #f3ecdd;
+  background: #f6f1e6;
 }
 
 .tile-preview .tp-a,
@@ -1787,12 +1709,13 @@ html[data-theme="parchment"] .dd-menu {
   font-size: 11px;
   font-weight: 600;
   color: var(--gb-muted);
-  background: var(--gb-inset);
+  background: var(--gb-well);
   padding: 5px 9px;
 }
 
 .theme-tile[aria-pressed="true"] .tile-label {
-  color: var(--gb-ink);
+  color: var(--gb-gold-text);
+  background: var(--gb-chosen-wash);
 }
 
 .tile-check {
@@ -1814,7 +1737,7 @@ html[data-theme="parchment"] .dd-menu {
 }
 
 .settings-divider {
-  border-top: 1px solid var(--gb-line-soft);
+  border-top: 1px solid var(--gb-divider);
 }
 
 .settings-advanced {
@@ -1845,7 +1768,7 @@ html[data-theme="parchment"] .dd-menu {
 
 .settings-credit {
   margin: 0;
-  border-top: 1px solid var(--gb-line-soft);
+  border-top: 1px solid var(--gb-divider);
   padding-top: 9px;
   font-size: 10px;
   color: var(--gb-dim);
@@ -1869,5 +1792,5 @@ html[data-theme="parchment"] .dd-menu {
 }
 .linklike:hover,
 .linklike:focus-visible {
-  color: var(--gb-gold, inherit);
+  color: var(--gb-gold-text);
 }

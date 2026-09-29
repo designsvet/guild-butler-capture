@@ -52,7 +52,7 @@ src/preload/    the sandboxed IPC bridge (self-contained on purpose)
 src/renderer/   the single screen (plain TS/HTML/CSS, no framework)
 src/shared/     types, channel names, all user-facing copy (strings.ts)
 resources/mac/  the ChmodBPF-style permission helper (plist + scripts)
-tools/          mock engine, stdout recorder, static-copy build step
+tools/          mock engine, stdout recorder, static-copy build step (+ design-system CSS)
 test/           vitest suites — run with no Electron and no game
 ```
 
@@ -80,17 +80,43 @@ English shape, so a missing key anywhere is a compile error rather than a
 runtime fallback. Same provenance caveat as the bot: EN and UK are written
 with care, the rest are machine-quality and welcome a native proofread.
 
-The screen itself is the Guild Butler design system — the dashboard's token
-layer (`styles.css` carries the same `--gb-*` names and values) with the three
-brand fonts **bundled** as woff2 subsets (latin + latin-ext + cyrillic, OFL
-licences beside the files in `src/renderer/fonts/`). Bundled rather than
-fetched because the CSP forbids remote anything and a capture tool must render
-identically offline.
+The screen itself is the Guild Butler design system, **installed, not copied**:
+`@guild-butler/design-system` (ADR 0145 in the Raid-Bot repo), pinned to an
+exact version in `package.json`. The renderer is sandboxed with no bundler and
+a `style-src 'self'` CSP, so it cannot import from `node_modules`; instead
+`tools/build-static.mjs` copies the stylesheets that `index.html` links from
+`./ds/` — today `tokens.css`, then `surfaces.css` — out of the package and
+beside the page. `styles.css` loads after them and declares only what the
+package does not: the title bar, the ember Stop, the log rain, the motion
+timings. `test/designSystem.test.ts` fails if a package token is copied back
+into `styles.css`, if a retired one comes back, if the links fall out of order,
+or if the build stops shipping what the page links. Taking a new package
+version is a change to the pin, then `pnpm install` and `pnpm test`. (The
+package's `base.css` and `controls.css` are not linked yet — the app's own
+buttons and switches move to the kit's controls in a later step.)
+
+Surfaces follow the package's five heights (ADR 0150): cards are `.gb-card`,
+readings and fields sit in wells, and the four things that open over the page
+— the gear popover, the language menu, the pairing details and the waiting
+reasons — are vellum (`.gb-overlay`: translucent, blurred, a real 1px border).
+The gear popover is a *host* (`.gb-overlay--host`) because the language menu
+opens inside it, and Chrome will not blur a backdrop inside another backdrop.
+Lines are neutral, status is never a coloured bar, gold text uses
+`--gb-gold-text`, and focus is the kit's steel ring.
+
+The three brand fonts are **bundled** as woff2 subsets (latin + latin-ext +
+cyrillic, OFL licences beside the files in `src/renderer/fonts/`). Bundled
+rather than fetched because the CSP forbids remote anything and a capture tool
+must render identically offline. The package's font tokens name newer faces
+(Rubik, Onest, IBM Plex Mono) that arrive with the design system's step P6;
+until then `styles.css` points those three tokens at the bundled faces.
 
 Two window looks, named like the kill-card grounds: **Obsidian** (dark, the
 default) and **Parchment** — preview tiles in the gear popover, stored as
-`settings.json` `theme`. The whole palette is CSS tokens, so the layout never
-forks; on Windows the overlay window-controls retint with the theme. The
+`settings.json` `theme` (`"obsidian"` / `"parchment"`). The page wears the
+package's attribute for them, `<html data-theme="dark">` or `"light"`. The
+whole palette is CSS tokens, so the layout never forks; on Windows the overlay
+window-controls retint with the theme. The
 window itself is **frameless with the OS chrome merged in**: the 48px header
 is the drag region, macOS keeps its traffic lights over it (`hiddenInset`),
 Windows gets overlay controls, and the window is ONE fixed size in every

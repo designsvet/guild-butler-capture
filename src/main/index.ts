@@ -585,8 +585,9 @@ const createWindow = (): void => {
         ? { titleBarStyle: "hidden" as const, titleBarOverlay: overlayFor(theme) }
         : {}),
     // Matches --gb-bg so the flash before first paint is the brand ground,
-    // not a grey rectangle.
-    backgroundColor: theme === "parchment" ? "#f3ecdd" : "#0a0a0c",
+    // not a grey rectangle — the design system's values (ds/tokens.css: the
+    // light theme and the dark default); test/designSystem.test.ts pins them.
+    backgroundColor: theme === "parchment" ? "#F6F1E6" : "#0A0A0C",
     title: "Guild Butler Capture",
     webPreferences: {
       preload: join(APP_ROOT, "dist", "preload", "index.cjs"),

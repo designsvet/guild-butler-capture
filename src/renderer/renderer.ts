@@ -1391,11 +1391,10 @@ document.addEventListener("keydown", (event) => {
 
 const applyTheme = (next: TTheme): void => {
   theme = next;
-  if (next === "parchment") {
-    document.documentElement.dataset.theme = "parchment";
-  } else {
-    delete document.documentElement.dataset.theme;
-  }
+  // The stored words stay "obsidian" / "parchment"; the page wears the design
+  // system's attribute (ds/tokens.css): dark is also :root's default, parchment
+  // is the package's light theme.
+  document.documentElement.dataset.theme = next === "parchment" ? "light" : "dark";
   ui.themeObsidian.setAttribute("aria-pressed", String(next === "obsidian"));
   ui.themeParchment.setAttribute("aria-pressed", String(next === "parchment"));
   rain.restyle();
@@ -1453,7 +1452,7 @@ const rebuildLangMenu = (): void => {
   for (const value of ["system", ...SUPPORTED_LANGS]) {
     const item = document.createElement("button");
     item.type = "button";
-    item.className = "dd-item";
+    item.className = "dd-item gb-overlay-item"; // the package's menu row (ADR 0150)
     item.dataset.value = value;
     item.setAttribute("role", "option");
     item.setAttribute("aria-selected", String(value === langValue));

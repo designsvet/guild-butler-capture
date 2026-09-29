@@ -7,6 +7,13 @@
       content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
     />
     <title>Guild Butler Capture</title>
+    <!-- The design system (@guild-butler/design-system, ADR 0145), copied into
+         ./ds/ by tools/build-static.mjs — every ./ds/ link here is what it
+         copies. Tokens first, then the surfaces (ADR 0150), then the app's own
+         sheet, which reads them. base.css and controls.css are not linked yet:
+         their resets and control classes arrive with the controls step. -->
+    <link rel="stylesheet" href="./ds/tokens.css" />
+    <link rel="stylesheet" href="./ds/surfaces.css" />
     <link rel="stylesheet" href="./fonts.css" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -31,7 +38,7 @@
       </button>
     </header>
 
-    <div id="update-strip" class="card update-strip hidden">
+    <div id="update-strip" class="gb-card update-strip hidden">
       <p id="update-text" class="status-hint"></p>
       <button id="btn-update-restart" class="btn accent hidden">Restart and update</button>
       <p id="update-note" class="fix-note hidden"></p>
@@ -39,7 +46,7 @@
 
     <main>
       <!-- Fix cards replace the greeting zone when they apply. -->
-      <section id="error-panel" class="card error-card hidden">
+      <section id="error-panel" class="gb-card error-card hidden">
         <p id="error-title" class="error-title"></p>
         <p id="error-body" class="error-body"></p>
         <div class="actions">
@@ -51,11 +58,11 @@
         <p id="error-fix-note" class="fix-note hidden"></p>
         <details id="error-details" class="hidden">
           <summary id="error-details-summary">Technical details</summary>
-          <pre id="error-detail-text"></pre>
+          <pre id="error-detail-text" class="gb-well"></pre>
         </details>
       </section>
 
-      <section id="setup-panel" class="card setup-card hidden">
+      <section id="setup-panel" class="gb-card setup-card hidden">
         <ul class="setup-list">
           <li id="setup-engine" data-ok="true"></li>
           <li id="setup-access" data-ok="true"></li>
@@ -84,11 +91,11 @@
           <span id="stat-loot" class="hero-count"><span class="roll">0</span></span>
           <span id="stat-loot-label" class="hero-caption">Loot events this session</span>
           <div class="hero-chips">
-            <span class="chip" id="traffic-chip">
+            <span class="chip gb-well" id="traffic-chip">
               <span id="traffic-dot" class="chip-dot" aria-hidden="true"></span>
               <span id="stat-traffic" class="swap">not seen yet</span>
             </span>
-            <span class="chip chip-log">
+            <span class="chip chip-log gb-well">
               <span id="stat-file" class="chip-file swap"></span>
               <button id="btn-reveal" class="btn tiny" disabled>Reveal</button>
             </span>
@@ -119,7 +126,7 @@
                follow by pressing Stop — the button has to stay reachable. It is
                absolutely positioned either way, so the fixed 660x620 window never
                re-flows, whatever six languages do to the copy. -->
-          <div id="waiting-hints" class="hint-sheet" hidden>
+          <div id="waiting-hints" class="hint-sheet gb-overlay" hidden>
             <p id="waiting-hints-title" class="hint-sheet-title"></p>
             <dl id="waiting-hints-list" class="hint-sheet-list"></dl>
           </div>
@@ -135,15 +142,15 @@
       </section>
 
       <!-- The bottom slot: pairing. One card, two exclusive faces. -->
-      <section id="pairing-panel" class="card pairing-card">
+      <section id="pairing-panel" class="gb-card pairing-card">
         <!-- Not paired: the two-step onboarding. -->
         <div id="pairing-setup">
           <p id="pairing-title" class="pairing-title"></p>
           <p id="pairing-intro" class="pairing-intro"></p>
           <div class="pair-step">
-            <span class="step-badge" aria-hidden="true">1</span>
+            <span class="step-badge gb-well" aria-hidden="true">1</span>
             <span id="pairing-step1-label" class="step-text"></span>
-            <span class="cmd-chip">
+            <span class="cmd-chip gb-well">
               <span class="cmd-text">/capture pair</span>
               <button id="btn-copy-cmd" class="copy-btn" aria-label="Copy">
                 <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
@@ -155,7 +162,7 @@
             <span id="copy-note" class="copy-note" role="status"></span>
           </div>
           <div class="pair-step">
-            <span class="step-badge" aria-hidden="true">2</span>
+            <span class="step-badge gb-well" aria-hidden="true">2</span>
             <span id="pairing-step2-label" class="step-text"></span>
             <input
               id="pairing-code"
@@ -186,7 +193,7 @@
             </button>
           </div>
           <!-- Opens as an overlay ABOVE the row — the fixed window never re-flows. -->
-          <div id="pairing-details" class="pair-details" hidden>
+          <div id="pairing-details" class="pair-details gb-overlay" hidden>
             <label class="switch-row" for="pairing-upload-toggle">
               <span class="switch">
                 <input id="pairing-upload-toggle" type="checkbox" checked />
@@ -200,8 +207,9 @@
       </section>
     </main>
 
-    <!-- The gear popover: configuration, not session. -->
-    <div id="settings-popover" class="settings-popover" hidden>
+    <!-- The gear popover: configuration, not session. A vellum HOST, because the
+         language menu (itself vellum) opens inside it — see styles.css. -->
+    <div id="settings-popover" class="settings-popover gb-overlay gb-overlay--host" hidden>
       <label class="switch-row" for="auto-capture-toggle">
         <span class="switch">
           <input id="auto-capture-toggle" type="checkbox" checked />
@@ -218,7 +226,7 @@
               <path d="M2 3.5 L5 6.5 L8 3.5"></path>
             </svg>
           </button>
-          <div id="lang-menu" class="dd-menu" role="listbox" hidden></div>
+          <div id="lang-menu" class="dd-menu gb-overlay" role="listbox" hidden></div>
         </div>
       </div>
       <div class="settings-theme">

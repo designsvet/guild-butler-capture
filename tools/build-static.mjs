@@ -14,14 +14,29 @@
  * it is resources/icons/icon-256.png — the same art the OS shows on the dock
  * and installer — copied in at build time so the repo does not carry the same
  * pixels twice.
+ *
+ * The design system is the other: `@guild-butler/design-system` (ADR 0145),
+ * pinned in package.json. The renderer is sandboxed under `style-src 'self'`
+ * with no bundler, so it cannot import from node_modules — its stylesheets are
+ * copied beside the page, into ds/. Which ones is DERIVED from index.html's
+ * `./ds/*.css` links rather than listed here, so linking a new package file is
+ * the whole change; each resolves through the package's exports map, and a
+ * name the package does not export fails the build instead of shipping a page
+ * with a dead link. test/designSystem.test.ts runs this script and checks the
+ * copies against the package byte for byte.
  */
 
-import { cpSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const dest = join(root, "dist", "web", "renderer");
+// GBC_DIST_DIR points the output somewhere else — test/designSystem.test.ts
+// runs this very script into a temp dir, so a test run never restamps the
+// real dist/ (the build time in the window is how a stale build is spotted).
+const dist = process.env.GBC_DIST_DIR ? resolve(process.env.GBC_DIST_DIR) : join(root, "dist");
+const dest = join(dist, "web", "renderer");
 mkdirSync(dest, { recursive: true });
 
 cpSync(join(root, "src", "renderer"), dest, {
@@ -35,8 +50,18 @@ cpSync(join(root, "src", "renderer"), dest, {
 // one sits on the app's own titlebar, where a second border reads as a sticker.
 cpSync(join(root, "resources", "icons", "crest-mark.png"), join(dest, "crest.png"));
 
+// The design system's stylesheets, the ones index.html links from ./ds/.
+const require = createRequire(import.meta.url);
+const html = readFileSync(join(root, "src", "renderer", "index.html"), "utf8");
+const dsFiles = [...html.matchAll(/href="\.\/ds\/([^"]+\.css)"/g)].map((m) => m[1]);
+rmSync(join(dest, "ds"), { recursive: true, force: true }); // nothing unlinked survives a rebuild
+mkdirSync(join(dest, "ds"), { recursive: true });
+for (const file of dsFiles) {
+  cpSync(require.resolve(`@guild-butler/design-system/${file}`), join(dest, "ds", file));
+}
+
 // Stamp the build so the window and the app log can say WHICH build is
 // running — package.json's version is static across dev builds, and the first
 // hardware pass spent a round-trip on a stale instance nobody could identify.
-writeFileSync(join(root, "dist", "buildstamp.json"), JSON.stringify({ builtAt: new Date().toISOString() }));
-console.log(`static → ${dest}`);
+writeFileSync(join(dist, "buildstamp.json"), JSON.stringify({ builtAt: new Date().toISOString() }));
+console.log(`static → ${dest} (design system: ${dsFiles.join(", ") || "none"})`);
