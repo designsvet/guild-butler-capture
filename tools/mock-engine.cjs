@@ -22,6 +22,11 @@
  *   --no-game            never detect (the "Albion not running" scenario)
  *   --crash-after=<ms>   exit(1) after this long (tests the auto-restart)
  *   --fail=permission|npcap|abi   die immediately the way the real engine does
+ *
+ * Env (the app spawns the mock with no flags, so this one rides the environment):
+ *   GBC_MOCK_BROKEN_AFTER=<ms>   after this long the [health] line reports a broken handler,
+ *                                the way the real engine did after the 2026-09-23 patch —
+ *                                `GBC_MOCK_BROKEN_AFTER=5000 pnpm dev:mock` shows the card
  */
 
 "use strict";
@@ -121,6 +126,7 @@ if (require.main === module) {
 
   let detected = false;
   let linesWritten = 0;
+  const startedAt = Date.now();
   let tickCount = 0;
 
   if (has("no-game")) {
@@ -156,6 +162,13 @@ if (require.main === module) {
     }
     const who = detected ? CHARACTER : "not identified yet (change zone once)";
     process.stdout.write(`[status] character: ${who} · lines written: ${linesWritten}\n`);
+    // The decoder verdict the real engine prints beside [status] (ao-loot-logger#16) — the
+    // recorded shapes in test/fixtures/realEngineLines.ts.
+    const brokenAfter = Number(process.env.GBC_MOCK_BROKEN_AFTER);
+    const broken = Number.isFinite(brokenAfter) && brokenAfter >= 0 && Date.now() - startedAt >= brokenAfter;
+    process.stdout.write(
+      broken ? "[health] parse broken: EvAttachItemContainer 5/5 (last 10 min)\n" : "[health] parse ok\n",
+    );
   }, interval);
 
   if (crashAfter != null) {

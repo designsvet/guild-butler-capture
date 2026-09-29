@@ -75,6 +75,24 @@
         <p id="setup-fix-note" class="fix-note hidden"></p>
       </section>
 
+      <!-- A game update broke the decoder (raid-bot ADR 0092 amendment; owner's pick C,
+           2026-09-29): the loudest fix card, on purpose. Loot is being logged wrong until the
+           app updates, so it takes the greeting's place and its one button is the next step
+           toward the fixed build. role="alert" so it is announced, not just drawn. -->
+      <section id="health-panel" class="gb-card error-card health-card hidden" role="alert">
+        <p id="health-title" class="error-title health-title">A game update broke loot logging</p>
+        <p id="health-body" class="error-body"></p>
+        <p id="health-line" class="error-body health-line"></p>
+        <div class="actions">
+          <button id="btn-health-action" class="btn accent hidden"></button>
+        </div>
+        <p id="health-note" class="fix-note hidden"></p>
+        <details id="health-details">
+          <summary id="health-details-summary">Technical details</summary>
+          <pre id="health-detail-text" class="gb-well"></pre>
+        </details>
+      </section>
+
       <!-- The greeting: status chip → the character's name → the count, over
            the log rain. The whole zone flexes so the window never resizes. -->
       <section id="hero" class="hero">

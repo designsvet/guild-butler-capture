@@ -37,6 +37,7 @@ import {
 import { asLang, detectLang, LANG_NAMES, SUPPORTED_LANGS, type TLang } from "../shared/i18n.js";
 import { PAIR_COMMAND } from "../shared/ipc.js";
 import { stringsFor } from "../shared/strings.js";
+import { EHealthAction, EHealthLine, engineRunning, healthCard } from "../shared/engineHealth.js";
 
 // The OS decides the DEFAULT language; a stored override (the gear's picker)
 // arrives with the settings snapshot and re-applies everything live. The
@@ -120,6 +121,14 @@ const ui = {
   errorDetails: el<HTMLDetailsElement>("error-details"),
   errorDetailText: el<HTMLPreElement>("error-detail-text"),
   errorDetailsSummary: el<HTMLElement>("error-details-summary"),
+  healthPanel: el<HTMLElement>("health-panel"),
+  healthTitle: el<HTMLParagraphElement>("health-title"),
+  healthBody: el<HTMLParagraphElement>("health-body"),
+  healthLine: el<HTMLParagraphElement>("health-line"),
+  healthAction: el<HTMLButtonElement>("btn-health-action"),
+  healthNote: el<HTMLParagraphElement>("health-note"),
+  healthDetailsSummary: el<HTMLElement>("health-details-summary"),
+  healthDetailText: el<HTMLPreElement>("health-detail-text"),
   setupPanel: el<HTMLDivElement>("setup-panel"),
   setupEngine: el<HTMLLIElement>("setup-engine"),
   setupAccess: el<HTMLLIElement>("setup-access"),
@@ -632,10 +641,22 @@ const render = (): void => {
     show(ui.setupFixNote, setupNote.length > 0);
   }
 
+  // A game update broke the decoder: the third fix card, and the loudest (see renderHealth).
+  // Below the other two — an engine that cannot run, or cannot start, comes first.
+  const showHealth = !isError && !showSetup && (s.engineBroken?.length ?? 0) > 0;
+  show(ui.healthPanel, showHealth);
+  renderHealth();
+  if (healthShown !== showHealth) {
+    // The card carries the update step itself; the strip above it would say the same thing
+    // with a second, different button (see renderUpdate).
+    healthShown = showHealth;
+    renderUpdate();
+  }
+
   // Fix cards replace the GREETING, not the zone: the hero section stays (it
   // owns the flex space and, since round 6, the CTA) and only the stack hides —
   // otherwise an error would take the Start/Stop button down with it.
-  show(ui.heroStack, !isError && !showSetup);
+  show(ui.heroStack, !isError && !showSetup && !showHealth);
 
   ui.advEngine.textContent = setup?.engineRoot ?? STR.advanced.engineNotFound;
   // The build time answers "am I looking at the code I just built?" — the
@@ -967,6 +988,9 @@ const applyStatic = (): void => {
   ui.setupGetNpcap.textContent = STR.buttons.getNpcap;
   ui.errorGetNpcap.textContent = STR.buttons.getNpcap;
   ui.errorDetailsSummary.textContent = STR.buttons.details;
+  ui.healthDetailsSummary.textContent = STR.buttons.details;
+  ui.healthTitle.textContent = STR.health.title;
+  ui.healthBody.textContent = STR.health.body;
   ui.errorFixMac.textContent = STR.buttons.fixMacPermissions;
   ui.setupFixMac.textContent = STR.buttons.fixMacPermissions;
   ui.errorChooseEngine.textContent = STR.buttons.chooseEngine;
@@ -1184,6 +1208,122 @@ void gbc.getPairing().then((status) => {
   renderPairing();
 });
 
+// --- a game update broke the decoder (raid-bot ADR 0092 amendment) ------------
+//
+// The owner's pick (C, 2026-09-29): the card takes the greeting's place, because the member has
+// to understand that their loot is being logged wrong and that updating is the fix. Its one button
+// is always the next step toward the fixed build, whatever the updater is doing — see healthCard.
+
+/** Set by "Stop capture and update": the restart waits for the engine to be down (main refuses otherwise). */
+let updateAfterStop = false;
+
+/** The card is on screen — the update strip stands down while it is (renderUpdate). */
+let healthShown = false;
+
+const renderHealth = (): void => {
+  const broken = state?.engineBroken ?? [];
+  if (state == null || broken.length === 0) {
+    return;
+  }
+  const card = healthCard(update, state.status);
+  const line = ((): string => {
+    switch (card.line) {
+      case EHealthLine.Ready: {
+        return STR.health.ready(update.version);
+      }
+      case EHealthLine.Downloading: {
+        return STR.health.downloading(update.version, update.percent);
+      }
+      case EHealthLine.Checking: {
+        return STR.health.checking;
+      }
+      case EHealthLine.NotOutYet: {
+        return STR.health.notOutYet;
+      }
+      case EHealthLine.CheckFailed: {
+        return STR.health.checkFailed(update.error);
+      }
+      case EHealthLine.Manual: {
+        return STR.health.manual;
+      }
+    }
+  })();
+  ui.healthLine.textContent = line;
+  const label = ((): string | null => {
+    switch (card.action) {
+      case EHealthAction.StopAndUpdate: {
+        return STR.health.stopAndUpdate;
+      }
+      case EHealthAction.RestartToUpdate: {
+        return STR.health.restartToUpdate;
+      }
+      case EHealthAction.CheckForFix: {
+        return STR.health.checkForFix;
+      }
+      case EHealthAction.GetUpdate: {
+        return STR.health.getUpdate;
+      }
+      case EHealthAction.None: {
+        return null;
+      }
+    }
+  })();
+  show(ui.healthAction, label != null);
+  ui.healthAction.textContent = label ?? "";
+  ui.healthAction.dataset.action = card.action;
+  ui.healthAction.disabled = updateAfterStop;
+  ui.healthDetailText.textContent = broken.map((b) => STR.health.detailLine(b.handler, b.failures, b.calls)).join("\n");
+};
+
+/** "Stop capture and update": once the engine is down, restart into the downloaded fix. */
+const maybeUpdateAfterStop = (): void => {
+  if (!updateAfterStop || state == null || engineRunning(state.status)) {
+    return;
+  }
+  updateAfterStop = false;
+  void gbc.updateRestart().then((result: TRestartResult) => {
+    // ok:true never renders — the app is quitting into the new version.
+    if (!result.ok) {
+      ui.healthNote.textContent = STR.update.blockedCapturing;
+      show(ui.healthNote, true);
+      renderHealth();
+    }
+  });
+};
+
+ui.healthAction.addEventListener("click", () => {
+  switch (ui.healthAction.dataset.action) {
+    case EHealthAction.StopAndUpdate: {
+      updateAfterStop = true;
+      ui.healthAction.disabled = true;
+      void gbc.stop();
+      return;
+    }
+    case EHealthAction.RestartToUpdate: {
+      updateAfterStop = true;
+      maybeUpdateAfterStop();
+      return;
+    }
+    case EHealthAction.CheckForFix:
+    case EHealthAction.GetUpdate: {
+      // Where the updater is off (macOS, dev) main opens the download page instead.
+      ui.healthAction.disabled = true;
+      void gbc
+        .updateCheckNow()
+        .then((status) => {
+          update = status;
+          renderUpdate();
+          renderUpdateInline();
+        })
+        .finally(() => {
+          ui.healthAction.disabled = false;
+          renderHealth();
+        });
+      return;
+    }
+  }
+});
+
 // --- auto-update: strip + the gear's Updates row ------------------------------
 
 const updateEls = {
@@ -1201,7 +1341,8 @@ const renderUpdate = (): void => {
   // actually happening. An Error shows as one muted line so a tester can see
   // it; capture is unaffected either way.
   const visible =
-    u.phase === EUpdatePhase.Downloading || u.phase === EUpdatePhase.Ready || u.phase === EUpdatePhase.Error;
+    !healthShown &&
+    (u.phase === EUpdatePhase.Downloading || u.phase === EUpdatePhase.Ready || u.phase === EUpdatePhase.Error);
   updateEls.strip.classList.toggle("hidden", !visible);
   if (!visible) {
     updateEls.note.classList.add("hidden");
@@ -1274,12 +1415,14 @@ gbc.onUpdate((status) => {
   update = status;
   renderUpdate();
   renderUpdateInline();
+  renderHealth();
 });
 
 void gbc.getUpdate().then((status) => {
   update = status;
   renderUpdate();
   renderUpdateInline();
+  renderHealth();
 });
 
 let waveTimer: number | null = null;
@@ -1349,6 +1492,7 @@ gbc.onState((next) => {
   maybeWave(prev, next.status);
   maybePulse(prevLoot, next.lastLootAt);
   render();
+  maybeUpdateAfterStop();
 });
 
 // --- the gear popover ---------------------------------------------------------

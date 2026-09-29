@@ -26,6 +26,15 @@ export const REAL = {
    */
   heartbeatWithHeld: "[status] character: Bors · lines written: 4 · held: 1",
   /**
+   * The decoder's verdict, beside the heartbeat every minute (designsvet/ao-loot-logger#16).
+   * PRINTED BY THE ENGINE'S OWN MODULE — `require('./src/storage/parse-health').statusLine()` at
+   * protocol18 ab6cc6b, 2026-09-29 — fed the failure pattern of the 2026-09-28 patch (every
+   * container attach threw) and then a second handler. Not typed by hand.
+   */
+  healthOk: "[health] parse ok",
+  healthBroken: "[health] parse broken: EvAttachItemContainer 5/5 (last 10 min)",
+  healthBrokenTwo: "[health] parse broken: EvAttachItemContainer 5/5, OpJoin 5/6 (last 10 min)",
+  /**
    * One pickup, echoed as it is written to the log. Recorded in the same
    * session as the rest. Read as NOISE until 2026-08-29, when it became the
    * live counter's source — the heartbeat's minute of lag was the whole

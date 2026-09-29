@@ -227,6 +227,31 @@ builds keep the single-instance front-the-window behaviour.
 writes a real CSV whose rows are pinned by test to the bot's own parser regex.
 `--fail=permission|npcap|abi` and `--crash-after=<ms>` flags exercise the
 error and auto-restart paths (see `test/engineSupervisor.test.ts`).
+`GBC_MOCK_BROKEN_AFTER=5000 pnpm dev:mock` makes the mock report a broken
+decoder after five seconds, which puts up the "A game update broke loot
+logging" card (below).
+
+## When a game update breaks the decoder
+
+An Albion patch can move a packet field. From 2026-09-23 every container attach
+threw, and bank deposits were logged as loot for five days before anyone knew
+(raid-bot ADR 0092). The engine now prints a verdict every minute beside
+`[status]` (designsvet/ao-loot-logger#16): `[health] parse ok`, or
+`[health] parse broken: EvAttachItemContainer 5/5 (last 10 min)` once a handler
+has failed at least 5 times, on at least half its calls, in ten minutes. A
+rate, because some handlers fail now and then in normal play (9 of 1,204).
+
+The app turns that into the loudest fix card it has (the owner's pick, "C",
+2026-09-29). The card takes the greeting's place, says plainly that loot is
+being logged wrong, and its one button is the next step to the fixed build:
+"Stop capture and update" once the update has downloaded (a restart never cuts
+a live capture), "Check for the fix" while none is out, and "Get the update"
+where the app cannot update itself (macOS). It is sticky for the app session,
+so walking away from the broken packet does not hide it; only the updated app
+clears it. When paired, the app also reports the newly broken handlers to the
+bot, which posts them to the ops channel once per handler per day. The rules
+are the pure `src/shared/engineHealth.ts`, tested in
+`test/engineHealth.test.ts`.
 
 ## Builds (CI)
 
