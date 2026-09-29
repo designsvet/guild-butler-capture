@@ -1257,19 +1257,42 @@ main {
   padding: 15px 18px 16px 18px;
 }
 
-.pairing-title {
-  margin: 0 0 8px 0;
-  font-family: var(--gb-font-display);
-  font-weight: 600;
-  font-size: 19px;
-  color: var(--gb-ink);
+/* Not paired: the connected face's row (below), so the card is within a line
+   of the same height either way. The dot is hollow: nothing is linked yet.
+   Compound selectors because .pair-dot and .pair-sub are declared after these
+   and would otherwise win on source order. */
+.pair-dot.pair-dot-off {
+  background: transparent;
+  border: 1.5px solid var(--gb-faint);
 }
 
-.pairing-intro {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--gb-muted);
+/* The pitch is the one line allowed to wrap: two lines in every language at
+   this width (tools/layout-check.cjs, 47px of the greeting still spare), and
+   clamped there so a longer translation can never grow the card into the
+   Start button again — the check reports a clamped pitch as a failure. */
+.pair-sub.pair-sub-wrap {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.45;
+}
+
+/* The two steps open OVER the greeting, upward, like the connected face's
+   details: the card never grows. Full card width — step 2's field and button
+   need it in the longer languages. */
+.pair-steps {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  padding: 12px 16px 14px 16px; /* vellum: .gb-overlay in the markup draws the surface */
+  animation: dd-open 0.16s ease;
+}
+
+.pair-steps .fix-note {
+  margin: 8px 0 0 0;
 }
 
 .pair-step {
@@ -1449,8 +1472,12 @@ main {
   z-index: 30;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 11px 14px; /* vellum: .gb-overlay in the markup draws the surface */
+  gap: 14px;
+  /* 40px tall with the tiny button: the greeting leaves 48px under the pill
+     (its 1:3 spacer share of 65px), and at 11px padding with a small button
+     the row stood 52px + the 6px gap and sat over the pill's bottom edge —
+     unnoticed until tools/layout-check.cjs measured it. */
+  padding: 8px 12px; /* vellum: .gb-overlay in the markup draws the surface */
   animation: dd-open 0.16s ease;
   white-space: nowrap;
 }
