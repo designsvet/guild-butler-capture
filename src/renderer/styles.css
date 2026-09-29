@@ -311,6 +311,40 @@ main {
   white-space: pre-line;
 }
 
+/* The engine-health card (raid-bot ADR 0092 amendment; owner's pick C, 2026-09-29): the one fix
+   card that must read as serious — loot is being logged wrong until the app updates. Status is not
+   a surface (ADR 0150 rule 6), so the weight is the red mark and the red words, not a bar or a
+   tinted card. Fill and word are the package's two reds: --gb-red behind, --gb-red-text as text,
+   which clears 4.5:1 on a card in both themes (Q40 ruling 3). */
+
+.health-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  color: var(--gb-red-text);
+}
+
+.health-title::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gb-red);
+  box-shadow: 0 0 0 3px var(--gb-stop-bg);
+}
+
+/* What is wrong and what to do are the message here, not asides: both in ink. */
+.health-card .error-body {
+  color: var(--gb-ink);
+}
+
+.health-card details {
+  color: var(--gb-muted);
+  font-size: 12px;
+}
+
 .setup-list {
   margin: 0;
   padding: 0;

@@ -69,8 +69,10 @@ import {
   pairDevice,
   sendEnergyLogPage,
   sendEnergyReading,
+  sendEngineHealth,
   sendFestivities,
 } from "./uploadClient.js";
+import { newlyBroken } from "../shared/engineHealth.js";
 import electronUpdater from "electron-updater";
 
 import { createUpdateController, updaterEnabled, type TUpdateController } from "./updateController.js";
@@ -123,7 +125,12 @@ const stopTracker = (): void => {
 };
 
 const dispatch = (ev: TSessionEvent): void => {
+  const brokenBefore = state.engineBroken;
   state = reduceCaptureSession(state, ev);
+  const fresh = newlyBroken(brokenBefore, state.engineBroken);
+  if (fresh.length > 0) {
+    forwardEngineHealth(fresh);
+  }
   if (ev.type === "engine-line" && ev.event.kind === "festivities") {
     forwardFestivities(ev.event);
   }
@@ -222,6 +229,30 @@ const forwardFestivities = (event: Extract<TEngineEvent, { kind: "festivities" }
     entries: event.entries,
   }).then((result) => {
     appLog(`festivities ${result.outcome} server=${event.server} entries=${event.entries.length}`);
+  });
+};
+
+/**
+ * A game update broke part of the engine's decoder (raid-bot ADR 0092 amendment, 2026-09-28).
+ *
+ * Logged for support first — the card on screen does not depend on anything below. Then, when
+ * paired, the NEW handlers go to the bot, which posts them to its ops channel: that is how the
+ * people who can ship the fix hear about it the first time any member meets the broken packet,
+ * instead of days later from wrong loot. Only newly broken handlers, so a sticky verdict repeated
+ * every minute costs one request per handler per app session.
+ */
+const forwardEngineHealth = (fresh: ReadonlyArray<{ handler: string; failures: number; calls: number }>): void => {
+  appLog(`engine health: broken ${fresh.map((b) => `${b.handler} ${b.failures}/${b.calls}`).join(", ")}`);
+  const settings = loadSettings(SETTINGS_FILE);
+  const token = decryptToken(safeStorage, settings.pairing);
+  if (token == null) {
+    return;
+  }
+  void sendEngineHealth(fetch, settings.apiBase ?? "", token, {
+    appVersion: app.getVersion(),
+    broken: fresh,
+  }).then((result) => {
+    appLog(`engine health report ${result.outcome}`);
   });
 };
 

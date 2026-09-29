@@ -10,6 +10,7 @@
 
 import type { TEngineEvent } from "./engineAdapter.js";
 import { ECaptureStatus, EEngineErrorKind, initialCaptureState, type TCaptureState } from "../shared/captureTypes.js";
+import { mergeBroken } from "../shared/engineHealth.js";
 
 export type TSessionEvent =
   | { type: "user-start"; at: number }
@@ -51,6 +52,8 @@ export const reduceCaptureSession = (state: TCaptureState, ev: TSessionEvent): T
         startedAt: ev.at,
         character: state.character,
         logFile: state.logFile,
+        // A new session runs the same build: a broken decoder is still broken (see engineBroken).
+        engineBroken: state.engineBroken,
       };
     }
 
@@ -130,6 +133,10 @@ export const reduceCaptureSession = (state: TCaptureState, ev: TSessionEvent): T
         }
         case "log-file": {
           next.logFile = line.file;
+          return next;
+        }
+        case "engine-health": {
+          next.engineBroken = mergeBroken(state.engineBroken, line.broken);
           return next;
         }
         case "fatal":

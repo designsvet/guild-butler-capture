@@ -424,3 +424,57 @@ export const sendFestivities = async (
     },
   };
 };
+
+/**
+ * Tell the bot this app's engine says a game update broke its decoder (raid-bot
+ * `/control/capture/engine-health`, ADR 0092 amendment 2026-09-28). The bot posts it to its ops
+ * channel once per handler per day, so every app sending it costs nothing extra.
+ *
+ * Shaped like `sendFestivities` — same token, same outcome vocabulary, no retry. A lost report
+ * is repaired by the next paired app that hits the same broken packet; the card on THIS
+ * member's screen does not depend on it at all.
+ */
+export const sendEngineHealth = async (
+  fetchLike: TFetchLike,
+  base: string,
+  token: string,
+  payload: { appVersion: string; broken: ReadonlyArray<{ handler: string; failures: number; calls: number }> },
+): Promise<TUploadResult> => {
+  let res: Awaited<ReturnType<TFetchLike>>;
+  try {
+    res = await fetchLike(`${apiBase(base)}/control/capture/engine-health`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    return { outcome: EUploadOutcome.Unreachable, detail: err instanceof Error ? err.message : null };
+  }
+
+  const text = await res.text().catch(() => "");
+  const body = parseJson(text);
+  if (res.status === 401) {
+    return { outcome: EUploadOutcome.Unauthorized, detail: null };
+  }
+  if (res.status === 429) {
+    return { outcome: EUploadOutcome.RateLimited, detail: null };
+  }
+  if (isMissingEndpoint(res.status)) {
+    return { outcome: EUploadOutcome.NotDeployed, detail: String(res.status) };
+  }
+  if (res.status >= 500) {
+    return { outcome: EUploadOutcome.ServerError, detail: String(res.status) };
+  }
+  if (!res.ok) {
+    return { outcome: EUploadOutcome.Rejected, detail: typeof body?.error === "string" ? body.error : null };
+  }
+  return {
+    outcome: EUploadOutcome.Accepted,
+    reply: {
+      accepted: typeof body?.received === "number" ? body.received : 0,
+      duplicate: 0,
+      rejected: 0,
+      nextFrom: null,
+    },
+  };
+};

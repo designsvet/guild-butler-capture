@@ -46,6 +46,18 @@ export const isFatalErrorKind = (kind: EEngineErrorKind | null): boolean => {
  * whole over IPC — the renderer never accumulates state of its own beyond a
  * 1-second clock for the "last seen Ns ago" style lines.
  */
+/**
+ * One engine handler failing on most of the packets it is given — the engine's own verdict,
+ * printed in its `[health]` line (designsvet/ao-loot-logger#16): at least 5 failures, on at least
+ * half its calls, in the last ten minutes. What a game update that moves a packet field looks
+ * like from inside the engine (2026-09-28: EvAttachItemContainer failed 5 of 5).
+ */
+export type TBrokenHandler = {
+  handler: string;
+  failures: number;
+  calls: number;
+};
+
 export type TCaptureState = {
   status: ECaptureStatus;
   /** Albion traffic is being decoded in the CURRENT engine run. */
@@ -92,6 +104,14 @@ export type TCaptureState = {
    */
   heartbeatSeen: boolean;
   stopRequested: boolean;
+  /**
+   * Engine handlers found broken THIS APP SESSION (see TBrokenHandler). Null until the engine
+   * reports at all — an engine too old to print `[health]` never does, and that silence must not
+   * read as "fine". Sticky on purpose: the engine's ten-minute verdict clears whenever the broken
+   * handler goes unused (walk away from the bank and it is "ok" again), but the build is just as
+   * broken, so only an app restart — which is how the fix arrives — clears it.
+   */
+  engineBroken: TBrokenHandler[] | null;
 };
 
 export const initialCaptureState: TCaptureState = {
@@ -113,6 +133,7 @@ export const initialCaptureState: TCaptureState = {
   restartDelayMs: null,
   heartbeatSeen: false,
   stopRequested: false,
+  engineBroken: null,
 };
 
 /** What the session-total counter shows: every run's lines, current one included. */

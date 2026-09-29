@@ -195,6 +195,32 @@ const EN = {
   },
 
   /**
+   * "A game update broke loot logging" (raid-bot ADR 0092 amendment, owner's pick C, 2026-09-29).
+   * Copy rule for this block, the opposite of the upload block below: it MUST read as serious.
+   * The member's loot is being logged wrong and the fix is an app update — say both, plainly,
+   * and make the next step the button.
+   */
+  health: {
+    title: "A game update broke loot logging",
+    body: "Until this app is updated, some of the loot it records is wrong — your guild's loot numbers will be off.",
+    ready: (version: string | null): string =>
+      `The fix is downloaded${version != null ? ` (v${version})` : ""}. Update now — it takes a few seconds.`,
+    downloading: (version: string | null, percent: number | null): string =>
+      `The fix is downloading${version != null ? ` (v${version})` : ""}…${percent != null ? ` ${percent}%` : ""}`,
+    checking: "Checking for the fix…",
+    notOutYet: "The fix isn't out yet. The app downloads it by itself the moment it is — keep it open.",
+    checkFailed: (detail: string | null): string =>
+      `Couldn't check for the fix${detail != null ? ` (${detail})` : ""}.`,
+    manual: "This computer doesn't update the app by itself. Download the new version from the Guild Butler site as soon as it's out.",
+    stopAndUpdate: "Stop capture and update",
+    restartToUpdate: "Update now",
+    checkForFix: "Check for the fix",
+    getUpdate: "Get the update",
+    detailLine: (handler: string, failures: number, calls: number): string =>
+      `${handler} failed on ${failures} of ${calls} packets in the last 10 minutes.`,
+  },
+
+  /**
    * Pairing + auto-upload (ADR 0092 P2 slice 4). Copy rule for this block:
    * uploading is a CONVENIENCE, never a requirement — no message may read as
    * "your loot is lost"; the worst true statement is "not sent yet".
@@ -413,6 +439,26 @@ const UK: TStrings = {
       `Не вдалося перевірити оновлення${detail != null ? ` (${detail})` : ""} — спробуємо пізніше. На запис це не впливає.`,
   },
 
+  health: {
+    title: "Оновлення гри зламало запис луту",
+    body: "Поки застосунок не оновлено, частина луту, який він записує, неправильна — підсумки луту гільдії будуть хибними.",
+    ready: (version: string | null): string =>
+      `Виправлення завантажено${version != null ? ` (v${version})` : ""}. Оновіть зараз — це займе кілька секунд.`,
+    downloading: (version: string | null, percent: number | null): string =>
+      `Завантажуємо виправлення${version != null ? ` (v${version})` : ""}…${percent != null ? ` ${percent}%` : ""}`,
+    checking: "Шукаємо виправлення…",
+    notOutYet: "Виправлення ще не вийшло. Застосунок завантажить його сам, щойно воно з’явиться, — не закривайте його.",
+    checkFailed: (detail: string | null): string =>
+      `Не вдалося перевірити виправлення${detail != null ? ` (${detail})` : ""}.`,
+    manual: "Цей комп’ютер не оновлює застосунок сам. Завантажте нову версію з сайту Guild Butler, щойно вона вийде.",
+    stopAndUpdate: "Зупинити запис і оновити",
+    restartToUpdate: "Оновити зараз",
+    checkForFix: "Перевірити виправлення",
+    getUpdate: "Завантажити оновлення",
+    detailLine: (handler: string, failures: number, calls: number): string =>
+      `${handler}: збій на ${failures} з ${calls} пакетів за останні 10 хвилин.`,
+  },
+
   pairing: {
     intro: "Зв'яжіть цей комп'ютер один раз — і кожен запис потраплятиме на сторінку здобичі гільдії та в Discord.",
     step1: "У Discord вашої гільдії виконайте",
@@ -615,6 +661,26 @@ const RU: TStrings = {
     blockedCapturing: "Идёт запись — обновление установится после выхода, или сначала остановите запись.",
     failed: (detail: string | null): string =>
       `Не удалось проверить обновления${detail != null ? ` (${detail})` : ""} — попробуем позже. На запись это не влияет.`,
+  },
+
+  health: {
+    title: "Обновление игры сломало запись лута",
+    body: "Пока приложение не обновлено, часть лута, который оно записывает, неверна — итоги лута гильдии будут ошибочными.",
+    ready: (version: string | null): string =>
+      `Исправление скачано${version != null ? ` (v${version})` : ""}. Обновитесь сейчас — это займёт несколько секунд.`,
+    downloading: (version: string | null, percent: number | null): string =>
+      `Скачиваем исправление${version != null ? ` (v${version})` : ""}…${percent != null ? ` ${percent}%` : ""}`,
+    checking: "Ищем исправление…",
+    notOutYet: "Исправление ещё не вышло. Приложение скачает его само, как только оно появится, — не закрывайте его.",
+    checkFailed: (detail: string | null): string =>
+      `Не удалось проверить исправление${detail != null ? ` (${detail})` : ""}.`,
+    manual: "Этот компьютер не обновляет приложение сам. Скачайте новую версию с сайта Guild Butler, как только она выйдет.",
+    stopAndUpdate: "Остановить запись и обновить",
+    restartToUpdate: "Обновить сейчас",
+    checkForFix: "Проверить исправление",
+    getUpdate: "Скачать обновление",
+    detailLine: (handler: string, failures: number, calls: number): string =>
+      `${handler}: сбой на ${failures} из ${calls} пакетов за последние 10 минут.`,
   },
 
   pairing: {
@@ -821,6 +887,26 @@ const DE: TStrings = {
       "Die Aufzeichnung läuft — das Update wird beim Beenden installiert, oder stoppe zuerst die Aufzeichnung.",
     failed: (detail: string | null): string =>
       `Update-Prüfung fehlgeschlagen${detail != null ? ` (${detail})` : ""} — wird später erneut versucht. Die Aufzeichnung ist nicht betroffen.`,
+  },
+
+  health: {
+    title: "Ein Spiel-Update hat die Loot-Aufzeichnung kaputt gemacht",
+    body: "Bis diese App aktualisiert ist, wird ein Teil des Loots falsch aufgezeichnet – die Loot-Zahlen deiner Gilde stimmen dann nicht.",
+    ready: (version: string | null): string =>
+      `Die Korrektur ist heruntergeladen${version != null ? ` (v${version})` : ""}. Jetzt aktualisieren – das dauert nur ein paar Sekunden.`,
+    downloading: (version: string | null, percent: number | null): string =>
+      `Die Korrektur wird geladen${version != null ? ` (v${version})` : ""}…${percent != null ? ` ${percent}%` : ""}`,
+    checking: "Suche nach der Korrektur…",
+    notOutYet: "Die Korrektur ist noch nicht erschienen. Die App lädt sie selbst, sobald es sie gibt – lass sie geöffnet.",
+    checkFailed: (detail: string | null): string =>
+      `Suche nach der Korrektur fehlgeschlagen${detail != null ? ` (${detail})` : ""}.`,
+    manual: "Dieser Computer aktualisiert die App nicht selbst. Lade die neue Version von der Guild-Butler-Website, sobald sie erscheint.",
+    stopAndUpdate: "Aufzeichnung stoppen und aktualisieren",
+    restartToUpdate: "Jetzt aktualisieren",
+    checkForFix: "Nach der Korrektur suchen",
+    getUpdate: "Update holen",
+    detailLine: (handler: string, failures: number, calls: number): string =>
+      `${handler}: bei ${failures} von ${calls} Paketen in den letzten 10 Minuten fehlgeschlagen.`,
   },
 
   pairing: {
@@ -1033,6 +1119,26 @@ const FR: TStrings = {
       `Échec de la vérification de mise à jour${detail != null ? ` (${detail})` : ""} — nouvel essai plus tard. La capture n'est pas affectée.`,
   },
 
+  health: {
+    title: "Une mise à jour du jeu a cassé l'enregistrement du loot",
+    body: "Tant que l'app n'est pas mise à jour, une partie du loot qu'elle enregistre est fausse — les totaux de loot de votre guilde seront erronés.",
+    ready: (version: string | null): string =>
+      `Le correctif est téléchargé${version != null ? ` (v${version})` : ""}. Mettez à jour maintenant — cela prend quelques secondes.`,
+    downloading: (version: string | null, percent: number | null): string =>
+      `Téléchargement du correctif${version != null ? ` (v${version})` : ""}…${percent != null ? ` ${percent}%` : ""}`,
+    checking: "Recherche du correctif…",
+    notOutYet: "Le correctif n'est pas encore sorti. L'app le télécharge d'elle-même dès qu'il l'est — laissez-la ouverte.",
+    checkFailed: (detail: string | null): string =>
+      `Impossible de vérifier le correctif${detail != null ? ` (${detail})` : ""}.`,
+    manual: "Cet ordinateur ne met pas l'app à jour tout seul. Téléchargez la nouvelle version sur le site Guild Butler dès sa sortie.",
+    stopAndUpdate: "Arrêter la capture et mettre à jour",
+    restartToUpdate: "Mettre à jour",
+    checkForFix: "Chercher le correctif",
+    getUpdate: "Obtenir la mise à jour",
+    detailLine: (handler: string, failures: number, calls: number): string =>
+      `${handler} : échec sur ${failures} paquets sur ${calls} ces 10 dernières minutes.`,
+  },
+
   pairing: {
     intro: "Associe cet ordinateur une fois — chaque capture arrive sur la page de butin de ta guilde et sur Discord.",
     step1: "Dans le Discord de ta guilde, lance",
@@ -1239,6 +1345,26 @@ const PT: TStrings = {
     blockedCapturing: "A captura está rodando — a atualização instala quando você sair, ou pare a captura antes.",
     failed: (detail: string | null): string =>
       `A checagem de atualização falhou${detail != null ? ` (${detail})` : ""} — tentaremos de novo depois. A captura não é afetada.`,
+  },
+
+  health: {
+    title: "Uma atualização do jogo quebrou o registro de loot",
+    body: "Até o app ser atualizado, parte do loot que ele registra está errada — os totais de loot da sua guilda vão ficar incorretos.",
+    ready: (version: string | null): string =>
+      `A correção foi baixada${version != null ? ` (v${version})` : ""}. Atualize agora — leva poucos segundos.`,
+    downloading: (version: string | null, percent: number | null): string =>
+      `Baixando a correção${version != null ? ` (v${version})` : ""}…${percent != null ? ` ${percent}%` : ""}`,
+    checking: "Procurando a correção…",
+    notOutYet: "A correção ainda não saiu. O app baixa ela sozinho assim que sair — deixe-o aberto.",
+    checkFailed: (detail: string | null): string =>
+      `Não foi possível verificar a correção${detail != null ? ` (${detail})` : ""}.`,
+    manual: "Este computador não atualiza o app sozinho. Baixe a nova versão no site do Guild Butler assim que ela sair.",
+    stopAndUpdate: "Parar a captura e atualizar",
+    restartToUpdate: "Atualizar agora",
+    checkForFix: "Procurar a correção",
+    getUpdate: "Baixar a atualização",
+    detailLine: (handler: string, failures: number, calls: number): string =>
+      `${handler}: falhou em ${failures} de ${calls} pacotes nos últimos 10 minutos.`,
   },
 
   pairing: {

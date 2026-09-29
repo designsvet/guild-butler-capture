@@ -26,7 +26,7 @@
  * "noise" event — never a crash, never a wrong state.
  */
 
-import { EEngineErrorKind } from "../shared/captureTypes.js";
+import { EEngineErrorKind, type TBrokenHandler } from "../shared/captureTypes.js";
 
 /** One festivity as the bot's ingest wants it: epoch milliseconds, not .NET ticks. */
 export type TFestivityEntry = {
@@ -85,6 +85,8 @@ export type TEngineEvent =
       total: number;
       changed: boolean;
     }
+  /** The engine's minute-by-minute decoder verdict; `broken` is empty when it says "ok". */
+  | { kind: "engine-health"; broken: TBrokenHandler[] }
   | { kind: "fatal"; errorKind: EEngineErrorKind; line: string }
   | { kind: "noise"; line: string };
 
@@ -359,6 +361,44 @@ const parseEnergyLog = (line: string): TEngineEvent => {
 };
 
 /**
+ * The decoder's verdict (designsvet/ao-loot-logger#16), printed every minute beside `[status]`.
+ * RECORDED from the engine's own `statusLine()` (test/fixtures/realEngineLines.ts):
+ *   [health] parse ok
+ *   [health] parse broken: EvAttachItemContainer 5/5, OpJoin 5/6 (last 10 min)
+ *
+ * Strict, like the loot line and for the same reason: this one puts a card over the member's
+ * greeting telling them their loot is wrong. A "broken" line whose entries do not parse is noise,
+ * never an empty verdict — and never a guessed one.
+ */
+const HEALTH_MARK_RE = /^\[health\]\s+parse\s+(ok|broken:\s*(.+))$/i;
+const HEALTH_ENTRY_RE = /^((?:Ev|Op)[A-Za-z0-9]{2,60})\s+(\d{1,9})\/(\d{1,9})$/;
+
+const parseHealth = (line: string): TEngineEvent | null => {
+  const m = HEALTH_MARK_RE.exec(line);
+  if (m == null) {
+    return null;
+  }
+  if (m[2] == null) {
+    return { kind: "engine-health", broken: [] };
+  }
+  const list = m[2].replace(/\s*\(last[^)]*\)\s*$/i, "");
+  const broken: TBrokenHandler[] = [];
+  for (const part of list.split(",")) {
+    const entry = HEALTH_ENTRY_RE.exec(part.trim());
+    if (entry == null) {
+      return { kind: "noise", line };
+    }
+    const failures = Number(entry[2]);
+    const calls = Number(entry[3]);
+    if (failures < 1 || failures > calls) {
+      return { kind: "noise", line };
+    }
+    broken.push({ handler: entry[1]!, failures, calls });
+  }
+  return { kind: "engine-health", broken };
+};
+
+/**
  * Failure classification, most-specific first. Order matters twice:
  * - ABI before Npcap: a native-module load failure on Windows says "The
  *   specified module could not be found", which mentions no driver — but
@@ -444,6 +484,10 @@ export const parseEngineLine = (raw: string): TEngineEvent => {
   }
   if (HEARTBEAT_MARK_RE.test(line)) {
     return parseHeartbeat(line);
+  }
+  const health = parseHealth(line);
+  if (health != null) {
+    return health;
   }
   if (FESTIVITIES_MARK_RE.test(line)) {
     return parseFestivities(line);
