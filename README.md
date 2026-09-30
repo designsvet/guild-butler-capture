@@ -180,6 +180,24 @@ Verified by driving the renderer at the real 660×620 in all six languages: the
 status chip and the button land on the same pixel in every language, open or
 closed.
 
+**So does the pairing card** (fixed in 0.8.8). Not yet paired, it used to hold
+the whole two-step setup inline — 114–137px taller than the connected row —
+and the window did not have that room: in every not-paired state, in all six
+languages, the status line went off the top and the Start button slid under the
+card. It shipped in 0.8.5, 0.8.6 and 0.8.7 because nothing measured the states
+nobody happened to open. The not-paired face is now **one row**, like the
+connected one (*Send loot to your guild* · the one-line pitch · **Pair with
+Discord**), and the two steps open as an overlay above it. The connected face's
+details overlay was trimmed in the same change: it sat 9px over the Stop pill.
+
+**`pnpm check:layout` measures all of it** (`tools/layout-check.cjs`, in CI
+under xvfb): the built renderer at 660×620 behind a stub bridge, six languages
+× five capture states × paired or not, plus every overlay opened — about 90
+windows, failing on anything cut by the greeting's edges, the pill under the
+card, an overlay over the pill or under the title bar, or a clamped pitch.
+`OUT=<dir> pnpm check:layout` also writes a PNG of each, the quickest way to
+look at every state at once.
+
 **Capture starts by itself when the app opens** (default on — the app exists
 to be forgotten about; open it, play). The toggle in the gear popover turns
 that off, persisted in `settings.json` as `autoCapture`. Auto-start goes
@@ -198,6 +216,7 @@ Every command runs from INSIDE this folder (while staged, that is
 pnpm install          # its own workspace — does NOT join the raid-bot install
 pnpm test             # vitest: adapter, state machine, supervisor vs mock engine
 pnpm typecheck
+pnpm check:layout     # every state at 660x620 in the built renderer (see "How it moves")
 pnpm dev:mock         # full app against tools/mock-engine.cjs — no game needed
 pnpm dev              # real engine (auto-discovered, see above)
 pnpm engine:rebuild   # rebuild the engine's natives for Electron's ABI
@@ -515,8 +534,8 @@ each step proves an assumption the container build could not.
 
 ## Sending loot to your guild (v0.3.0+)
 
-Run `/capture pair` in Discord, then type the code into **Pair with Discord**
-here. From then on, captured lines are sent to the guild's bot as they are
+Press **Pair with Discord** in the card at the bottom, run `/capture pair` in
+Discord, and type the code it replies with into the box that opened. From then on, captured lines are sent to the guild's bot as they are
 written; the officer's loot session picks them up by itself, and `View my loot`
 opens the member's own page.
 

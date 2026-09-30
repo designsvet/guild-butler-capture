@@ -161,38 +161,59 @@
 
       <!-- The bottom slot: pairing. One card, two exclusive faces. -->
       <section id="pairing-panel" class="gb-card pairing-card">
-        <!-- Not paired: the two-step onboarding. -->
+        <!-- Not paired: ONE row at the connected face's height; the two steps
+             open over the greeting from its button. The card used to hold both
+             steps inline — 114–137px more than the connected row, which the
+             fixed 660x620 window does not have: every not-yet-paired state
+             clipped the status line off the top and the Start button under this
+             card, in all six languages (0.8.5–0.8.7). tools/layout-check.cjs
+             measures every state now. -->
         <div id="pairing-setup">
-          <p id="pairing-title" class="pairing-title"></p>
-          <p id="pairing-intro" class="pairing-intro"></p>
-          <div class="pair-step">
-            <span class="step-badge gb-well" aria-hidden="true">1</span>
-            <span id="pairing-step1-label" class="step-text"></span>
-            <span class="cmd-chip gb-well">
-              <span class="cmd-text">/capture pair</span>
-              <button id="btn-copy-cmd" class="copy-btn" aria-label="Copy">
-                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
-                  <rect x="4.5" y="4.5" width="8" height="8" rx="1.5"></rect>
-                  <path d="M9.5 4.5 V3 A1.5 1.5 0 0 0 8 1.5 H3 A1.5 1.5 0 0 0 1.5 3 v5 A1.5 1.5 0 0 0 3 9.5 h1.5"></path>
-                </svg>
-              </button>
-            </span>
-            <span id="copy-note" class="copy-note" role="status"></span>
+          <div class="pair-row">
+            <span class="pair-dot pair-dot-off" aria-hidden="true"></span>
+            <div class="pair-lines">
+              <span id="pairing-title" class="pairing-as"></span>
+              <span id="pairing-intro" class="pair-sub pair-sub-wrap"></span>
+            </div>
+            <button
+              id="btn-pair-open"
+              class="btn small gold-ghost"
+              type="button"
+              aria-expanded="false"
+              aria-controls="pairing-steps"
+            ></button>
           </div>
-          <div class="pair-step">
-            <span class="step-badge gb-well" aria-hidden="true">2</span>
-            <span id="pairing-step2-label" class="step-text"></span>
-            <input
-              id="pairing-code"
-              class="pairing-input"
-              type="text"
-              autocomplete="off"
-              spellcheck="false"
-              maxlength="9"
-            />
-            <button id="btn-pair" class="btn gold"></button>
+          <!-- Opens as an overlay ABOVE the row, like the connected face's details. -->
+          <div id="pairing-steps" class="pair-steps gb-overlay" hidden>
+            <div class="pair-step">
+              <span class="step-badge gb-well" aria-hidden="true">1</span>
+              <span id="pairing-step1-label" class="step-text"></span>
+              <span class="cmd-chip gb-well">
+                <span class="cmd-text">/capture pair</span>
+                <button id="btn-copy-cmd" class="copy-btn" aria-label="Copy">
+                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+                    <rect x="4.5" y="4.5" width="8" height="8" rx="1.5"></rect>
+                    <path d="M9.5 4.5 V3 A1.5 1.5 0 0 0 8 1.5 H3 A1.5 1.5 0 0 0 1.5 3 v5 A1.5 1.5 0 0 0 3 9.5 h1.5"></path>
+                  </svg>
+                </button>
+              </span>
+              <span id="copy-note" class="copy-note" role="status"></span>
+            </div>
+            <div class="pair-step">
+              <span class="step-badge gb-well" aria-hidden="true">2</span>
+              <span id="pairing-step2-label" class="step-text"></span>
+              <input
+                id="pairing-code"
+                class="pairing-input"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                maxlength="9"
+              />
+              <button id="btn-pair" class="btn gold"></button>
+            </div>
+            <p id="pairing-error" class="fix-note hidden"></p>
           </div>
-          <p id="pairing-error" class="fix-note hidden"></p>
         </div>
 
         <!-- Paired: the connected row; the chevron opens the details. -->
@@ -219,7 +240,7 @@
               </span>
               <span id="pairing-upload-label" class="switch-label"></span>
             </label>
-            <button id="btn-unpair" class="btn small"></button>
+            <button id="btn-unpair" class="btn tiny"></button>
           </div>
         </div>
       </section>

@@ -138,9 +138,11 @@ const ui = {
   setupFixNote: el<HTMLParagraphElement>("setup-fix-note"),
   version: el<HTMLSpanElement>("app-version"),
   // pairing — the two faces
-  pairTitle: el<HTMLParagraphElement>("pairing-title"),
+  pairTitle: el<HTMLSpanElement>("pairing-title"),
   pairSetup: el<HTMLDivElement>("pairing-setup"),
-  pairIntro: el<HTMLParagraphElement>("pairing-intro"),
+  pairIntro: el<HTMLSpanElement>("pairing-intro"),
+  pairOpen: el<HTMLButtonElement>("btn-pair-open"),
+  pairSteps: el<HTMLDivElement>("pairing-steps"),
   pairStep1: el<HTMLSpanElement>("pairing-step1-label"),
   pairStep2: el<HTMLSpanElement>("pairing-step2-label"),
   copyCmdBtn: el<HTMLButtonElement>("btn-copy-cmd"),
@@ -1081,6 +1083,8 @@ const renderPairing = (): void => {
     ui.pairUploadLabel.textContent = STR.pairing.uploadToggle;
     ui.viewLootBtn.textContent = STR.pairing.viewLoot;
     ui.unpairBtn.textContent = STR.pairing.unpair;
+    // The steps belong to the other face; a later unpair starts them closed.
+    setPairSteps(false);
     return;
   }
 
@@ -1089,6 +1093,8 @@ const renderPairing = (): void => {
   setPairDetails(false);
   ui.pairTitle.textContent = STR.pairing.title;
   ui.pairIntro.textContent = STR.pairing.intro;
+  ui.pairOpen.textContent = STR.pairing.pair;
+  ui.pairCode.setAttribute("aria-label", STR.pairing.codeLabel);
   ui.pairStep1.textContent = STR.pairing.step1;
   ui.pairStep2.textContent = STR.pairing.step2;
   ui.pairCode.placeholder = STR.pairing.codePlaceholder;
@@ -1169,6 +1175,23 @@ ui.pairMore.addEventListener("click", (event) => {
   setPairDetails(ui.pairDetails.hidden);
 });
 
+// Not paired, the two steps are the same kind of overlay over the greeting —
+// the unpaired card is one row, so the fixed window has room for the Start
+// button (see index.html). Opening lands in the code field: the code is what
+// the member comes back from Discord with.
+const setPairSteps = (open: boolean): void => {
+  ui.pairSteps.hidden = !open;
+  ui.pairOpen.setAttribute("aria-expanded", String(open));
+  if (open) {
+    ui.pairCode.focus();
+  }
+};
+
+ui.pairOpen.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setPairSteps(ui.pairSteps.hidden);
+});
+
 ui.hintsToggle.addEventListener("click", (event) => {
   event.stopPropagation();
   setWaitingHints(ui.hints.hidden);
@@ -1177,6 +1200,10 @@ ui.hintsToggle.addEventListener("click", (event) => {
 document.addEventListener("click", (event) => {
   if (!ui.pairDetails.hidden && !ui.pairDetails.contains(event.target as Node)) {
     setPairDetails(false);
+  }
+  // Not while a code is being checked: the answer lands in this overlay.
+  if (!ui.pairSteps.hidden && !pairBusy && !ui.pairSteps.contains(event.target as Node)) {
+    setPairSteps(false);
   }
   if (!ui.hints.hidden && !ui.hints.contains(event.target as Node)) {
     setWaitingHints(false);
@@ -1521,6 +1548,11 @@ document.addEventListener("keydown", (event) => {
     }
     if (!ui.pairDetails.hidden) {
       setPairDetails(false);
+      return;
+    }
+    if (!ui.pairSteps.hidden && !pairBusy) {
+      setPairSteps(false);
+      ui.pairOpen.focus();
       return;
     }
     if (!ui.hints.hidden) {
