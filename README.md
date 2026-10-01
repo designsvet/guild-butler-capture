@@ -53,7 +53,7 @@ src/renderer/   the single screen (plain TS/HTML/CSS, no framework)
 src/app/        the v5 shell preview (React + Tailwind, behind a flag — see "The v5 shell (preview)")
 src/shared/     types, channel names, all user-facing copy (strings.ts)
 resources/mac/  the ChmodBPF-style permission helper (plist + scripts)
-tools/          mock engine, stdout recorder, static-copy build step (+ design-system CSS), v5 shell build + shots
+tools/          mock engine, stdout recorder, static-copy build step (+ design-system CSS), v5 shell build, shots + layout check
 test/           vitest suites — run with no Electron and no game
 ```
 
@@ -218,6 +218,7 @@ pnpm install          # its own workspace — does NOT join the raid-bot install
 pnpm test             # vitest: adapter, state machine, supervisor vs mock engine
 pnpm typecheck
 pnpm check:layout     # every state at 660x620 in the built renderer (see "How it moves")
+pnpm check:layout:v5  # the v5 shell at every width, theme, language and state (see "The v5 shell")
 pnpm dev:mock         # full app against tools/mock-engine.cjs — no game needed
 pnpm dev              # real engine (auto-discovered, see above)
 pnpm engine:rebuild   # rebuild the engine's natives for Electron's ABI
@@ -331,7 +332,38 @@ for both themes with the board it came from; where the board takes a different t
 the layout check's stub bridge in every capture state, both themes, both platforms and three widths,
 and writes a PNG of each (`ONLY=<part of a name>` for some, `SCALE=2` for 2x). The OS's own buttons
 are not in a page, so the tool draws dashed stand-ins where a Mac's lights and Windows' caption
-buttons go. It measures nothing; the v5 layout check is the next step.
+buttons go. It measures nothing; the layout check below does.
+
+**Checking it.** `pnpm check:layout:v5` (`tools/shell-layout-check.cjs`, in CI under xvfb beside the
+old window's check) drives the built page behind the same stub bridge and measures every route at
+768, 1024, 1280 and 1440 — the narrowest width of each of the shell's layouts, and the boards' width
+— all at the window's smallest height, 620, in both themes, the six languages, both platforms and
+the twelve states that change the layout: every capture state the shell draws, each with a guild
+connection that gives the sidebar's foot one of its shapes, and the foot's remaining states over a
+running capture. 1,152 scenarios, from 288 windows each shrunk through the four widths. It fails on:
+
+- sideways scroll — the window, or anything in it that scrolls, wider than it is;
+- clipped text — words cut by a box that hides its overflow, or past the window's edge. Two cuts are
+  the design's and pass while they end in "…" with the whole text in a title: a device's name in
+  the sidebar's foot, and the bar's status words (at 768 on Windows the longest restarting
+  sentences give way). The run lists each, with how often it happened. A state in words —
+  "Disconnected in Discord" — may not be cut, only wrap;
+- words spilling out of a box that is drawn (a button, a card, the bar), and two drawn boxes over one
+  another, neither holding the other — a card too wide for its column lands on the next one without
+  making anything scroll;
+- the title bar's parts — crest, wordmark, status, button, version, gear — overlapping one another,
+  leaving the bar, or sitting under the OS's own buttons (a Mac's lights, Windows' caption buttons);
+- any `securitypolicyviolation`, heard from the page's first moment (`tools/shell-layout-preload.cjs`),
+  and any error the page logs;
+- a page that did not draw: the landmarks, the route marked current in the sidebar, a page in the
+  panel.
+
+The routes and the languages are read from the source (`ROUTES` in `src/app/router.ts`,
+`SUPPORTED_LANGS` in `src/shared/i18n.ts`); the sidebar must offer exactly those routes, and the run
+must measure exactly the product of its lists, none of them empty — so an empty route list, or a run
+that stops early, fails. Each measurement waits until the page says it has settled (its language and
+theme applied, every slice of the bridge drawn, the faces loaded) rather than a fixed time.
+`OUT=<dir>` writes a PNG of each failing scenario. About a minute on an Apple-silicon Mac.
 
 **The window.** Behind the flag the window is the shell's own (`src/main/windowOptions.ts`):
 resizable down to 768×620, maximizable and full-screenable, and opening at 1280×800 the first time —
@@ -368,7 +400,9 @@ compares them with JSON produced from 0.8.8's own source), and none of the above
 nothing. The error state names what is wrong but carries no fix: the notice that holds the fix
 comes in a later step, so until then the old window is where a broken setup gets mended. Times of
 day are in the OS's format, which may not be the app language's. In full screen on a Mac the bar
-still pads 84px for the lights it no longer shows. `pnpm check:layout` measures the old window only.
+still pads 84px for the lights it no longer shows. The layout check cannot see the rail's tooltips
+(drawn by CSS on hover and focus, out of the DOM's reach), what the OS draws over the window, or a
+real Windows machine.
 
 ## When a game update breaks the decoder
 
