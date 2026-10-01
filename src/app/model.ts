@@ -10,6 +10,7 @@
  */
 
 import { ECaptureStatus, EEngineErrorKind, type TCaptureState, type TPairingStatus } from "../shared/captureTypes.js";
+import { EBlock } from "../shared/notices.js";
 import type { TStrings } from "../shared/strings.js";
 import { formatDuration } from "./format.js";
 
@@ -46,15 +47,21 @@ const since = (from: number | null, now: number, s: TStrings): string | null => 
   return from == null ? null : formatDuration(now - from, s.shell.units);
 };
 
-/** Null until the first snapshot arrives: the bar draws no state rather than guess "Not capturing". */
-export const barStatus = (state: TCaptureState | null, now: number, s: TStrings): TBarStatus | null => {
+/**
+ * Null until the first snapshot arrives: the bar draws no state rather than guess "Not capturing".
+ *
+ * `blocked`: capture is blocked (src/shared/notices.ts `captureBlock`) — the error state, or an idle
+ * one whose setup probe already knows Start would fail. The dot goes red then, and only then: a
+ * broken decoder, a stopping logger, an update are the band's to say, not the bar's (board Fh4).
+ */
+export const barStatus = (state: TCaptureState | null, now: number, s: TStrings, blocked = false): TBarStatus | null => {
   if (state == null) {
     return null;
   }
   const words = { tone: "grey" as TTone, look: "state" as const, details: [] as string[], short: [] as string[] };
   switch (state.status) {
     case ECaptureStatus.Idle: {
-      return { ...words, label: s.status.idle };
+      return blocked ? { ...words, tone: "red", look: "danger", label: s.status.error } : { ...words, label: s.status.idle };
     }
     case ECaptureStatus.Starting: {
       return { ...words, tone: "amber", label: s.status.starting };
@@ -105,13 +112,18 @@ export const barStatus = (state: TCaptureState | null, now: number, s: TStrings)
   }
 };
 
-export const barAction = (state: TCaptureState | null): TBarAction | null => {
+/**
+ * `fixFirst`: the band holds the next step — capture is blocked, or the band's notice carries the
+ * window's gold button. Start then steps back to the neutral face, as in the error state: one gold
+ * button per window, and a gold Start over a capture that cannot start invites the press that fails.
+ */
+export const barAction = (state: TCaptureState | null, fixFirst = false): TBarAction | null => {
   if (state == null) {
     return null;
   }
   switch (state.status) {
     case ECaptureStatus.Idle: {
-      return { kind: "start", look: "primary", disabled: false };
+      return { kind: "start", look: fixFirst ? "neutral" : "primary", disabled: false };
     }
     case ECaptureStatus.Error: {
       return { kind: "start", look: "neutral", disabled: false };
@@ -170,6 +182,30 @@ export type THero = {
   reasons: boolean;
 };
 
+/** What blocks capture, in the old window's words: the title of its fix card. */
+export const blockTitle = (block: EBlock, s: TStrings): string => {
+  switch (block) {
+    case EBlock.MacPermission: {
+      return s.errors.permissionTitle;
+    }
+    case EBlock.NpcapMissing: {
+      return s.errors.npcapMissingTitle;
+    }
+    case EBlock.NpcapAdminOnly: {
+      return s.errors.npcapAdminOnlyTitle;
+    }
+    case EBlock.EngineMissing: {
+      return s.errors.engineMissingTitle;
+    }
+    case EBlock.AbiMismatch: {
+      return s.errors.abiMismatchTitle;
+    }
+    case EBlock.Unknown: {
+      return s.errors.crashTitle;
+    }
+  }
+};
+
 const errorTitle = (kind: EEngineErrorKind | null, platform: string, s: TStrings): string => {
   switch (kind) {
     case EEngineErrorKind.Permission: {
@@ -191,12 +227,25 @@ const errorTitle = (kind: EEngineErrorKind | null, platform: string, s: TStrings
   }
 };
 
-/** The Session page's card before there is anything to count (boards Fh3, Fh7). */
-export const sessionHero = (state: TCaptureState | null, now: number, platform: string, s: TStrings): THero | null => {
+/**
+ * The Session page's card before there is anything to count (boards Fh3, Fh7). `blockedBy`: what
+ * blocks capture (src/shared/notices.ts) — an idle capture that cannot start says so, as the bar
+ * does, rather than invite a Start; the fix is in the band's notice above.
+ */
+export const sessionHero = (
+  state: TCaptureState | null,
+  now: number,
+  platform: string,
+  s: TStrings,
+  blockedBy: EBlock | null = null,
+): THero | null => {
   if (state == null) {
     return null;
   }
   const card = { tight: false, reasons: false };
+  if (state.status === ECaptureStatus.Idle && blockedBy != null) {
+    return { ...card, icon: "alert", title: s.status.error, lines: [blockTitle(blockedBy, s)] };
+  }
   switch (state.status) {
     case ECaptureStatus.Waiting: {
       const from = state.runStartedAt;
@@ -227,8 +276,8 @@ export const sessionHero = (state: TCaptureState | null, now: number, platform: 
       return { ...card, icon: "refresh", title: s.status.restarting, lines: [s.statusHint.restarting(seconds)] };
     }
     case ECaptureStatus.Error: {
-      // The fix lives in the notice, which arrives with a later step; until then the card names
-      // what is wrong in the old window's words and offers nothing it cannot do.
+      // The fix lives in the band's notice above (src/app/Notice.tsx); the card names what is wrong
+      // in the old window's words.
       return { ...card, icon: "alert", title: s.status.error, lines: [errorTitle(state.errorKind, platform, s)] };
     }
   }
@@ -286,6 +335,11 @@ export const sidebarFoot = (
     }
     case "bot-outdated": {
       return on("amber", f.outdated);
+    }
+    // The decoder is broken where loot is concerned: nothing is sent until the app updates, and what
+    // is logged meanwhile never is (src/main/uploader.ts). Amber: not a fault of the connection.
+    case "held": {
+      return on("amber", f.held);
     }
     case "blocked": {
       return on("red", f.blocked);

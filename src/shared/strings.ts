@@ -348,6 +348,20 @@ const EN = {
       unauthorized: "Disconnected in Discord",
       pairAgain: "Pair again to resume",
       outdated: "Bot needs an update",
+      /** The decoder is broken: the guild upload waits for the update (src/main/uploader.ts). */
+      held: "Held until the update",
+    },
+    /**
+     * The notices (boards Fh4, Fh5): the band at the top of every page and the broken decoder's
+     * dialog. Every title and sentence they show is the old window's own (errors, setup, health,
+     * update) — these are the only new lines.
+     */
+    notices: {
+      updateReady: "An update is ready",
+      /** Under the broken decoder's notice and in its dialog: the held upload, said plainly. */
+      held: "Nothing is sent to your guild until then — what is logged meanwhile stays in the file on this computer.",
+      /** The dialog's quiet button: closes the dialog for this event; the band keeps the notice. */
+      later: "Later",
     },
   },
 };
@@ -645,6 +659,12 @@ const UK: TStrings = {
       unauthorized: "Відключено в Discord",
       pairAgain: "Підключіть знову, щоб продовжити",
       outdated: "Бот потребує оновлення",
+      held: "Затримано до оновлення",
+    },
+    notices: {
+      updateReady: "Оновлення готове",
+      held: "До того часу гільдії нічого не надсилається — усе, що записано за цей час, лишається у файлі на цьому комп'ютері.",
+      later: "Пізніше",
     },
   },
 };
@@ -936,6 +956,12 @@ const RU: TStrings = {
       unauthorized: "Отключено в Discord",
       pairAgain: "Подключите снова, чтобы продолжить",
       outdated: "Боту нужно обновление",
+      held: "Задержано до обновления",
+    },
+    notices: {
+      updateReady: "Обновление готово",
+      held: "До тех пор гильдии ничего не отправляется — всё, что записано за это время, остаётся в файле на этом компьютере.",
+      later: "Позже",
     },
   },
 };
@@ -1225,6 +1251,12 @@ const DE: TStrings = {
       unauthorized: "In Discord getrennt",
       pairAgain: "Neu koppeln zum Fortsetzen",
       outdated: "Bot braucht ein Update",
+      held: "Bis zum Update zurückgehalten",
+    },
+    notices: {
+      updateReady: "Ein Update ist bereit",
+      held: "Bis dahin wird nichts an deine Gilde gesendet – was in der Zwischenzeit aufgezeichnet wird, bleibt in der Datei auf diesem Computer.",
+      later: "Später",
     },
   },
 };
@@ -1515,6 +1547,12 @@ const FR: TStrings = {
       unauthorized: "Déconnecté dans Discord",
       pairAgain: "Associez à nouveau pour reprendre",
       outdated: "Le bot doit être mis à jour",
+      held: "Retenu jusqu'à la mise à jour",
+    },
+    notices: {
+      updateReady: "Une mise à jour est prête",
+      held: "Rien n'est envoyé à votre guilde d'ici là — ce qui est enregistré entre-temps reste dans le fichier sur cet ordinateur.",
+      later: "Plus tard",
     },
   },
 };
@@ -1800,6 +1838,12 @@ const PT: TStrings = {
       unauthorized: "Desconectado no Discord",
       pairAgain: "Pareie de novo para retomar",
       outdated: "O bot precisa de atualização",
+      held: "Retido até a atualização",
+    },
+    notices: {
+      updateReady: "Uma atualização está pronta",
+      held: "Nada é enviado à sua guilda até lá — o que for registrado nesse meio-tempo fica no arquivo neste computador.",
+      later: "Mais tarde",
     },
   },
 };

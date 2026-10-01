@@ -47,6 +47,7 @@ export const TitleBar = ({
   status,
   action,
   version,
+  inert = false,
   onStart,
   onStop,
 }: {
@@ -55,10 +56,12 @@ export const TitleBar = ({
   action: TBarAction | null;
   /** "v0.8.8" once the setup probe has answered. */
   version: string | null;
+  /** A modal dialog is open over the page (Notice.tsx): nothing here takes a press or the focus. */
+  inert?: boolean;
   onStart: () => void;
   onStop: () => void;
 }) => (
-  <header className="lb-titlebar">
+  <header className="lb-titlebar" inert={inert}>
     <img src="./crest.png" alt="" width={26} height={26} className="lb-bar-crest" />
     {/* The wordmark is the serif's one use in the app (the package README). The board sets it at
         700; the package ships the serif at 500 and 600 only, so 600 is what draws. */}

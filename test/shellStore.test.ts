@@ -10,9 +10,17 @@ import {
   initialUpdateStatus,
   type TAppSettings,
   type TCaptureState,
+  type TNpcapFixResult,
   type TPairingStatus,
+  type TPermissionFixResult,
+  type TRestartResult,
   type TSetupStatus,
   type TUpdateStatus,
+  ECaptureAccess,
+  ENpcapInstallOutcome,
+  EPermissionFixOutcome,
+  ERestartRefusal,
+  EUpdatePhase,
 } from "../src/shared/captureTypes.js";
 
 /**
@@ -56,6 +64,10 @@ const fakeBridge = () => {
     update?: (s: TUpdateStatus) => void;
   } = {};
   const settings = (patch: Partial<TAppSettings>): TAppSettings => ({ autoCapture: false, language: null, theme: "obsidian", ...patch });
+  const restartAnswer: { value: TRestartResult } = { value: { ok: true } };
+  const checkAnswer = deferred<TUpdateStatus>();
+  const fixAnswer = deferred<TPermissionFixResult>();
+  const npcapAnswer = deferred<TNpcapFixResult>();
   const bridge = {
     platform: "darwin",
     getState: () => (calls.push("getState"), answers.state.promise),
@@ -70,7 +82,23 @@ const fakeBridge = () => {
     stop: vi.fn(() => Promise.resolve()),
     reveal: vi.fn(() => Promise.resolve(true)),
     setAutoCapture: vi.fn((enabled: boolean) => Promise.resolve(settings({ autoCapture: enabled }))),
-  } as unknown as TGbc & { start: ReturnType<typeof vi.fn>; setAutoCapture: ReturnType<typeof vi.fn> };
+    updateRestart: vi.fn(() => Promise.resolve(restartAnswer.value)),
+    updateCheckNow: vi.fn(() => checkAnswer.promise),
+    fixMacPermissions: vi.fn(() => fixAnswer.promise),
+    installNpcap: vi.fn(() => npcapAnswer.promise),
+    openNpcapPage: vi.fn(() => Promise.resolve()),
+    pickEnginePath: vi.fn(() => Promise.resolve({ ...SETUP, engineEntry: "/picked/src/index.js" })),
+  } as unknown as TGbc & {
+    start: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
+    setAutoCapture: ReturnType<typeof vi.fn>;
+    updateRestart: ReturnType<typeof vi.fn>;
+    updateCheckNow: ReturnType<typeof vi.fn>;
+    fixMacPermissions: ReturnType<typeof vi.fn>;
+    installNpcap: ReturnType<typeof vi.fn>;
+    openNpcapPage: ReturnType<typeof vi.fn>;
+    pickEnginePath: ReturnType<typeof vi.fn>;
+  };
   let onFocus: () => void = () => {};
   const focus = {
     addEventListener: (_type: "focus", listener: () => void) => {
@@ -78,7 +106,19 @@ const fakeBridge = () => {
       onFocus = listener;
     },
   };
-  return { bridge, focus, calls, answers, push, settings, focusWindow: () => onFocus() };
+  return {
+    bridge,
+    focus,
+    calls,
+    answers,
+    push,
+    settings,
+    restartAnswer,
+    checkAnswer,
+    fixAnswer,
+    npcapAnswer,
+    focusWindow: () => onFocus(),
+  };
 };
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -195,6 +235,99 @@ describe("the shell's store: a mirror of the bridge", () => {
     expect(fake.bridge.setAutoCapture).toHaveBeenCalledWith(true);
     await flush();
     expect(store.getSnapshot().settings?.autoCapture).toBe(true);
+  });
+});
+
+describe("the shell's store: the notices' buttons", () => {
+  const booted = async (capture: Partial<TCaptureState> = {}) => {
+    const fake = fakeBridge();
+    const store = createShellStore(fake.bridge, fake.focus);
+    const booting = store.boot();
+    answerAll(fake, capture, {});
+    await booting;
+    await flush();
+    return { fake, store };
+  };
+
+  it("Stop capture and update: stops, and asks for the install only once the engine is down", async () => {
+    const { fake, store } = await booted({ status: ECaptureStatus.Capturing });
+    store.updateNow();
+    expect(fake.bridge.stop).toHaveBeenCalledTimes(1);
+    expect(fake.bridge.updateRestart).not.toHaveBeenCalled();
+    expect(store.getSnapshot().ui.updateAfterStop).toBe(true);
+    // a second press while it waits does nothing more
+    store.updateNow();
+    expect(fake.bridge.stop).toHaveBeenCalledTimes(1);
+
+    fake.push.state?.({ ...initialCaptureState, status: ECaptureStatus.Stopping, stopRequested: true });
+    expect(fake.bridge.updateRestart).not.toHaveBeenCalled();
+    fake.push.state?.({ ...initialCaptureState });
+    expect(fake.bridge.updateRestart).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().ui.updateAfterStop).toBe(false);
+    // and only once
+    fake.push.state?.({ ...initialCaptureState });
+    expect(fake.bridge.updateRestart).toHaveBeenCalledTimes(1);
+  });
+
+  it("with nothing running it installs at once; a refusal is said, and cleared by the next press", async () => {
+    const { fake, store } = await booted({});
+    fake.restartAnswer.value = { ok: false, reason: ERestartRefusal.Capturing };
+    store.updateNow();
+    expect(fake.bridge.stop).not.toHaveBeenCalled();
+    expect(fake.bridge.updateRestart).toHaveBeenCalledTimes(1);
+    await flush();
+    expect(store.getSnapshot().ui.restartRefused).toBe(true);
+    fake.restartAnswer.value = { ok: true };
+    store.updateNow();
+    expect(store.getSnapshot().ui.restartRefused).toBe(false);
+  });
+
+  it("Check for the fix: one at a time, and main's answer is the update shown", async () => {
+    const { fake, store } = await booted({});
+    store.checkForUpdate();
+    store.checkForUpdate();
+    expect(fake.bridge.updateCheckNow).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().ui.checking).toBe(true);
+    fake.checkAnswer.resolve({ ...initialUpdateStatus, phase: EUpdatePhase.Checking });
+    await flush();
+    expect(store.getSnapshot().ui.checking).toBe(false);
+    expect(store.getSnapshot().update?.phase).toBe(EUpdatePhase.Checking);
+  });
+
+  it("the driver install: one at a time, busy until it answers, then what happened and the probe again", async () => {
+    const { fake, store } = await booted({ status: ECaptureStatus.Error });
+    store.installNpcap();
+    store.installNpcap();
+    expect(fake.bridge.installNpcap).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().ui.npcapBusy).toBe(true);
+    const setup = { ...SETUP, platform: "win32", access: ECaptureAccess.Ok };
+    fake.npcapAnswer.resolve({ setup, install: { outcome: ENpcapInstallOutcome.Installed, version: "1.80", detail: null } });
+    await flush();
+    expect(store.getSnapshot().ui).toMatchObject({ npcapBusy: false, npcapAttempt: { install: { outcome: ENpcapInstallOutcome.Installed } } });
+    expect(store.getSnapshot().setup).toEqual(setup);
+  });
+
+  it("the macOS fix keeps what happened and the probe that follows it; the link and the folder go to main", async () => {
+    const { fake, store } = await booted({});
+    store.fixMacPermissions();
+    const result = { setup: { ...SETUP, access: ECaptureAccess.NoPermission }, outcome: EPermissionFixOutcome.Cancelled, detail: null };
+    fake.fixAnswer.resolve(result);
+    await flush();
+    expect(store.getSnapshot().ui.fixAttempt).toEqual(result);
+    expect(store.getSnapshot().setup?.access).toBe(ECaptureAccess.NoPermission);
+    store.openNpcapPage();
+    expect(fake.bridge.openNpcapPage).toHaveBeenCalledTimes(1);
+    store.pickEnginePath();
+    await flush();
+    expect(store.getSnapshot().setup?.engineEntry).toBe("/picked/src/index.js");
+  });
+
+  it("Later answers the dialog's event in this window, once", async () => {
+    const { store } = await booted({});
+    store.dismissDialog("broken");
+    store.dismissDialog("broken");
+    store.dismissDialog("fix-ready:0.9.1");
+    expect(store.getSnapshot().ui.dismissed).toEqual(["broken", "fix-ready:0.9.1"]);
   });
 });
 
