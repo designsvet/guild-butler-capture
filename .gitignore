@@ -12,3 +12,6 @@ engine-output-*.log
 
 *.tsbuildinfo
 .DS_Store
+
+# `pnpm dev:v5` keeps its own throwaway data folder here
+.dev-v5-data/

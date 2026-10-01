@@ -18,6 +18,7 @@
     "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.preload.json && tsc -p tsconfig.renderer.json && node tools/build-static.mjs && node tools/build-app.mjs",
     "dev": "pnpm build && electron .",
     "dev:mock": "pnpm build && cross-env-shell GBC_MOCK_ENGINE=1 \"electron .\"",
+    "dev:v5": "pnpm build && node tools/dev-v5.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "check:layout": "pnpm build && electron --no-sandbox tools/layout-check.cjs",
