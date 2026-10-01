@@ -363,6 +363,17 @@ const EN = {
       /** The dialog's quiet button: closes the dialog for this event; the band keeps the notice. */
       later: "Later",
     },
+    /**
+     * The settings drawer (board Fh6, option C). Its rows reuse the old gear popover's words
+     * (settings, prefs, advanced, footer); these are the drawer's own: its close button and the
+     * eyebrows the popover never had.
+     */
+    settings: {
+      close: "Close settings",
+      appearance: "Appearance",
+      files: "Files",
+      about: "About",
+    },
   },
 };
 
@@ -666,6 +677,12 @@ const UK: TStrings = {
       held: "До того часу гільдії нічого не надсилається — усе, що записано за цей час, лишається у файлі на цьому комп'ютері.",
       later: "Пізніше",
     },
+    settings: {
+      close: "Закрити налаштування",
+      appearance: "Вигляд",
+      files: "Файли",
+      about: "Про застосунок",
+    },
   },
 };
 
@@ -963,6 +980,12 @@ const RU: TStrings = {
       held: "До тех пор гильдии ничего не отправляется — всё, что записано за это время, остаётся в файле на этом компьютере.",
       later: "Позже",
     },
+    settings: {
+      close: "Закрыть настройки",
+      appearance: "Внешний вид",
+      files: "Файлы",
+      about: "О приложении",
+    },
   },
 };
 
@@ -1257,6 +1280,12 @@ const DE: TStrings = {
       updateReady: "Ein Update ist bereit",
       held: "Bis dahin wird nichts an deine Gilde gesendet – was in der Zwischenzeit aufgezeichnet wird, bleibt in der Datei auf diesem Computer.",
       later: "Später",
+    },
+    settings: {
+      close: "Einstellungen schließen",
+      appearance: "Darstellung",
+      files: "Dateien",
+      about: "Über",
     },
   },
 };
@@ -1554,6 +1583,12 @@ const FR: TStrings = {
       held: "Rien n'est envoyé à votre guilde d'ici là — ce qui est enregistré entre-temps reste dans le fichier sur cet ordinateur.",
       later: "Plus tard",
     },
+    settings: {
+      close: "Fermer les réglages",
+      appearance: "Apparence",
+      files: "Fichiers",
+      about: "À propos",
+    },
   },
 };
 
@@ -1844,6 +1879,12 @@ const PT: TStrings = {
       updateReady: "Uma atualização está pronta",
       held: "Nada é enviado à sua guilda até lá — o que for registrado nesse meio-tempo fica no arquivo neste computador.",
       later: "Mais tarde",
+    },
+    settings: {
+      close: "Fechar configurações",
+      appearance: "Aparência",
+      files: "Arquivos",
+      about: "Sobre",
     },
   },
 };

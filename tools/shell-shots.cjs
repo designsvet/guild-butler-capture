@@ -32,6 +32,15 @@
  * the dialog so the band shows on its own. Each band is also cropped out and laid in a sheet per theme
  * and width, `notices-<theme>-<width>.png`, in Fh5's order (ONLY=notice for those alone).
  *
+ * The settings drawer (board Fh6, option C): the `settings-*` scenarios press the gear and shoot the
+ * drawer open over a running capture — at 1440 and 768, in both themes, in the languages that run
+ * longest at 768 — and once more with the language dropdown open (a `press` may be a list, pressed
+ * in order). The stub bridge answers with a real install's folders at their longest (`longPaths`),
+ * so the paths wrap as a member's would. ONLY=settings for those alone. The `settings-keys-*` ones
+ * get there from the keyboard alone (a scenario's `keys`: Tab from the top of the page to the gear,
+ * Enter, Tab on to the Parchment tile, Enter) and shoot the page re-themed behind the open drawer,
+ * printing what the page asked of the bridge on the way (the stub records it).
+ *
  * Not a check: it measures nothing and passes everything. tools/shell-layout-check.cjs measures.
  */
 
@@ -102,6 +111,10 @@ const DIALOGS = [
   { dialog: "not-out", state: "health", update: { phase: "up-to-date" }, paired: true, upload: "held", platform: "darwin" },
 ];
 
+/** The gear, and the language dropdown inside the drawer it opens (Fh6, option C). */
+const GEAR = "[data-settings-gear]";
+const LANGUAGE = "[data-language-picker]";
+
 app.commandLine.appendSwitch("force-prefers-reduced-motion");
 app.commandLine.appendSwitch("force-device-scale-factor", SCALE);
 app.commandLine.appendSwitch("disable-gpu");
@@ -111,7 +124,7 @@ const scenarios = () => {
   const add = (sc) => {
     const size = `${sc.width}x${sc.height}`;
     const pairing = sc.paired ? `-paired${sc.upload ? `-${sc.upload}` : ""}` : "";
-    list.push({ lang: "en", paired: false, ...sc, name: sc.name ?? `${sc.state}${pairing}-${sc.theme}-${sc.platform}-${size}` });
+    list.push({ lang: "en", paired: false, longPaths: true, ...sc, name: sc.name ?? `${sc.state}${pairing}-${sc.theme}-${sc.platform}-${size}` });
   };
   for (const platform of ["darwin", "win32"]) {
     for (const theme of ["obsidian", "parchment"]) {
@@ -152,6 +165,8 @@ const scenarios = () => {
   const npcap = NOTICES.find((n) => n.notice === "npcap-missing");
   add({ ...npcap, theme: "obsidian", width: 1440, height: 900, forced: true, sheet: false, name: "forced-colors-notice-npcap-missing-win32-1440x900" });
   add({ ...DIALOGS[0], theme: "obsidian", width: 1440, height: 900, forced: true, name: "forced-colors-dialog-fix-ready-win32-1440x900" });
+  // …and the settings drawer, its chosen theme a line in the system's Highlight.
+  add({ state: "capturing", theme: "obsidian", platform: "win32", width: 1440, height: 900, paired: true, forced: true, press: [GEAR], name: "forced-colors-settings-win32-1440x900" });
   // The notices in the band (Fh5) and the broken decoder's dialog (Fh4 D), at 1440 and 768, both themes.
   for (const theme of ["obsidian", "parchment"]) {
     for (const [width, height] of [
@@ -165,6 +180,36 @@ const scenarios = () => {
         add({ ...d, theme, width, height, name: `dialog-${d.dialog}-${theme}-${d.platform}-${width}x${height}` });
       }
     }
+  }
+  // The settings drawer (Fh6, option C) over a running capture, as the board draws it: at 1440 on a
+  // Mac and at 768 on Windows, in both themes; the languages that run longest at 768; and the
+  // language dropdown open, at both sizes (it opens upward in the smallest window).
+  for (const theme of ["obsidian", "parchment"]) {
+    add({ state: "capturing", theme, platform: "darwin", width: 1440, height: 900, paired: true, press: [GEAR], name: `settings-${theme}-darwin-1440x900` });
+    add({ state: "capturing", theme, platform: "win32", width: 768, height: 620, paired: true, press: [GEAR], name: `settings-${theme}-win32-768x620` });
+  }
+  for (const lang of ["de", "uk", "fr"]) {
+    add({ state: "capturing", theme: "obsidian", platform: "win32", width: 768, height: 620, lang, paired: true, press: [GEAR], name: `settings-${lang}-obsidian-win32-768x620` });
+  }
+  add({ state: "capturing", theme: "obsidian", platform: "darwin", width: 1440, height: 900, paired: true, press: [GEAR, LANGUAGE], name: "settings-language-open-obsidian-darwin-1440x900" });
+  add({ state: "capturing", theme: "parchment", platform: "win32", width: 768, height: 620, paired: true, press: [GEAR, LANGUAGE], name: "settings-language-open-parchment-win32-768x620" });
+  // …and from the keyboard alone, in Obsidian: Tab from the top of the page to the gear, Enter, Tab
+  // on to the Parchment tile, Enter — the page behind the open drawer goes to parchment, the focus
+  // ring stays on the tile, and the tool prints what the page asked of the bridge.
+  for (const [platform, width, height] of [
+    ["darwin", 1440, 900],
+    ["win32", 768, 620],
+  ]) {
+    add({
+      state: "capturing",
+      theme: "obsidian",
+      platform,
+      width,
+      height,
+      paired: true,
+      keys: [{ tabTo: GEAR }, "Enter", { tabTo: "[data-theme-pick='parchment']" }, "Enter"],
+      name: `settings-keys-obsidian-to-parchment-${platform}-${width}x${height}`,
+    });
   }
   // The Start/Stop morph, frame by frame (board Fh1's button), in both themes.
   for (const theme of ["obsidian", "parchment"]) {
@@ -235,6 +280,59 @@ const osChrome = (platform) => `(() => {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * A scenario's `keys`, typed as a keyboard does (DevTools' input, the page told it has the focus —
+ * an offscreen window is never the focused one): a key's name presses it; `{ tabTo }` presses Tab
+ * from wherever the focus is until that selector has it, and fails the shot if forty presses never
+ * get there. Whatever a key set moving plays out before the next. Returns what the page asked of the
+ * bridge meanwhile — the stub records it (layout-check-preload.cjs), reads (get*) apart.
+ */
+const typeKeys = async (win, sc) => {
+  const cdp = win.webContents.debugger;
+  if (!cdp.isAttached()) {
+    cdp.attach("1.3");
+  }
+  await cdp.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+  const js = (code) => win.webContents.executeJavaScript(code);
+  const CODES = { Tab: ["Tab", 9], Enter: ["Enter", 13], Escape: ["Escape", 27], " ": ["Space", 32] };
+  const press = async (key) => {
+    const [code, vk] = CODES[key];
+    for (const type of ["keyDown", "keyUp"]) {
+      await cdp.sendCommand("Input.dispatchKeyEvent", {
+        type,
+        key,
+        code,
+        windowsVirtualKeyCode: vk,
+        // Enter and Space press a button through the character they type
+        ...((key === "Enter" || key === " ") && type === "keyDown" ? { text: key === "Enter" ? "\r" : " " } : {}),
+      });
+    }
+    await js(
+      "new Promise((r) => setTimeout(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {}))).then(() => r()), 60))",
+    );
+  };
+  const before = await js("window.gbcStub.calls().length");
+  for (const key of sc.keys) {
+    if (typeof key === "string") {
+      await press(key);
+      continue;
+    }
+    let there = false;
+    for (let i = 0; i < 40 && !there; i += 1) {
+      await press("Tab");
+      there = (await js(`document.activeElement?.matches(${JSON.stringify(key.tabTo)}) === true`)) === true;
+    }
+    if (!there) {
+      throw new Error(`${sc.name}: Tab never reached ${key.tabTo}`);
+    }
+  }
+  const calls = await js("window.gbcStub.calls().map((c) => ({ name: c.name, args: c.args }))");
+  return calls
+    .slice(before)
+    .filter((c) => !c.name.startsWith("get"))
+    .map((c) => `${c.name}(${c.args.map((a) => JSON.stringify(a)).join(", ")})`);
+};
+
 const run = async () => {
   mkdirSync(OUT, { recursive: true });
   const strip = [];
@@ -286,16 +384,21 @@ const run = async () => {
     }
     win.webContents.off("console-message", onConsole);
     refused.push(...refusedAtLoad);
-    if (sc.press != null) {
+    for (const press of sc.press == null ? [] : [sc.press].flat()) {
       // as a member would: the button, pressed (an offscreen window takes no clicks, so the page's own)
       const pressed = await win.webContents.executeJavaScript(
-        `(() => { const el = document.querySelector(${JSON.stringify(sc.press)}); el?.click(); return el != null; })()`,
+        `(() => { const el = document.querySelector(${JSON.stringify(press)}); el?.click(); return el != null; })()`,
       );
       if (!pressed) {
-        throw new Error(`${sc.name}: nothing to press at ${sc.press}`);
+        throw new Error(`${sc.name}: nothing to press at ${press}`);
       }
       await wait(150);
+      // and whatever the press set moving (the drawer's arrival) has arrived
+      await win.webContents.executeJavaScript(
+        "Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {})))",
+      );
     }
+    const asked = sc.keys == null ? null : await typeKeys(win, sc);
     if (OS_CHROME) {
       await win.webContents.executeJavaScript(osChrome(sc.platform));
     }
@@ -332,7 +435,9 @@ const run = async () => {
     const picture = shot.getSize().width === width ? shot : shot.resize({ width, quality: "best" });
     writeFileSync(join(OUT, `${sc.name}.png`), picture.toPNG());
     win.destroy();
-    console.log(`${refused.length > 0 ? "CSP " : "shot"} ${sc.name}${refused.length > 0 ? `  refused: ${refused.join(" | ")}` : ""}`);
+    console.log(
+      `${refused.length > 0 ? "CSP " : "shot"} ${sc.name}${asked != null ? `  asked the bridge: ${asked.join(", ") || "nothing"}` : ""}${refused.length > 0 ? `  refused: ${refused.join(" | ")}` : ""}`,
+    );
   }
   if (strip.length > 0) {
     await shootStrip(strip);

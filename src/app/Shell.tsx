@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { announce, LiveRegion } from "@guild-butler/design-system/react";
 
@@ -13,17 +13,23 @@ import { holdsTheGold, noticeView, type TNoticeActionId } from "./notices.js";
 import { PAGE_PANEL_ID, PageHeader } from "./PageHeader.js";
 import type { TRouter } from "./router.js";
 import { SessionPage } from "./SessionPage.js";
+import { langChoiceOf, storedLang } from "./settings.js";
+import { SettingsDrawer } from "./SettingsDrawer.js";
 import { Sidebar } from "./Sidebar.js";
 import type { TShellStore } from "./store.js";
 import { TitleBar } from "./TitleBar.js";
 
 /**
- * The shell (Loot Butler, raid-bot ADR 0159; boards Fh1, Fh2, Fh3, Fh4, Fh5, Fh7, F1, Fa): the skip
- * link, the title bar (banner), the sidebar (navigation "Views") and the page (main) — the band's
- * notice at its top, on every page — with one polite live region, and the broken decoder's dialog
- * over it all when it interrupts. Everything it shows comes from the store, which mirrors the main
- * process; the only state of its own is the clock that moves "listening for 40 s".
+ * The shell (Loot Butler, raid-bot ADR 0159; boards Fh1, Fh2, Fh3, Fh4, Fh5, Fh6, Fh7, F1, Fa): the
+ * skip link, the title bar (banner), the sidebar (navigation "Views") and the page (main) — the
+ * band's notice at its top, on every page — with one polite live region; the settings drawer the
+ * gear opens, and the broken decoder's dialog over it all when it interrupts. Everything it shows
+ * comes from the store, which mirrors the main process; the only state of its own is the clock that
+ * moves "listening for 40 s" and whether the drawer is open.
  */
+
+/** The drawer: shut, open, or on its way out (it leaves inert, and goes once its exit has played). */
+type TDrawerState = "closed" | "open" | "closing";
 
 /** The second hand: the bar counts seconds for the first minute. */
 const useNow = (): number => {
@@ -136,9 +142,30 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
     actions[id]();
   };
 
+  // The settings drawer (Fh6, option C). The gear opens it and, pressed again, closes it; when it
+  // closes the focus goes back to the gear (board Fa) — once the gear is alive again, so after the
+  // commit that lifts the rest of the window's inertness.
+  const [drawer, setDrawer] = useState<TDrawerState>("closed");
+  const closeSettings = useCallback(() => {
+    setDrawer((now) => (now === "open" ? "closing" : now));
+  }, []);
+  const settingsGone = useCallback(() => {
+    setDrawer((now) => (now === "closing" ? "closed" : now));
+  }, []);
+  const lastDrawer = useRef<TDrawerState>(drawer);
+  useEffect(() => {
+    if (lastDrawer.current === "open" && drawer === "closing") {
+      document.querySelector<HTMLElement>("[data-settings-gear]")?.focus();
+    }
+    lastDrawer.current = drawer;
+  }, [drawer]);
+  const settingsOpen = drawer === "open";
+  // Modal, either of them: the rest of the window takes no press and no focus.
+  const modal = dialogOpen || settingsOpen;
+
   return (
     <>
-      <a className="gb-skip" href="#main" inert={dialogOpen}>
+      <a className="gb-skip" href="#main" inert={modal}>
         {s.shell.skipToContent}
       </a>
       <TitleBar
@@ -147,11 +174,15 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
         // The band holds the next step: Start steps back to the neutral face (one gold button per window).
         action={barAction(capture, block != null || holdsTheGold(view))}
         version={snap.setup != null ? `v${snap.setup.appVersion}` : null}
-        inert={dialogOpen}
+        inert={modal}
+        settingsOpen={settingsOpen}
+        onSettings={() => {
+          setDrawer((now) => (now === "open" ? "closing" : "open"));
+        }}
         onStart={store.start}
         onStop={store.stop}
       />
-      <div className="lb-body" inert={dialogOpen}>
+      <div className="lb-body" inert={modal}>
         <Sidebar s={s} route={route} foot={sidebarFoot(snap.pairing, now, platform, s)} />
         <main id="main" tabIndex={-1} className="lb-main">
           {/* The page's one h1 (board Fa) comes first, so the band's h2 sits under it. */}
@@ -175,6 +206,35 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
           </div>
         </main>
       </div>
+      {drawer !== "closed" ? (
+        <SettingsDrawer
+          s={s}
+          phase={drawer}
+          suspended={dialogOpen}
+          values={{
+            setup: snap.setup,
+            update: snap.update,
+            checking: snap.ui.checking,
+            autoCapture: snap.settings?.autoCapture ?? null,
+            theme: snap.settings?.theme === "parchment" ? "parchment" : "obsidian",
+            lang: langChoiceOf(snap.settings?.language),
+            canReveal: snap.setup?.captureDir != null || capture?.logFile != null,
+          }}
+          on={{
+            onClose: closeSettings,
+            onClosed: settingsGone,
+            onAutoCapture: store.setAutoCapture,
+            onTheme: store.setTheme,
+            onLanguage: (choice) => {
+              store.setLanguage(storedLang(choice));
+            },
+            onCheckUpdates: store.checkForUpdate,
+            onReveal: store.reveal,
+            onChooseEngine: store.pickEnginePath,
+            onPrivacy: store.openPrivacy,
+          }}
+        />
+      ) : null}
       {dialogOpen && event != null && decoder != null ? (
         <DecoderDialog
           // a new event is a new dialog: the focus moves into it again

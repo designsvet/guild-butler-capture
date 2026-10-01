@@ -506,6 +506,7 @@ const getSetup = async (): Promise<TSetupStatus> => {
     engineEntry: engine?.entry ?? null,
     engineRoot: engine?.root ?? null,
     engineSource: engine?.source ?? null,
+    captureDir: engine?.workDir ?? null,
     access: await probeAccess(),
     appVersion: app.getVersion(),
     builtAt: BUILT_AT,

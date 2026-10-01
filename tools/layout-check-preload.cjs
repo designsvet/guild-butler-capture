@@ -114,12 +114,27 @@ const pairing = sc.paired
       upload: { state: "unpaired", sentTotal: 0, lastSentAt: null, failures: 0, lastError: null },
     };
 
+// The folders a real install reports, at their longest: the v5 shell's settings show both whole
+// (sc.longPaths, set by its tools); the old check keeps its short stand-ins.
+const LONG_PATHS = {
+  darwin: {
+    engineRoot: "/Applications/Guild Butler Capture.app/Contents/Resources/engine",
+    captureDir: "/Users/Borysthenes/Library/Application Support/guild-butler-capture/captures",
+  },
+  win32: {
+    engineRoot: "C:\\Users\\Borysthenes\\AppData\\Local\\Programs\\guild-butler-capture\\resources\\engine",
+    captureDir: "C:\\Users\\Borysthenes\\AppData\\Roaming\\guild-butler-capture\\captures",
+  },
+};
+const paths = sc.longPaths ? (LONG_PATHS[sc.platform] ?? LONG_PATHS.darwin) : { engineRoot: "/engine", captureDir: "/engine" };
+
 // sc.access, sc.engineMissing and sc.update shape the v5 shell's notices; the old check sets none.
 const setup = {
   platform: sc.platform,
   engineEntry: sc.engineMissing ? null : "/engine/src/index.js",
-  engineRoot: sc.engineMissing ? null : "/engine",
+  engineRoot: sc.engineMissing ? null : paths.engineRoot,
   engineSource: sc.engineMissing ? null : "bundled",
+  captureDir: sc.engineMissing ? null : paths.captureDir,
   access: sc.access ?? "ok",
   appVersion: "0.0.0",
   builtAt: null,
@@ -128,12 +143,18 @@ const update = { phase: "off", version: null, percent: null, error: null, ...sc.
 // sc.fixOutcome: what "Fix capture permissions…" answers (the password prompt closed, say);
 // sc.npcapPending: the driver install never answers, so the notice is shot while it fetches.
 const never = new Promise(() => {});
-// autoCapture off: the check must not press Start behind its own back.
-const settings = { autoCapture: false, language: sc.lang, theme: sc.theme };
+// autoCapture off: the check must not press Start behind its own back. A set stores and answers
+// what it stored, as main does — the v5 check picks a language and a theme in the settings drawer
+// and expects them to stay; the old check sets nothing.
+let settings = { autoCapture: false, language: sc.lang, theme: sc.theme };
+const store = (patch) => {
+  settings = { ...settings, ...patch };
+  return ok(settings);
+};
 
 const ok = (value) => Promise.resolve(value);
 
-contextBridge.exposeInMainWorld("gbc", {
+const bridge = {
   platform: sc.platform,
   start: () => ok(),
   stop: () => ok(),
@@ -162,9 +183,30 @@ contextBridge.exposeInMainWorld("gbc", {
   updateRestart: () => ok({ ok: true }),
   onUpdate: () => () => {},
   getSettings: () => ok(settings),
-  setAutoCapture: () => ok(settings),
-  setLanguage: () => ok(settings),
-  setTheme: () => ok(settings),
+  setAutoCapture: (autoCapture) => store({ autoCapture }),
+  setLanguage: (language) => store({ language }),
+  setTheme: (theme) => store({ theme }),
   updateCheckNow: () => ok(update),
   copyText: () => ok(),
-});
+};
+
+// Every call the page makes, in order, by name and arguments — the subscriptions (on*) apart — so a
+// tool can tell that a control reached the bridge at all: the v5 check presses each of the settings
+// drawer's controls and reads the calls back from `gbcStub.calls()`. The old check never asks.
+const calls = [];
+const recorded = Object.fromEntries(
+  Object.entries(bridge).map(([name, value]) =>
+    typeof value !== "function" || /^on[A-Z]/.test(name)
+      ? [name, value]
+      : [
+          name,
+          (...args) => {
+            calls.push({ name, args });
+            return value(...args);
+          },
+        ],
+  ),
+);
+
+contextBridge.exposeInMainWorld("gbc", recorded);
+contextBridge.exposeInMainWorld("gbcStub", { calls: () => calls.map((call) => ({ name: call.name, args: call.args })) });

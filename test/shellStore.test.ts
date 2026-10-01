@@ -34,6 +34,7 @@ const SETUP: TSetupStatus = {
   engineEntry: "/engine/src/index.js",
   engineRoot: "/engine",
   engineSource: "bundled",
+  captureDir: "/data/captures",
   access: "ok" as TSetupStatus["access"],
   appVersion: "0.8.8",
   builtAt: null,
@@ -68,6 +69,8 @@ const fakeBridge = () => {
   const checkAnswer = deferred<TUpdateStatus>();
   const fixAnswer = deferred<TPermissionFixResult>();
   const npcapAnswer = deferred<TNpcapFixResult>();
+  const languageAnswer = deferred<TAppSettings>();
+  const themeAnswer = deferred<TAppSettings>();
   const bridge = {
     platform: "darwin",
     getState: () => (calls.push("getState"), answers.state.promise),
@@ -82,6 +85,9 @@ const fakeBridge = () => {
     stop: vi.fn(() => Promise.resolve()),
     reveal: vi.fn(() => Promise.resolve(true)),
     setAutoCapture: vi.fn((enabled: boolean) => Promise.resolve(settings({ autoCapture: enabled }))),
+    setLanguage: vi.fn(() => languageAnswer.promise),
+    setTheme: vi.fn(() => themeAnswer.promise),
+    openPrivacy: vi.fn(() => Promise.resolve()),
     updateRestart: vi.fn(() => Promise.resolve(restartAnswer.value)),
     updateCheckNow: vi.fn(() => checkAnswer.promise),
     fixMacPermissions: vi.fn(() => fixAnswer.promise),
@@ -92,6 +98,9 @@ const fakeBridge = () => {
     start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
     setAutoCapture: ReturnType<typeof vi.fn>;
+    setLanguage: ReturnType<typeof vi.fn>;
+    setTheme: ReturnType<typeof vi.fn>;
+    openPrivacy: ReturnType<typeof vi.fn>;
     updateRestart: ReturnType<typeof vi.fn>;
     updateCheckNow: ReturnType<typeof vi.fn>;
     fixMacPermissions: ReturnType<typeof vi.fn>;
@@ -117,6 +126,8 @@ const fakeBridge = () => {
     checkAnswer,
     fixAnswer,
     npcapAnswer,
+    languageAnswer,
+    themeAnswer,
     focusWindow: () => onFocus(),
   };
 };
@@ -235,6 +246,61 @@ describe("the shell's store: a mirror of the bridge", () => {
     expect(fake.bridge.setAutoCapture).toHaveBeenCalledWith(true);
     await flush();
     expect(store.getSnapshot().settings?.autoCapture).toBe(true);
+  });
+});
+
+describe("the shell's store: the settings drawer", () => {
+  const booted = async () => {
+    const fake = fakeBridge();
+    const store = createShellStore(fake.bridge, fake.focus);
+    const booting = store.boot();
+    answerAll(fake, {}, { language: "en", theme: "obsidian" });
+    await booting;
+    await flush();
+    return { fake, store };
+  };
+
+  it("draws a picked language at once, then keeps what main stored", async () => {
+    const { fake, store } = await booted();
+    store.setLanguage("uk");
+    expect(store.getSnapshot().settings?.language).toBe("uk");
+    expect(fake.bridge.setLanguage).toHaveBeenCalledWith("uk");
+    // main has the last word: what it stored is what is drawn
+    fake.languageAnswer.resolve(fake.settings({ language: "de" }));
+    await flush();
+    expect(store.getSnapshot().settings?.language).toBe("de");
+  });
+
+  it("System is stored as no language, so the window follows the OS again", async () => {
+    const { fake, store } = await booted();
+    store.setLanguage(null);
+    expect(store.getSnapshot().settings?.language).toBeNull();
+    expect(fake.bridge.setLanguage).toHaveBeenCalledWith(null);
+  });
+
+  it("draws a picked theme at once, then keeps what main stored", async () => {
+    const { fake, store } = await booted();
+    store.setTheme("parchment");
+    expect(store.getSnapshot().settings?.theme).toBe("parchment");
+    expect(fake.bridge.setTheme).toHaveBeenCalledWith("parchment");
+    fake.themeAnswer.resolve(fake.settings({ theme: "parchment" }));
+    await flush();
+    expect(store.getSnapshot().settings?.theme).toBe("parchment");
+  });
+
+  it("before the settings arrive a pick is not drawn over nothing: main's answer alone will be", async () => {
+    const fake = fakeBridge();
+    const store = createShellStore(fake.bridge, fake.focus);
+    void store.boot();
+    store.setTheme("parchment");
+    expect(store.getSnapshot().settings).toBeNull();
+    expect(fake.bridge.setTheme).toHaveBeenCalledWith("parchment");
+  });
+
+  it("the privacy policy is main's to open", async () => {
+    const { fake, store } = await booted();
+    store.openPrivacy();
+    expect(fake.bridge.openPrivacy).toHaveBeenCalledTimes(1);
   });
 });
 

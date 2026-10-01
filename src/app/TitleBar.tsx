@@ -48,6 +48,8 @@ export const TitleBar = ({
   action,
   version,
   inert = false,
+  settingsOpen = false,
+  onSettings,
   onStart,
   onStop,
 }: {
@@ -56,8 +58,11 @@ export const TitleBar = ({
   action: TBarAction | null;
   /** "v0.8.8" once the setup probe has answered. */
   version: string | null;
-  /** A modal dialog is open over the page (Notice.tsx): nothing here takes a press or the focus. */
+  /** A modal is open (Notice.tsx, SettingsDrawer.tsx): nothing here takes a press or the focus. */
   inert?: boolean;
+  /** The gear's drawer is open: the gear shows itself pressed. */
+  settingsOpen?: boolean;
+  onSettings: () => void;
   onStart: () => void;
   onStop: () => void;
 }) => (
@@ -80,8 +85,19 @@ export const TitleBar = ({
         <span className="lb-bar-version lb-wide">{version}</span>
       </>
     ) : null}
-    {/* The design system's Button. Inert for now: where settings live is still a pick on the canvas
-        (Fh6), and the gear opens whatever is built there. */}
-    <Button variant="quiet" size="sm" iconOnly label={s.settings.gearLabel} icon={<Icon paths={GEAR} />} className="lb-gear" />
+    {/* The design system's Button. It opens the settings drawer (SettingsDrawer.tsx, board Fh6
+        option C), and the focus comes back here when the drawer closes. */}
+    <Button
+      variant="quiet"
+      size="sm"
+      iconOnly
+      label={s.settings.gearLabel}
+      icon={<Icon paths={GEAR} />}
+      className="lb-gear"
+      aria-haspopup="dialog"
+      aria-expanded={settingsOpen}
+      data-settings-gear=""
+      onClick={onSettings}
+    />
   </header>
 );

@@ -20,6 +20,10 @@
  * ask main to install (it refuses while a capture runs), saying so if it still refuses; and the
  * broken decoder's dialog events this window has answered "Later" to (src/shared/notices.ts).
  *
+ * The settings drawer (src/app/SettingsDrawer.tsx) writes through here as well: the auto-start
+ * switch, the theme and the language — each drawn at once, then set to what main stored — the
+ * engine folder and the check for updates; the folder and the privacy policy are main's to open.
+ *
  * Pure of the DOM (the window arrives as `TFocusSource`), so test/shellStore.test.ts drives it with
  * a fake bridge.
  */
@@ -32,10 +36,12 @@ import {
   type TPairingStatus,
   type TPermissionFixResult,
   type TSetupStatus,
+  type TTheme,
   type TUpdateStatus,
 } from "../shared/captureTypes.js";
 import type { TGbc } from "../shared/bridge.js";
 import { engineRunning } from "../shared/engineHealth.js";
+import type { TLang } from "../shared/i18n.js";
 
 /** What the page remembers about the notices' buttons — nothing main keeps for it. */
 export type TShellUi = {
@@ -77,6 +83,12 @@ export type TShellStore = {
   stop: () => void;
   reveal: () => void;
   setAutoCapture: (enabled: boolean) => void;
+  /** The settings drawer's language: a language, or null to follow the OS ("System"). */
+  setLanguage: (lang: TLang | null) => void;
+  /** The settings drawer's theme tiles. */
+  setTheme: (theme: TTheme) => void;
+  /** The privacy policy, at its capture-app section, in the browser (the settings drawer's About). */
+  openPrivacy: () => void;
   /** macOS: the one-time admin helper, then the probe again (the old window's Fix capture permissions…). */
   fixMacPermissions: () => void;
   /** Windows: fetch, verify and start Npcap's own installer. One at a time. */
@@ -236,6 +248,23 @@ export const createShellStore = (bridge: TGbc, focus: TFocusSource): TShellStore
         set({ settings: { ...snapshot.settings, autoCapture: enabled } });
       }
       quietly(bridge.setAutoCapture(enabled).then((settings) => set({ settings })));
+    },
+    // The theme and the language are drawn at once too — the drawer leaves the page in view so the
+    // change is seen as it happens (Fh6 C) — then whatever main stored, as the old window does.
+    setLanguage: (lang) => {
+      if (snapshot.settings != null) {
+        set({ settings: { ...snapshot.settings, language: lang } });
+      }
+      quietly(bridge.setLanguage(lang).then((settings) => set({ settings })));
+    },
+    setTheme: (theme) => {
+      if (snapshot.settings != null) {
+        set({ settings: { ...snapshot.settings, theme } });
+      }
+      quietly(bridge.setTheme(theme).then((settings) => set({ settings })));
+    },
+    openPrivacy: () => {
+      quietly(bridge.openPrivacy());
     },
     fixMacPermissions: () => {
       quietly(

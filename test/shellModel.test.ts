@@ -331,6 +331,7 @@ describe("noticeView: each notice of board Fh5 in the app's own words, and its b
     engineEntry: "/engine/src/index.js",
     engineRoot: "/engine",
     engineSource: "bundled",
+    captureDir: "/data/captures",
     access: ECaptureAccess.Ok,
     appVersion: "0.8.8",
     builtAt: null,
