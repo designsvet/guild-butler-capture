@@ -171,6 +171,13 @@ export type TSetupStatus = {
   engineRoot: string | null;
   /** Where the entry came from: "settings", "bundled", "sibling". */
   engineSource: string | null;
+  /**
+   * The folder the engine writes its loot logs into — its working folder: `<data folder>/captures`
+   * for the bundled engine, the engine's own folder otherwise. It is where Reveal looks when no log
+   * file exists yet, and the path the v5 shell's settings show beside Open folder. Null when no
+   * engine was found. The old window does not read it.
+   */
+  captureDir: string | null;
   access: ECaptureAccess;
   appVersion: string;
   /** Build timestamp (ISO) from dist/buildstamp.json — null on odd layouts. */

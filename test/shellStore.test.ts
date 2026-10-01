@@ -34,6 +34,7 @@ const SETUP: TSetupStatus = {
   engineEntry: "/engine/src/index.js",
   engineRoot: "/engine",
   engineSource: "bundled",
+  captureDir: "/data/captures",
   access: "ok" as TSetupStatus["access"],
   appVersion: "0.8.8",
   builtAt: null,

@@ -40,6 +40,7 @@ const setupOf = (patch: Partial<TSetupStatus> = {}): TSetupStatus => ({
   engineEntry: "/engine/src/index.js",
   engineRoot: "/engine",
   engineSource: "bundled",
+  captureDir: "/data/captures",
   access: ECaptureAccess.Ok,
   appVersion: "0.8.8",
   builtAt: null,
