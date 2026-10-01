@@ -112,6 +112,14 @@ const readLists = () => ({
   SUPPORTED_LANGS: fromSource("src/shared/i18n.ts").SUPPORTED_LANGS,
 });
 
+/** The words the connection panel's keys check against: the app's catalog and its failures, read in the run (above). */
+let stringsFor = null;
+let EPairFailure = null;
+const readWords = () => {
+  stringsFor = fromSource("src/shared/strings.ts").stringsFor;
+  EPairFailure = fromSource("src/shared/captureTypes.ts").EPairFailure;
+};
+
 /**
  * The narrowest width of each of the shell's layouts — 768 (the smallest window: the rail, one
  * column, the short bar), 1024 (the rail, a 320px right column, the full bar), 1280 (the labelled
@@ -236,14 +244,18 @@ const STATES = [
   { name: "settings-no-engine", state: "idle", engineMissing: true, paired: false, press: SETTINGS, waitFor: ".lb-drawer", notice: "blocked", drawer: true },
   // The guild connection's panel (Fh2): not connected, from the foot and from Session's button; a
   // code refused, the board's refusal and the longest in every language (this computer cannot
-  // store the token securely); a code being checked ("Connecting…"); connected, as the board draws
-  // it and with the longest sentence the details can carry (the bot needs an update).
+  // store the token securely) — and, from the keys, every other refusal in turn; a code being
+  // checked ("Connecting…"); opened under the band's fix; connected, as the board draws it and with
+  // the longest sentence the details can carry (the bot needs an update).
   { name: "connect", state: "idle", paired: false, press: CONNECT, waitFor: "[data-connection-panel='connect']", notice: null, panel: "connect" },
   // (the stub accepts its code: the keys pair this one)
   { name: "connect-from-session", state: "waiting", paired: false, pairOk: true, press: FROM_SESSION, waitFor: "[data-connection-panel='connect']", notice: null, panel: "connect" },
   { name: "connect-refused", state: "idle", paired: false, press: REFUSED, waitFor: "[data-pair-failure]", notice: null, panel: "connect" },
   { name: "connect-no-encryption", state: "idle", paired: false, pairFailure: "no-encryption", press: REFUSED, waitFor: "[data-pair-failure]", notice: null, panel: "connect" },
   { name: "connect-checking", state: "idle", paired: false, pairPending: true, press: REFUSED, waitFor: "[data-pair-submit][aria-disabled='true']", notice: null, panel: "connect" },
+  // Under the band's gold fix (no engine found): the fix keeps the window's one gold button, so Pair
+  // is outlined — and the bar's Start stays neutral.
+  { name: "connect-under-fix", state: "idle", engineMissing: true, paired: false, press: CONNECT, waitFor: "[data-connection-panel='connect']", notice: "blocked", panel: "connect" },
   { name: "connected", state: "capturing", paired: true, sentAgoMs: 60_000, press: CONNECT, waitFor: "[data-connection-panel='connected']", notice: null, panel: "connected" },
   { name: "connected-outdated", state: "capturing", paired: true, upload: "bot-outdated", press: CONNECT, waitFor: "[data-connection-panel='connected']", notice: null, panel: "connected" },
 ];
@@ -581,6 +593,15 @@ const measure = ({ route, zones, mayCut, surfaces, scope, veils = [], overlay = 
         if (door == null || !painted(css(door).backgroundColor)) {
           problems.add("the foot's door is not drawn pressed while its panel is open");
         }
+      }
+      // One gold button per window (model.ts `barAction`, connection.ts `pairHoldsTheGold`): the
+      // band's fix, else the connection panel's Pair, else the bar's Start — never two in sight. What
+      // lies inert under the dialog or the drawer is veiled, not in sight.
+      const golds = [...document.querySelectorAll(".gbtn-primary, .lb-act[data-kind='start'][data-surface='gold']")].filter(
+        (el) => el.closest("[inert]") == null && !unseen(el),
+      );
+      if (golds.length > 1) {
+        problems.add(`${golds.length} gold buttons in sight, not one: ${golds.map(say).join(", ")}`);
       }
     }
 
@@ -1211,6 +1232,15 @@ const connectionKeys = async (win, load) => {
           out.push(`Tab from the copy button went to ${await focused()}, not the code field`);
           return out;
         }
+        // Spaces are not a code: Pair still waits. Then the field is emptied as the browser would.
+        await cdp.sendCommand("Input.insertText", { text: "   " });
+        await settle();
+        if ((await js("document.querySelector('[data-pair-submit]')?.disabled")) !== true) {
+          out.push("Pair stopped waiting for a code with only spaces typed");
+        }
+        await js(
+          "(() => { const el = document.querySelector('[data-pair-code]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })); })()",
+        );
         await cdp.sendCommand("Input.insertText", { text: "abcd efgh" });
         await settle();
         if ((await js("document.querySelector('[data-pair-submit]')?.disabled")) !== false) {
@@ -1276,6 +1306,29 @@ const connectionKeys = async (win, load) => {
         await closedOnto("Escape, once Session's button had gone", DOOR, out);
         return out;
       }
+      case "connect-refused": {
+        // Every way a code can be refused (EPairFailure), each said under the field in the app's own
+        // sentence for it — the old window's catalog key, `fail` + the failure's name — and read out
+        // through the page's one polite region. The stub is told which refusal to give next.
+        const s = stringsFor(load.lang);
+        for (const [key, failure] of Object.entries(EPairFailure)) {
+          const sentence = s.pairing[`fail${key}`];
+          await js(`window.gbcStub.refuseWith(${JSON.stringify(failure)})`);
+          await js("document.querySelector('[data-pair-code]')?.focus()");
+          await makes("the code field", "Enter", 'pair("ABCD-EFGH")', out);
+          // the region says it 60ms after it is asked to (the package's LiveRegion)
+          await js("new Promise((r) => setTimeout(r, 120))");
+          const said = await js("document.querySelector('[data-pair-failure]')?.textContent.trim() ?? null");
+          if (typeof sentence !== "string" || said !== sentence) {
+            out.push(`refused with ${failure}, the panel says ${said == null ? "nothing" : JSON.stringify(said)}, not the app's sentence for it`);
+          }
+          const heard = await js("document.querySelector('[role=\"status\"][aria-live=\"polite\"]')?.textContent.trim() ?? null");
+          if (heard !== sentence) {
+            out.push(`refused with ${failure}, the polite region says ${heard == null ? "nothing" : JSON.stringify(heard)}, not its sentence`);
+          }
+        }
+        return out;
+      }
       case "connect-checking": {
         const pairs = async () => (await asked()).filter((c) => c.startsWith("pair(")).length;
         await press("Escape");
@@ -1291,6 +1344,14 @@ const connectionKeys = async (win, load) => {
         await click(await centre(DOOR));
         if ((await open()) == null) {
           out.push("the foot's door closed the panel while a code was being checked");
+          return out;
+        }
+        // Session's Pair with Discord, the other door (pressed by the page's own click: at 768 the
+        // panel may lie over it)
+        await js("document.querySelector(\"[data-connection-opener='session']\")?.click()");
+        await settle();
+        if ((await open()) == null) {
+          out.push("Session's Pair with Discord closed the panel while a code was being checked");
           return out;
         }
         await js("document.querySelector('[data-pair-code]')?.focus()");
@@ -1357,6 +1418,7 @@ const connectionKeys = async (win, load) => {
 
 const run = async () => {
   const { ROUTES, SUPPORTED_LANGS } = readLists();
+  readWords();
   const lists = [
     ["route", ROUTES],
     ["width", WIDTHS],

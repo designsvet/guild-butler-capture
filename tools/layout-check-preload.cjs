@@ -118,6 +118,8 @@ const UNPAIRED = {
 // and each answers with the status after it, and pushes it, as main does. The old check presses
 // Pair alone.
 let pairing = sc.paired ? PAIRED : UNPAIRED;
+// The refusal the next code gets: the scenario's, until a tool names another (`gbcStub.refuseWith`).
+let refusal = sc.pairFailure ?? "refused";
 const onPairingListeners = new Set();
 const setPairing = (next) => {
   pairing = next;
@@ -193,7 +195,7 @@ const bridge = {
       ? never
       : sc.pairOk
         ? ok({ ok: true, status: setPairing(PAIRED), failure: null, detail: null })
-        : ok({ ok: false, status: pairing, failure: sc.pairFailure ?? "refused", detail: null }),
+        : ok({ ok: false, status: pairing, failure: refusal, detail: null }),
   unpair: () => ok(setPairing(UNPAIRED)),
   setUpload: (enabled) => ok(setPairing({ ...pairing, uploadEnabled: enabled !== false })),
   openLoot: () => ok(),
@@ -234,4 +236,10 @@ const recorded = Object.fromEntries(
 );
 
 contextBridge.exposeInMainWorld("gbc", recorded);
-contextBridge.exposeInMainWorld("gbcStub", { calls: () => calls.map((call) => ({ name: call.name, args: call.args })) });
+contextBridge.exposeInMainWorld("gbcStub", {
+  calls: () => calls.map((call) => ({ name: call.name, args: call.args })),
+  // The v5 check refuses a code each way an EPairFailure names, in one window.
+  refuseWith: (failure) => {
+    refusal = String(failure);
+  },
+});

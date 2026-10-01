@@ -45,7 +45,8 @@
  * from the sidebar's foot and shoot Fh2's three scenes — not connected, a code that was not accepted
  * (a `press` may fill a field: `{ fill, value }`), connected — at 1440 on a Mac and at 768 on Windows,
  * in both themes; then, at 1440, the panel while a code is checked, opened from Session's Pair with
- * Discord, connected in each upload state that says more than the line, the longest refusal in the
+ * Discord, opened under the band's gold fix (Pair outlined; at 768 too), connected in each upload
+ * state that says more than the line, the longest refusal in the
  * languages that run longest at 768, under Windows' high contrast, and reached from the keyboard
  * alone. Each panel is also cropped out with the foot under it and laid in a sheet per theme and
  * width, `connection-<theme>-<width>.png`, in Fh2's order (ONLY=connection for those alone).
@@ -252,6 +253,10 @@ const scenarios = () => {
   const more = { theme: "obsidian", platform: "darwin", width: 1440, height: 900, sheet: false };
   add({ ...more, state: "idle", pairPending: true, press: [DOOR, TYPE_CODE, PAIR], name: "connection-checking-obsidian-darwin-1440x900" });
   add({ ...more, state: "waiting", press: [SESSION_PAIR], name: "connection-from-session-obsidian-darwin-1440x900" });
+  // Under the band's gold fix (no engine found): the fix keeps the window's one gold button, Pair is
+  // outlined, and the bar's Start stays neutral.
+  add({ ...more, state: "idle", engineMissing: true, press: [DOOR], name: "connection-under-fix-obsidian-darwin-1440x900" });
+  add({ ...more, theme: "parchment", platform: "win32", width: 768, height: 620, state: "idle", engineMissing: true, press: [DOOR], name: "connection-under-fix-parchment-win32-768x620" });
   for (const upload of ["retrying", "held", "bot-outdated", "blocked", "unauthorized"]) {
     add({ ...more, state: "capturing", paired: true, upload, press: [DOOR], name: `connection-connected-${upload}-obsidian-darwin-1440x900` });
   }
