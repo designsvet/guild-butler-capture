@@ -25,10 +25,14 @@ describe("plural", () => {
     expect(plural("ru", 5, { one: "# строка", few: "# строки", many: "# строк", other: "# строки" })).toBe("5 строк");
   });
 
-  it("falls back to other for a form the line does not write — French millions are `many`", () => {
+  it("falls back to other for a form the line does not write — French and Portuguese millions are `many`", () => {
     expect(new Intl.PluralRules("fr").select(1_000_000)).toBe("many");
     expect(plural("fr", 1_000_000, { one: "# ligne", other: "# lignes" })).toMatch(/lignes$/);
     expect(plural("fr", 0, { one: "# ligne", other: "# lignes" })).toBe("0 ligne");
+    // The catalogs' own lines, which write only one and other: a million must still say something.
+    expect(new Intl.PluralRules("pt-BR").select(1_000_000)).toBe("many");
+    expect(stringsFor("pt").shell.foot.linesSent(1_000_000)).toBe("1.000.000 linhas enviadas");
+    expect(stringsFor("fr").shell.foot.linesSent(1_000_000)).toMatch(/^1\s000\s000 lignes envoyées$/);
   });
 
   it("writes the count in the language's own grouping", () => {
