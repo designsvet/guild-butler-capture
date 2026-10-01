@@ -31,6 +31,13 @@
  *   the window inert while it is open; a box under the dialog's scrim is not "under" the dialog.
  *   Then, answered from the keyboard (a click on the scrim, then Escape — `dialogKeys`): closed,
  *   the band still holding its notice, the window alive again and the focus on the page;
+ * - the settings drawer (board Fh6, option C) open when the gear was pressed and not otherwise, 16px
+ *   in from the window's edges under the title bar, no wider than 440px, the focus inside it and the
+ *   rest of the window inert; its language menu, when open, whole in the window, clear of the title
+ *   bar and of its own button, not scrolling, the focus on one of its rows. A box in the drawer and
+ *   one under its scrim are not "on" one another, nor the menu and the rows it floats over. Then
+ *   the keys (`settingsKeys`): Tab held inside, a theme and a language picked from the keyboard and
+ *   kept, Escape closing the menu alone and then the drawer, and the focus back on the gear;
  * - while the title bar's Start/Stop changes face (MORPHS, measured every 55ms of it with motion
  *   on): any of the above in the bar, the version or the gear moving, a change that did not play,
  *   and a button still holding its eased width, or a leaving word, once it is over.
@@ -44,7 +51,8 @@
  *
  * Final frames, the morph's apart: reduced motion is forced, and each measurement waits for the page
  * to say it has settled — the scenario's language and theme applied, every slice of the bridge
- * drawn, the faces loaded — rather than for a fixed time. One window per route, platform, theme, language and state,
+ * drawn, the faces loaded, nothing left playing (the drawer fades in, under reduced motion) —
+ * rather than for a fixed time. One window per route, platform, theme, language and state,
  * shrunk through the four widths: the shell's shape is CSS alone (nothing in src/app reads the
  * window's width), so a window resized to 1024 draws what one opened at 1024 draws.
  *
@@ -116,12 +124,16 @@ const PLATFORMS = ["darwin", "win32"];
  * Fh5 in the band, at its tallest, and the broken decoder's dialog (Fh4, option D).
  *
  * `notice` is the band's notice the state must draw (null: none — a band that appears where it
- * should not is a fault too), `dialog` whether the dialog must be open. `press` clicks a button
- * first, as a member would — "Later", the fix that reports back, the install still fetching —
- * required on the platforms named (`on`), not tried on the others, where the card has no such
- * button; `waitFor` is what the press must bring before measuring.
+ * should not is a fault too), `dialog` whether the dialog must be open, `drawer` the settings
+ * drawer, `menu` its language menu. `press` clicks a button first — or several, in order — as a
+ * member would: "Later", the fix that reports back, the install still fetching, the gear and then
+ * the language; required on the platforms named (`on`), not tried on the others, where the card
+ * has no such button; `waitFor` is what the press must bring before measuring.
  */
 const LATER = { selector: "[data-dialog-later]", on: ["darwin", "win32"] };
+const GEAR = "[data-settings-gear]";
+const SETTINGS = { selector: GEAR, on: ["darwin", "win32"] };
+const LANGUAGE_MENU = { selector: [GEAR, "[data-language-picker]"], on: ["darwin", "win32"] };
 const STATES = [
   // The first run: Start in gold, the pair card in the right column, "Connect a guild" in the foot.
   { name: "idle", state: "idle", paired: false, notice: null },
@@ -183,11 +195,21 @@ const STATES = [
   { name: "logger-stopping", state: "restartingAgain", paired: true, upload: "retrying", notice: "logger-stopping" },
   { name: "update-ready", state: "idle", update: { phase: "ready", version: "0.9.1" }, paired: false, notice: "update-ready" },
   { name: "update-ready-capturing", state: "capturing", update: { phase: "ready", version: "0.9.1" }, paired: true, notice: "update-ready" },
+  // The settings drawer (Fh6, option C) over a running capture, with a real install's folders at
+  // their longest; its language menu open; and over an idle capture with no engine found — the
+  // engine's "not found" sentence, no folder, the band's fix under the scrim.
+  { name: "settings", state: "capturing", paired: true, press: SETTINGS, waitFor: ".lb-drawer", notice: null, drawer: true },
+  { name: "settings-language", state: "capturing", paired: true, press: LANGUAGE_MENU, waitFor: "[role='listbox']", notice: null, drawer: true, menu: true },
+  { name: "settings-no-engine", state: "idle", engineMissing: true, paired: false, press: SETTINGS, waitFor: ".lb-drawer", notice: "blocked", drawer: true },
 ];
 
-/** The scrim is a veil over the page, not a box on it; the dialog's layer is over everything else. */
+/**
+ * The scrims are veils over the page, not boxes on it. The layers over the page — the decoder's
+ * dialog, the settings drawer, the drawer's language menu — each lie over what is under them on
+ * purpose: a box in one and a box in another are not on one another.
+ */
 const VEILS = [".lb-scrim"];
-const OVERLAY = ".lb-overlay";
+const OVERLAY = ".lb-overlay, .lb-settings, .lb-menu";
 
 /**
  * The cuts the shell makes on purpose: a device's name in the sidebar's foot, which is whatever a
@@ -236,17 +258,19 @@ const loads = ({ ROUTES, SUPPORTED_LANGS }) => {
     for (const platform of PLATFORMS) {
       for (const theme of THEMES) {
         for (const lang of SUPPORTED_LANGS) {
-          for (const { name, notice, dialog, press, waitFor, ...stub } of STATES) {
+          for (const { name, notice, dialog, drawer, menu, press, waitFor, ...stub } of STATES) {
+            const pressed = press != null && press.on.includes(platform);
             list.push({
               route,
               platform,
               theme,
               lang,
               stateName: name,
-              expect: { notice, dialog: dialog === true },
-              press: press != null && press.on.includes(platform) ? press.selector : null,
-              waitFor: press != null && press.on.includes(platform) ? (waitFor ?? null) : null,
-              sc: { lang, theme, platform, ...stub },
+              expect: { notice, dialog: dialog === true, drawer: drawer === true, menu: menu === true },
+              press: pressed ? [press.selector].flat() : [],
+              waitFor: pressed ? (waitFor ?? null) : null,
+              // a real install's folders, at their longest (the settings drawer shows them whole)
+              sc: { lang, theme, platform, longPaths: true, ...stub },
             });
           }
         }
@@ -432,6 +456,55 @@ const measure = ({ route, zones, mayCut, surfaces, scope, veils = [], overlay = 
           }
         }
       }
+      // The settings drawer (Fh6, option C): there when the gear was pressed, and only then.
+      const drawer = document.querySelector(".lb-drawer[role='dialog']");
+      if ((drawer != null) !== expect.drawer) {
+        problems.add(expect.drawer ? "the settings drawer is not open" : "the settings drawer is open");
+      }
+      if (drawer != null) {
+        // 16px in from the window's edges, under the title bar, no wider than the package's 440.
+        const r = drawer.getBoundingClientRect();
+        const inset = 16;
+        if (r.top < 48 + inset - T || r.right > W - inset + T || r.bottom > H - inset + T || r.left < -T) {
+          problems.add(`the drawer does not sit 16px in under the title bar (${Math.round(r.left)},${Math.round(r.top)} to ${Math.round(r.right)},${Math.round(r.bottom)})`);
+        }
+        if (r.width > 440 + T) {
+          problems.add(`the drawer is ${Math.round(r.width)}px wide, not 440`);
+        }
+        if (!drawer.contains(document.activeElement)) {
+          problems.add("the drawer is open and the focus is not in it");
+        }
+        for (const part of ["header.lb-titlebar", ".lb-body", ".gb-skip"]) {
+          if (document.querySelector(part)?.inert !== true) {
+            problems.add(`${part} is not inert under the drawer`);
+          }
+        }
+        if (document.querySelector("[data-settings-gear]")?.getAttribute("aria-expanded") !== "true") {
+          problems.add("the gear does not say its drawer is open");
+        }
+      }
+      // Its language menu: whole in the window, clear of the title bar and of its own button, not
+      // scrolling (seven rows fit the smallest window), the focus on one of its rows.
+      const menu = document.querySelector("[role='listbox']");
+      if ((menu != null) !== expect.menu) {
+        problems.add(expect.menu ? "the language menu is not open" : "a language menu is open");
+      }
+      if (menu != null) {
+        const r = menu.getBoundingClientRect();
+        if (r.top < 48 - T || r.left < -T || r.right > W + T || r.bottom > H + T) {
+          problems.add("the language menu does not fit the window under the title bar");
+        }
+        const button = document.querySelector("[data-language-picker]");
+        if (button != null && overlap(box(r), box(button.getBoundingClientRect()))) {
+          problems.add("the language menu covers its own button");
+        }
+        if (menu.scrollHeight > menu.clientHeight + T) {
+          problems.add(`the language menu scrolls (${menu.scrollHeight}px of it in ${menu.clientHeight}px)`);
+        }
+        if (document.activeElement?.getAttribute("role") !== "option" || !menu.contains(document.activeElement)) {
+          problems.add("the language menu is open and the focus is not on one of its rows");
+        }
+      }
     }
 
     // Sideways scroll: the window, then anything in it that scrolls.
@@ -493,6 +566,12 @@ const measure = ({ route, zones, mayCut, surfaces, scope, veils = [], overlay = 
       if (drawsABox(s, el) && visible.some((r) => outside(r, box(el.getBoundingClientRect())))) {
         problems.add(`${words(node.data)} spills out of ${say(el)}`);
       }
+      // A box fixed to the window (the drawer's language menu) is placed against the window, not
+      // in the boxes around it in the page: they neither hold nor cut it, and the window's edges
+      // are its last box.
+      if (s.position === "fixed") {
+        break;
+      }
     }
     if (scroller == null && visible.some((r) => outside(r, { left: 0, top: 0, right: W, bottom: H }))) {
       problems.add(`${words(node.data)} runs off the window`);
@@ -503,16 +582,16 @@ const measure = ({ route, zones, mayCut, surfaces, scope, veils = [], overlay = 
   // any two boxes the eye sees, neither of which holds the other. A box too wide for its column
   // that does not make the page scroll lands on its neighbour instead, and its words can still all
   // be inside it.
-  // A dialog's layer lies over the page on purpose: a box in it and a box under it are not on one
-  // another, and the scrim between them is a veil, not a box.
+  // A layer over the page (the dialog, the drawer, its menu) lies over what is under it on purpose: a
+  // box in one layer and a box in another are not on one another, and a scrim is a veil, not a box.
   const veiled = (el) => veils.some((selector) => el.matches(selector));
-  const lifted = (el) => overlay != null && el.closest(overlay) != null;
+  const layerOf = (el) => (overlay == null ? null : el.closest(overlay));
   const drawn = [...within.querySelectorAll("*")].filter(
     (el) => !layer(el) && !veiled(el) && drawsABox(css(el), el) && !unseen(el) && !parked(el) && el.getClientRects().length > 0,
   );
   for (const [i, a] of drawn.entries()) {
     for (const b of drawn.slice(i + 1)) {
-      if (lifted(a) !== lifted(b)) {
+      if (layerOf(a) !== layerOf(b)) {
         continue;
       }
       if (!a.contains(b) && !b.contains(a) && overlap(box(a.getBoundingClientRect()), box(b.getBoundingClientRect()))) {
@@ -588,8 +667,8 @@ const measure = ({ route, zones, mayCut, surfaces, scope, veils = [], overlay = 
  * Settled: the window is at the width asked for, the scenario's language and theme are on <html>,
  * every slice of the bridge the shell draws has arrived — the capture (the bar's status), the setup
  * (the version), the pairing (the sidebar's foot), the settings (a page's switch is enabled once
- * they land; a page with none shows them only as the language and the theme) — and the faces have
- * loaded. Polled, so a slow machine waits longer instead of measuring a half-built page (the old
+ * they land; a page with none shows them only as the language and the theme) — nothing that plays
+ * once is still playing (the settings drawer fades in), and the faces have loaded. Polled, so a slow machine waits longer instead of measuring a half-built page (the old
  * check's fixed 700ms is how its ru-pair-details came to fail now and then).
  */
 const settled = ({ lang, theme, platform, width, height, timeoutMs, notice = undefined, dialog = undefined, waitFor = null }) => `new Promise((resolve) => {
@@ -608,6 +687,8 @@ const settled = ({ lang, theme, platform, width, height, timeoutMs, notice = und
     ${notice === undefined ? "" : `if ((document.querySelector('main .lb-notice')?.dataset.notice ?? null) !== ${JSON.stringify(notice)}) out.push('the notice ${notice}');`}
     ${dialog === undefined ? "" : `if ((document.querySelector('[role=alertdialog]') != null) !== ${JSON.stringify(dialog)}) out.push('the dialog ${dialog ? "open" : "closed"}');`}
     ${waitFor == null ? "" : `if (document.querySelector(${JSON.stringify(waitFor)}) == null) out.push(${JSON.stringify(`what the press brings (${waitFor})`)});`}
+    const playing = document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity).length;
+    if (playing > 0) out.push(playing + ' animation(s) still playing');
     return out;
   };
   const tick = () => {
@@ -655,6 +736,216 @@ const dialogKeys = async (win) => {
       if (document.activeElement?.id !== "main") out.push("after Later the focus is on " + (document.activeElement?.tagName ?? "nothing") + ", not the page");
       resolve(out);
     }, 100))`);
+  } finally {
+    cdp.detach();
+  }
+};
+
+/**
+ * The settings drawer from the keyboard (board Fa: Esc closes, Tab stays inside while it is open, the
+ * focus returns to the button that opened it), once its window has been measured. Real keys and
+ * presses through DevTools, as a member's would arrive. Returns the problems; empty = it behaved.
+ *
+ * With its language menu open: a row picked with the keys (End — Português — or, where that is the
+ * scenario's own language, Home and ↓ — English) and Enter must close the menu onto its button and
+ * put the page in that language, the drawer still open; ↓ on the button opens the menu again, and
+ * Escape closes the menu alone, onto its button; a second Escape closes the drawer.
+ *
+ * Without it: the focus starts on Close; Shift+Tab goes round to the drawer's last stop and Tab back
+ * to Close; Enter on the other theme's tile puts the page in that theme and keeps the focus there.
+ * Then the drawer is closed — over a running capture by a click on its words (which leaves the focus
+ * on the page's body, outside it) and Escape; opened again with Enter on the gear, interrupted by the
+ * broken decoder's dialog (the drawer inert under it, the focus back in the drawer once "Later" is
+ * pressed) and closed with Escape — and with no engine found, by a press on the scrim.
+ *
+ * Every close must leave the drawer gone, the focus on the gear and the rest of the window alive.
+ */
+const settingsKeys = async (win, load) => {
+  const cdp = win.webContents.debugger;
+  cdp.attach("1.3");
+  const js = (code) => win.webContents.executeJavaScript(code);
+  const KEYS = {
+    Tab: ["Tab", 9],
+    Escape: ["Escape", 27],
+    Enter: ["Enter", 13],
+    End: ["End", 35],
+    Home: ["Home", 36],
+    ArrowDown: ["ArrowDown", 40],
+  };
+  const press = async (name, shift = false) => {
+    const [code, vk] = KEYS[name];
+    for (const type of ["keyDown", "keyUp"]) {
+      await cdp.sendCommand("Input.dispatchKeyEvent", {
+        type,
+        key: name,
+        code,
+        windowsVirtualKeyCode: vk,
+        modifiers: shift ? 8 : 0,
+        // Enter activates a button through the character it types
+        ...(name === "Enter" && type === "keyDown" ? { text: "\r" } : {}),
+      });
+    }
+  };
+  const click = async (x, y) => {
+    for (const type of ["mousePressed", "mouseReleased"]) {
+      await cdp.sendCommand("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+    }
+  };
+  // whatever the keys set moving (the drawer's fade out) has played out
+  const settle = () =>
+    js(`new Promise((r) => { const t0 = performance.now(); const tick = () => { const busy = document.getAnimations().some((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity); if (!busy || performance.now() - t0 > 3000) { setTimeout(r, 30); } else { setTimeout(tick, 10); } }; tick(); })`);
+  const focused = () =>
+    js(`(() => { const el = document.activeElement; if (el == null || el === document.body) return 'the page'; if (el.matches('[data-settings-close]')) return 'Close'; if (el.matches('[data-settings-gear]')) return 'the gear'; if (el.matches('[data-language-picker]')) return 'the language button'; return (el.getAttribute('aria-label') ?? el.textContent ?? el.tagName).trim().slice(0, 40); })()`);
+  const lastStop = () =>
+    js(`(() => { const list = [...document.querySelectorAll('.lb-drawer :is(button, a[href], [tabindex]:not([tabindex="-1"]))')].filter((el) => !el.hasAttribute('disabled')); const el = list.at(-1); return el == null ? null : (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 40); })()`);
+  const closedWell = async (how) => {
+    await settle();
+    const problems = [];
+    if ((await js("document.querySelector('.lb-settings') != null")) === true) {
+      problems.push(`${how} did not close the drawer`);
+    }
+    for (const part of ["header.lb-titlebar", ".lb-body", ".gb-skip"]) {
+      if ((await js(`document.querySelector(${JSON.stringify(part)})?.inert === true`)) === true) {
+        problems.push(`${part} is still inert after ${how} closed the drawer`);
+      }
+    }
+    const at = await focused();
+    if (at !== "the gear") {
+      problems.push(`after ${how} closed the drawer the focus is on ${at}, not the gear`);
+    }
+    return problems;
+  };
+  const out = [];
+  try {
+    await cdp.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+    if (load.expect.menu) {
+      const own = load.lang === "pt";
+      for (const name of own ? ["Home", "ArrowDown"] : ["End"]) {
+        await press(name);
+      }
+      await press("Enter");
+      await settle();
+      const want = own ? "en" : "pt";
+      if ((await js("document.querySelector(\"[role='listbox']\") != null")) === true) {
+        out.push("Enter on a row of the language menu did not close it");
+      }
+      const at = await focused();
+      if (at !== "the language button") {
+        out.push(`after a language was picked the focus is on ${at}, not the language button`);
+      }
+      const lang = await js("document.documentElement.lang");
+      if (lang !== want) {
+        out.push(`a language picked from the keys left the page in ${lang}, not ${want}`);
+      }
+      if ((await js("document.querySelector('.lb-drawer') != null")) !== true) {
+        out.push("picking a language closed the drawer too");
+      }
+      // ↓ on the button opens the menu again; Escape closes the menu alone, onto its button
+      await press("ArrowDown");
+      await settle();
+      if ((await js("document.querySelector(\"[role='listbox']\") != null")) !== true) {
+        out.push("↓ on the language button did not open its menu");
+      }
+      await press("Escape");
+      await settle();
+      if ((await js("document.querySelector(\"[role='listbox']\") != null")) === true) {
+        out.push("Escape did not close the language menu");
+      }
+      if ((await js("document.querySelector('.lb-drawer') != null")) !== true) {
+        out.push("Escape in the language menu closed the drawer too");
+      } else if ((await focused()) !== "the language button") {
+        out.push(`after Escape in the language menu the focus is on ${await focused()}, not its button`);
+      }
+      await press("Escape");
+      out.push(...(await closedWell("Escape")));
+      return out;
+    }
+
+    if ((await focused()) !== "Close") {
+      out.push(`the drawer opened with the focus on ${await focused()}, not Close`);
+    }
+    const last = await lastStop();
+    await press("Tab", true);
+    const back = await focused();
+    if (back !== last) {
+      out.push(`Shift+Tab from the drawer's first stop went to ${back}, not its last (${last})`);
+    }
+    await press("Tab");
+    if ((await focused()) !== "Close") {
+      out.push(`Tab from the drawer's last stop went to ${await focused()}, not back to Close`);
+    }
+    const pick = await js(
+      "(() => { const tile = document.querySelector('.lb-theme-tile[aria-pressed=\"false\"]'); tile?.focus(); return tile?.dataset.themePick ?? null; })()",
+    );
+    if (pick == null) {
+      out.push("the drawer has no theme tile to pick");
+    } else {
+      await press("Enter");
+      await settle();
+      const wanted = pick === "parchment" ? "light" : "dark";
+      const theme = await js("document.documentElement.dataset.theme");
+      if (theme !== wanted) {
+        out.push(`Enter on the ${pick} tile left the page ${theme}, not ${wanted}`);
+      }
+      if ((await js(`document.querySelector('.lb-theme-tile[data-theme-pick="${pick}"]')?.getAttribute('aria-pressed')`)) !== "true") {
+        out.push(`the ${pick} tile does not show itself chosen after Enter`);
+      }
+      if ((await js(`document.activeElement?.dataset.themePick ?? null`)) !== pick) {
+        out.push(`after the ${pick} tile was picked the focus left it`);
+      }
+    }
+    if (load.sc.engineMissing) {
+      const height = await js("innerHeight");
+      await click(8, height - 8);
+      out.push(...(await closedWell("a press on the scrim")));
+      return out;
+    }
+    const title = await js("(() => { const r = document.querySelector('.lb-drawer-title').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()");
+    await click(title[0], title[1]);
+    if ((await js("document.querySelector('.lb-drawer') != null")) !== true) {
+      out.push("a click on the drawer's own words closed it");
+    }
+    await press("Escape");
+    out.push(...(await closedWell("Escape, after a click on its words")));
+    await press("Enter");
+    await settle();
+    if ((await js("document.querySelector('.lb-drawer') != null")) !== true) {
+      out.push("Enter on the gear did not open the drawer again");
+      return out;
+    }
+    if ((await focused()) !== "Close") {
+      out.push(`the drawer opened again with the focus on ${await focused()}, not Close`);
+    }
+    // A broken decoder interrupts the open drawer (Fh4, option D): its dialog goes over it, the
+    // drawer takes nothing meanwhile, and "Later" (Escape) gives the drawer back its focus.
+    win.webContents.send("gbc-stub:state", "health");
+    const interrupted = await js(
+      `new Promise((r) => { const t0 = performance.now(); const tick = () => document.querySelector("[role='alertdialog']") != null ? r(true) : performance.now() - t0 > 3000 ? r(false) : setTimeout(tick, 10); tick(); })`,
+    );
+    if (!interrupted) {
+      out.push("the decoder's dialog did not open over the drawer");
+    } else {
+      await settle();
+      if ((await js("document.querySelector(\"[role='alertdialog']\").contains(document.activeElement)")) !== true) {
+        out.push("the decoder's dialog opened over the drawer without the focus");
+      }
+      if ((await js("document.querySelector('.lb-settings')?.inert === true")) !== true) {
+        out.push("the drawer is not inert under the decoder's dialog");
+      }
+      await press("Escape");
+      await settle();
+      if ((await js("document.querySelector(\"[role='alertdialog']\") != null")) === true) {
+        out.push("Escape did not answer the decoder's dialog over the drawer");
+      }
+      if ((await js("document.querySelector('.lb-settings') != null && document.querySelector('.lb-settings').inert !== true")) !== true) {
+        out.push("after the dialog over it was answered the drawer is gone or still inert");
+      } else if ((await focused()) !== "Close") {
+        out.push(`after the dialog over the drawer was answered the focus is on ${await focused()}, not back in the drawer`);
+      }
+    }
+    await press("Escape");
+    out.push(...(await closedWell("Escape, the second time")));
+    return out;
   } finally {
     cdp.detach();
   }
@@ -722,13 +1013,14 @@ const run = async () => {
     });
     await win.loadFile(PAGE, { hash: `/${load.route}` });
     const pressFailed = [];
-    if (load.press != null) {
-      // as a member would, once the page has drawn what the press is on
+    for (const press of load.press) {
+      // as a member would, once the page has drawn what the press is on (and settled from the last)
       const ready = await win.webContents.executeJavaScript(
-        `new Promise((r) => { const t0 = performance.now(); const tick = () => { const el = document.querySelector(${JSON.stringify(load.press)}); if (el != null) { el.click(); r(true); } else if (performance.now() - t0 > 5000) { r(false); } else { setTimeout(tick, 10); } }; tick(); })`,
+        `new Promise((r) => { const t0 = performance.now(); const tick = () => { const el = document.querySelector(${JSON.stringify(press)}); const busy = document.getAnimations().some((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity); if (el != null && !busy) { el.click(); r(true); } else if (performance.now() - t0 > 5000) { r(false); } else { setTimeout(tick, 10); } }; tick(); })`,
       );
       if (!ready) {
-        pressFailed.push(`there was nothing to press at ${load.press}`);
+        pressFailed.push(`there was nothing to press at ${press}`);
+        break;
       }
     }
     const results = [];
@@ -775,10 +1067,10 @@ const run = async () => {
       }
       results.push({ width, all });
     }
-    if (load.expect.dialog) {
-      // Measured at every width, the dialog is answered at the last one: no scenario of its own (the
-      // count stays the product of the lists), its faults are the last width's.
-      const keys = await dialogKeys(win);
+    if (load.expect.dialog || load.expect.drawer) {
+      // Measured at every width, the dialog or the drawer is answered at the last one: no scenario of
+      // its own (the count stays the product of the lists), its faults are the last width's.
+      const keys = load.expect.dialog ? await dialogKeys(win) : await settingsKeys(win, load);
       const last = results.at(-1);
       if (keys.length > 0 && last != null) {
         if (last.all.length === 0) {

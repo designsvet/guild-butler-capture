@@ -32,6 +32,12 @@
  * the dialog so the band shows on its own. Each band is also cropped out and laid in a sheet per theme
  * and width, `notices-<theme>-<width>.png`, in Fh5's order (ONLY=notice for those alone).
  *
+ * The settings drawer (board Fh6, option C): the `settings-*` scenarios press the gear and shoot the
+ * drawer open over a running capture — at 1440 and 768, in both themes, in the languages that run
+ * longest at 768 — and once more with the language dropdown open (a `press` may be a list, pressed
+ * in order). The stub bridge answers with a real install's folders at their longest (`longPaths`),
+ * so the paths wrap as a member's would. ONLY=settings for those alone.
+ *
  * Not a check: it measures nothing and passes everything. tools/shell-layout-check.cjs measures.
  */
 
@@ -102,6 +108,10 @@ const DIALOGS = [
   { dialog: "not-out", state: "health", update: { phase: "up-to-date" }, paired: true, upload: "held", platform: "darwin" },
 ];
 
+/** The gear, and the language dropdown inside the drawer it opens (Fh6, option C). */
+const GEAR = "[data-settings-gear]";
+const LANGUAGE = "[data-language-picker]";
+
 app.commandLine.appendSwitch("force-prefers-reduced-motion");
 app.commandLine.appendSwitch("force-device-scale-factor", SCALE);
 app.commandLine.appendSwitch("disable-gpu");
@@ -111,7 +121,7 @@ const scenarios = () => {
   const add = (sc) => {
     const size = `${sc.width}x${sc.height}`;
     const pairing = sc.paired ? `-paired${sc.upload ? `-${sc.upload}` : ""}` : "";
-    list.push({ lang: "en", paired: false, ...sc, name: sc.name ?? `${sc.state}${pairing}-${sc.theme}-${sc.platform}-${size}` });
+    list.push({ lang: "en", paired: false, longPaths: true, ...sc, name: sc.name ?? `${sc.state}${pairing}-${sc.theme}-${sc.platform}-${size}` });
   };
   for (const platform of ["darwin", "win32"]) {
     for (const theme of ["obsidian", "parchment"]) {
@@ -152,6 +162,8 @@ const scenarios = () => {
   const npcap = NOTICES.find((n) => n.notice === "npcap-missing");
   add({ ...npcap, theme: "obsidian", width: 1440, height: 900, forced: true, sheet: false, name: "forced-colors-notice-npcap-missing-win32-1440x900" });
   add({ ...DIALOGS[0], theme: "obsidian", width: 1440, height: 900, forced: true, name: "forced-colors-dialog-fix-ready-win32-1440x900" });
+  // …and the settings drawer, its chosen theme a line in the system's Highlight.
+  add({ state: "capturing", theme: "obsidian", platform: "win32", width: 1440, height: 900, paired: true, forced: true, press: [GEAR], name: "forced-colors-settings-win32-1440x900" });
   // The notices in the band (Fh5) and the broken decoder's dialog (Fh4 D), at 1440 and 768, both themes.
   for (const theme of ["obsidian", "parchment"]) {
     for (const [width, height] of [
@@ -166,6 +178,18 @@ const scenarios = () => {
       }
     }
   }
+  // The settings drawer (Fh6, option C) over a running capture, as the board draws it: at 1440 on a
+  // Mac and at 768 on Windows, in both themes; the languages that run longest at 768; and the
+  // language dropdown open, at both sizes (it opens upward in the smallest window).
+  for (const theme of ["obsidian", "parchment"]) {
+    add({ state: "capturing", theme, platform: "darwin", width: 1440, height: 900, paired: true, press: [GEAR], name: `settings-${theme}-darwin-1440x900` });
+    add({ state: "capturing", theme, platform: "win32", width: 768, height: 620, paired: true, press: [GEAR], name: `settings-${theme}-win32-768x620` });
+  }
+  for (const lang of ["de", "uk", "fr"]) {
+    add({ state: "capturing", theme: "obsidian", platform: "win32", width: 768, height: 620, lang, paired: true, press: [GEAR], name: `settings-${lang}-obsidian-win32-768x620` });
+  }
+  add({ state: "capturing", theme: "obsidian", platform: "darwin", width: 1440, height: 900, paired: true, press: [GEAR, LANGUAGE], name: "settings-language-open-obsidian-darwin-1440x900" });
+  add({ state: "capturing", theme: "parchment", platform: "win32", width: 768, height: 620, paired: true, press: [GEAR, LANGUAGE], name: "settings-language-open-parchment-win32-768x620" });
   // The Start/Stop morph, frame by frame (board Fh1's button), in both themes.
   for (const theme of ["obsidian", "parchment"]) {
     for (const m of MORPHS) {
@@ -286,15 +310,19 @@ const run = async () => {
     }
     win.webContents.off("console-message", onConsole);
     refused.push(...refusedAtLoad);
-    if (sc.press != null) {
+    for (const press of sc.press == null ? [] : [sc.press].flat()) {
       // as a member would: the button, pressed (an offscreen window takes no clicks, so the page's own)
       const pressed = await win.webContents.executeJavaScript(
-        `(() => { const el = document.querySelector(${JSON.stringify(sc.press)}); el?.click(); return el != null; })()`,
+        `(() => { const el = document.querySelector(${JSON.stringify(press)}); el?.click(); return el != null; })()`,
       );
       if (!pressed) {
-        throw new Error(`${sc.name}: nothing to press at ${sc.press}`);
+        throw new Error(`${sc.name}: nothing to press at ${press}`);
       }
       await wait(150);
+      // and whatever the press set moving (the drawer's arrival) has arrived
+      await win.webContents.executeJavaScript(
+        "Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {})))",
+      );
     }
     if (OS_CHROME) {
       await win.webContents.executeJavaScript(osChrome(sc.platform));
