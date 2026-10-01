@@ -286,10 +286,39 @@ rendering under the policy. A value a board draws that no token holds is a `--lb
 `src/app/shell.css`, defined for both themes; where the board takes a different token in each theme
 (the bar's hairline), the variable names the two tokens instead of copying their values.
 
-**Not yet.** The window is still the old 660×620 frame (the v5 window is the next step). The gear
-does nothing. There is no status, action, version, sidebar, page or skip link. The stored theme and
-language are not read: the page follows the OS language and draws dark until the store arrives.
-`pnpm check:layout` measures the old window only.
+**The window.** Behind the flag the window is the shell's own (`src/main/windowOptions.ts`):
+resizable down to 768×620, maximizable and full-screenable, and opening at 1280×800 the first time —
+clamped to the screen's work area and centred on it — then wherever it was left.
+
+- Its size and place go to **`window-state.json`** in the data folder, never to `settings.json`,
+  which holds the pairing token and is rewritten whole. The state is written to a temp file and
+  renamed over the old one, once the window has been still for half a second after a move or a
+  resize, and when it closes. On a Mac the close-time write is registered before the close
+  handler's early return: closing the window there is not quitting, and the next window (a click on
+  the dock icon) opens from the file.
+- A maximized window keeps the bounds it un-maximizes to and reopens maximized over them. Full
+  screen is not remembered.
+- A remembered place is dropped, and the first-open size used, when less than 160 px of its title
+  bar would land on any screen's work area — most often a monitor since unplugged. The rules are
+  pure (`src/main/windowBounds.ts`, `test/windowBounds.test.ts`); the file and its timing are
+  `src/main/windowState.ts`.
+- On Windows the OS draws its three caption buttons over the right end of the 48px bar, in the
+  bar's colours (`--lb-bar`, glyphs in `--gb-muted`; `test/windowOptions.test.ts` holds the main
+  process's copies to `src/app/shell.css` and the package). On a Mac the traffic lights sit where
+  board Fh1 draws them, 18pt in and centred on the bar. That position is measured: Electron draws
+  each light 1pt right of and 2pt below the point it is given (macOS 26.6), so 0.8.8's
+  `{ x: 18, y: 18 }` centres them 2pt low.
+- The page cannot leave its window: a navigation to anything but its own `index.html` is refused,
+  and so is every new window, each with a `window: refused …` line in the app log. Moving between
+  routes changes only the hash, which is not a navigation.
+
+With the flag off, the old window's options are 0.8.8's byte for byte (`test/windowOptions.test.ts`
+compares them with JSON produced from 0.8.8's own source), and none of the above applies to it.
+
+**Not yet.** The gear does nothing. There is no status, action, version, sidebar, page or skip
+link. The stored theme and language are not read: the page follows the OS language and draws dark
+until the store arrives. In full screen on a Mac the bar still pads 84px for the lights it no longer
+shows. `pnpm check:layout` measures the old window only.
 
 ## When a game update breaks the decoder
 
