@@ -145,3 +145,12 @@ export const NOTICE = {
   /** "download" — an update is ready. */
   download: ["M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2", "M7 11l5 5l5 -5", "M12 4l0 12"],
 } as const;
+
+/** "x" — the settings drawer's close button. */
+export const CLOSE = ["M18 6l-12 12", "M6 6l12 12"] as const;
+
+/** "check" — the chosen theme's tile. */
+export const CHECK = ["M5 12l5 5l10 -10"] as const;
+
+/** "chevron-down" — the language dropdown. */
+export const CHEVRON_DOWN = ["M6 9l6 6l6 -6"] as const;

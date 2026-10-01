@@ -55,6 +55,11 @@
   /* the sheen crossing a refusing Stop: Stop's own red at 18% — the old pill's
      rgba(232, 161, 132, 0.18), which is --lb-danger-text's colour on dark */
   --lb-shimmer: color-mix(in srgb, var(--lb-danger-text) 18%, transparent);
+
+  /* The settings drawer's arrival (Fh6 option C: "slides in from the right ~300 ms, decelerating"),
+     on the package's decelerating --gb-ease. No token holds 300: the package's steps are 140, 220
+     and 260. It leaves on the package's own exit (--gb-motion-exit, accelerating). */
+  --lb-t-drawer: 300ms;
 }
 [data-theme="light"] {
   /* Fh1, "On parchment" */
@@ -1242,5 +1247,423 @@ body {
   from {
     opacity: 0;
     transform: translateY(6px) scale(0.98);
+  }
+}
+
+/* — The settings drawer (Fh6, option C: the floating drawer of F1s) — the package's drawer: 440px
+   (--gb-drawer-width), 16px in from the window's edges under the title bar (--gb-drawer-inset), the
+   dialog's opaque surface and radius (.gb-dialog, --gb-r-xl), over the one scrim. Its body scrolls
+   when the window is shorter than its settings. Under the decoder's dialog (z-index 50), which can
+   interrupt it. */
+.lb-settings {
+  position: fixed;
+  inset: 48px 0 0;
+  z-index: 40;
+}
+.lb-drawer {
+  position: absolute;
+  top: var(--gb-drawer-inset);
+  right: var(--gb-drawer-inset);
+  bottom: var(--gb-drawer-inset);
+  display: flex;
+  flex-direction: column;
+  width: var(--gb-drawer-width);
+  max-width: calc(100% - 2 * var(--gb-drawer-inset));
+  overflow: hidden;
+  animation: lb-drawer-in var(--lb-t-drawer) var(--gb-ease) backwards;
+}
+/* Leaving: out to the right, gathering speed, and the scrim with it. `backwards` on the way in, so
+   no transform is left on the drawer once it has arrived — a transform would make it the box its
+   fixed language menu is placed in. */
+.lb-settings[data-state="closing"] .lb-drawer {
+  animation: lb-drawer-out var(--gb-motion-exit) var(--gb-ease-exit) forwards;
+}
+.lb-settings[data-state="closing"] .lb-settings-scrim {
+  animation: lb-fade-out var(--gb-motion-exit) var(--gb-ease-exit) forwards;
+}
+@keyframes lb-drawer-in {
+  from {
+    transform: translateX(calc(100% + var(--gb-drawer-inset)));
+  }
+}
+@keyframes lb-drawer-out {
+  to {
+    transform: translateX(calc(100% + var(--gb-drawer-inset)));
+  }
+}
+@keyframes lb-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+/* Reduced motion: no slide — the drawer and its scrim fade in and out instead (Fh6). base.css takes
+   every animation away under reduced motion; these outrank it on purpose, as a fade moves nothing. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .lb-settings .lb-drawer,
+  :root:not([data-motion="full"]) .lb-settings .lb-settings-scrim {
+    animation: lb-fade-in var(--gb-motion-normal) var(--gb-ease) backwards !important;
+  }
+  :root:not([data-motion="full"]) .lb-settings[data-state="closing"] .lb-drawer,
+  :root:not([data-motion="full"]) .lb-settings[data-state="closing"] .lb-settings-scrim {
+    animation: lb-fade-out var(--gb-motion-exit) var(--gb-ease-exit) forwards !important;
+  }
+}
+
+/* Its head: the app's name as a mono eyebrow over "Settings", and Close (a 32px quiet button). */
+.lb-drawer-head {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--gb-card-rule);
+}
+.lb-drawer-titles {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+/* Fh6's eyebrows are a half-step under the label step: 10.5px, 500, tracked .16em. */
+.lb-drawer-eyebrow,
+.lb-set-eyebrow {
+  margin: 0;
+  font-family: var(--gb-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gb-dim);
+  white-space: nowrap;
+}
+.lb-drawer-title {
+  margin: 0;
+  font-family: var(--gb-font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gb-ink);
+}
+.gbtn.lb-drawer-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  color: var(--gb-muted);
+}
+.lb-drawer-close svg {
+  width: 16px;
+  height: 16px;
+}
+.lb-drawer-body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+/* A group: its eyebrow, then its rows; a hairline between groups. */
+.lb-set-section {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.lb-set-section + .lb-set-section {
+  padding-top: 16px;
+  border-top: 1px solid var(--gb-card-rule);
+}
+.lb-set-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+/* A row: what it is at the left, its control at the right. */
+.lb-set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+.lb-set-row--tiles {
+  align-items: flex-start;
+}
+.lb-set-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--gb-ink);
+  white-space: nowrap;
+}
+/* "Theme" sits level with the pictures, not with their names under them. */
+.lb-set-label--tiles {
+  display: inline-flex;
+  align-items: center;
+  height: 68px;
+}
+/* The drawer's buttons are the kit's small (28px) at the dense step, as Fh6 draws them. */
+.lb-drawer .gbtn-sm {
+  flex: none;
+  gap: 7px;
+  font-size: var(--gb-text-dense);
+}
+.lb-drawer .gbtn-sm svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* The theme tiles: a small window in each theme's own colours — the picture carries the package's
+   data-theme, so every token in it is that theme's — over its name. The chosen one: the chosen
+   wash, the gold outline, its name in gold with a check (Fh6). */
+.lb-theme-tiles {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+.lb-theme-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 5px 6px;
+  border: 1px solid var(--gb-outline);
+  border-radius: var(--gb-r-sm);
+  background: transparent;
+  font-family: var(--gb-font-body);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.lb-theme-tile:hover {
+  border-color: var(--gb-outline-hover);
+}
+.lb-theme-tile[aria-pressed="true"] {
+  background: var(--gb-chosen-wash);
+  border-color: var(--gb-gold-outline);
+}
+.lb-theme-tile[aria-pressed="true"]:hover {
+  border-color: var(--gb-gold-outline-hover);
+}
+.lb-theme-preview {
+  position: relative;
+  display: block;
+  width: 96px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--gb-bg);
+}
+.lb-theme-preview-bar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 10px;
+  background: var(--lb-bar);
+  border-bottom: 1px solid var(--lb-bar-line);
+}
+.lb-theme-preview-card {
+  position: absolute;
+  top: 17px;
+  right: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  height: 29px;
+  padding: 0 8px;
+  border-radius: 2px;
+  background: var(--gb-card);
+  box-shadow: var(--gb-card-edge);
+}
+.lb-theme-preview-card > span {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+}
+.lb-theme-preview-card > span:first-child {
+  width: 34px;
+  background: var(--gb-ink-2);
+}
+.lb-theme-preview-card > span:last-child {
+  width: 52px;
+  background: var(--gb-dim);
+}
+.lb-theme-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--gb-ink-2);
+  white-space: nowrap;
+}
+.lb-theme-tile[aria-pressed="true"] .lb-theme-name {
+  font-weight: 600;
+  color: var(--gb-gold-text);
+}
+
+/* The language: the kit's dropdown — a value pressed into a well (Fk's "lifted" field, as Fh6 draws
+   it here) with a chevron — and its vellum menu, fixed to the window over the drawer. */
+.lb-select {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 224px;
+  height: 34px;
+  padding: 0 9px 0 11px;
+  border: 1px solid var(--gb-outline);
+  border-radius: var(--gb-r-sm);
+  background: var(--gb-well);
+  box-shadow: var(--gb-sunk);
+  font-family: var(--gb-font-body);
+  font-size: var(--gb-text-dense);
+  color: var(--gb-ink);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.lb-select:hover,
+.lb-select[aria-expanded="true"] {
+  border-color: var(--gb-outline-hover);
+}
+.lb-select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-select-chevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--gb-dim);
+}
+.lb-select-chevron svg {
+  transition: transform 0.15s var(--gb-ease);
+}
+.lb-select[aria-expanded="true"] .lb-select-chevron svg {
+  transform: rotate(180deg);
+}
+.lb-menu {
+  position: fixed;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  animation: lb-fade-in var(--gb-motion-fast) var(--gb-ease) both;
+}
+.lb-menu[data-scroll="true"] {
+  overflow-y: auto;
+}
+.lb-menu-item {
+  font-size: var(--gb-text-dense);
+  white-space: nowrap;
+}
+.lb-menu-check {
+  display: inline-flex;
+  flex: none;
+  width: 12px;
+  color: var(--gb-gold-text);
+}
+
+/* Updates: the version in mono, then how the updater stands — a sentence that wraps under it when
+   it is long (the updater off on a Mac). */
+.lb-set-update {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--gb-text-dense);
+  line-height: 1.45;
+  color: var(--gb-muted);
+  text-wrap: pretty;
+}
+.lb-set-version {
+  font-family: var(--gb-font-mono);
+  font-size: 12.5px;
+  color: var(--gb-ink);
+  white-space: nowrap;
+}
+.lb-set-update-line {
+  margin-left: 7px;
+}
+
+/* A folder, whole, in mono: it breaks only between folders (Fh6), each folder an inline block —
+   whole while it fits the column, broken inside only when it alone is wider than the column. */
+.lb-set-path {
+  min-width: 0;
+  font-family: var(--gb-font-mono);
+  font-size: var(--gb-text-caption);
+  line-height: 1.5;
+  color: var(--gb-ink-2);
+}
+.lb-set-path-part {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.lb-set-note {
+  min-width: 0;
+  font-size: var(--gb-text-caption);
+  line-height: 1.45;
+  color: var(--gb-muted);
+}
+
+/* About: the app and its version, the engine's credit, the privacy policy. The link's padding
+   reaches into the drawer's, so its words line up with the text above. */
+.lb-set-about {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.lb-set-about-name {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 0;
+  white-space: nowrap;
+}
+.lb-set-app {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--gb-ink);
+}
+.lb-set-version--about {
+  color: var(--gb-ink-2);
+}
+.lb-set-credit {
+  margin: 0;
+  font-size: var(--gb-text-caption);
+  line-height: 1.45;
+  color: var(--gb-dim);
+}
+.lb-set-links {
+  display: flex;
+  margin-left: -8px;
+}
+
+/* Windows high contrast: the drawer keeps an edge, the chosen tile a line in the system's
+   Highlight, the dropdown its border. The tiles' pictures are pictures of a theme, which the
+   system's colours would blank: they keep their own. */
+@media (forced-colors: active) {
+  .lb-drawer {
+    border-color: CanvasText;
+  }
+  .lb-theme-preview {
+    forced-color-adjust: none;
+  }
+  .lb-theme-tile[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .lb-select {
+    border-color: ButtonText;
   }
 }
