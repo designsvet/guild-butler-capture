@@ -408,6 +408,13 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* A state in words wraps rather than end in "…": "Disconnected in Discord" runs past the 130px the
+   line leaves it in English already, and "Disconnected in Di…" no longer says what is wrong. A
+   device's name keeps the ellipsis above (the foot's tooltip has it whole). */
+.lb-foot-text--words {
+  white-space: normal;
+  text-wrap: pretty;
+}
 .lb-foot-chevron {
   display: inline-flex;
   flex: none;

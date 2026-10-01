@@ -231,6 +231,7 @@ describe("sidebarFoot: the guild connection, one line and a quieter one (Fh2)", 
       dot: "hollow",
       line1: "Connect a guild",
       connect: true,
+      named: false,
       line2: "Sessions stay on this Mac",
     });
     expect(sidebarFoot(initialPairingStatus, NOW, "win32", en)?.line2).toBe("Sessions stay on this computer");
@@ -246,6 +247,7 @@ describe("sidebarFoot: the guild connection, one line and a quieter one (Fh2)", 
       dot: "green",
       line1: "MacBook",
       connect: false,
+      named: true,
       line2: "312 lines sent · 1 min ago",
     });
     expect(sidebarFoot(paired({ sentTotal: 1, lastSentAt: NOW - 5_000 }), NOW, "darwin", en)?.line2).toBe("1 line sent · just now");
@@ -263,6 +265,20 @@ describe("sidebarFoot: the guild connection, one line and a quieter one (Fh2)", 
     expect(line("blocked")).toBe("red MacBook / Stuck — tell your officer");
     expect(line("unauthorized")).toBe("red Disconnected in Discord / Pair again to resume");
     expect(line("disabled")).toBe("grey MacBook / Auto-send off");
+  });
+
+  it("a name may end in an ellipsis; a state in words may not — it wraps (unauthorized)", () => {
+    const named = (state: string) => sidebarFoot(paired({ state }), NOW, "darwin", en)?.named;
+    expect(["up-to-date", "sending", "retrying", "bot-outdated", "blocked", "disabled"].map(named)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(named("unauthorized")).toBe(false);
+    expect(sidebarFoot(initialPairingStatus, NOW, "darwin", en)?.named).toBe(false);
   });
 
   it("auto-send switched off wins over whatever the uploader last said", () => {

@@ -242,6 +242,12 @@ export type TFoot = {
   /** The device's name, or "Connect a guild" — set in gold, since it is the way in. */
   line1: string;
   connect: boolean;
+  /**
+   * Whether line 1 is the device's name. A name too long for the 208px sidebar ends in "…" (the
+   * foot's tooltip keeps it whole); words — "Connect a guild", "Disconnected in Discord" — wrap
+   * instead, because a state cut to "Disconnected in Di…" no longer says what is wrong.
+   */
+  named: boolean;
   /** The quieter line: a short form of the old window's upload sentence. */
   line2: string;
 };
@@ -258,10 +264,16 @@ export const sidebarFoot = (
   }
   const f = s.shell.foot;
   if (!pairing.paired) {
-    return { dot: "hollow", line1: f.connect, connect: true, line2: platform === "darwin" ? f.localMac : f.local };
+    return {
+      dot: "hollow",
+      line1: f.connect,
+      connect: true,
+      named: false,
+      line2: platform === "darwin" ? f.localMac : f.local,
+    };
   }
   const device = pairing.deviceName ?? f.unnamedDevice;
-  const on = (dot: TFootDot, line2: string): TFoot => ({ dot, line1: device, connect: false, line2 });
+  const on = (dot: TFootDot, line2: string): TFoot => ({ dot, line1: device, connect: false, named: true, line2 });
   if (!pairing.uploadEnabled || pairing.upload.state === "disabled") {
     return on("grey", f.off);
   }
@@ -280,7 +292,7 @@ export const sidebarFoot = (
     }
     case "unauthorized": {
       // The one state that is not about this device's sending but about the pairing itself.
-      return { dot: "red", line1: f.unauthorized, connect: false, line2: f.pairAgain };
+      return { dot: "red", line1: f.unauthorized, connect: false, named: false, line2: f.pairAgain };
     }
     default: {
       const { sentTotal, lastSentAt } = pairing.upload;

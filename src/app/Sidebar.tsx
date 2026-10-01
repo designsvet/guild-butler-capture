@@ -21,7 +21,7 @@ const Foot = ({ foot }: { foot: TFoot }) => (
   <div className="lb-foot" data-dot={foot.dot} title={`${foot.line1} — ${foot.line2}`}>
     <div className={foot.connect ? "lb-foot-line lb-foot-line--connect" : "lb-foot-line"}>
       <span className="lb-foot-dot" aria-hidden="true" />
-      <span className="lb-foot-text">{foot.line1}</span>
+      <span className={foot.named ? "lb-foot-text" : "lb-foot-text lb-foot-text--words"}>{foot.line1}</span>
       <span className="lb-foot-chevron" aria-hidden="true">
         <Icon paths={CHEVRON} size={14} />
       </span>
