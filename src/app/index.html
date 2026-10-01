@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- The old window's policy, word for word (test/appDesignSystem.test.ts holds them equal):
+         the page loads its own files and nothing else. React and the design system's
+         components are bundled into main.js; the faces are served from ./fonts/. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
+    />
+    <title>Loot Butler</title>
+    <!-- The faces: the design system's fonts/ directory, copied whole by tools/build-app.mjs.
+         Then app.css: the package's stylesheets and Tailwind's layers in one file (see app.css). -->
+    <link rel="stylesheet" href="./fonts/fonts.css" />
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

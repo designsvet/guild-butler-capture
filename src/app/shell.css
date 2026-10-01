@@ -1,0 +1,59 @@
+/* The shell's own layer: the values no package token holds, and the frame. Inlined last into
+   app.css. */
+
+/* — The shell's values —
+   What a board draws that no token in @guild-butler/design-system holds, each defined once, for
+   both themes, with the board it came from. Named --lb-*, never --gb-*: the package owns that
+   prefix, and the old window's own names (--gb-titlebar, --gb-wash, …) live there too. A
+   component reads one of these or a package token, never a raw colour. The selectors are the
+   package's tokens.css ones, so on data-theme="light" the light block wins the same way. */
+:root,
+[data-theme="dark"] {
+  /* Fh1, F1: the title bar's ground, a shade under the page's --gb-bg (#0A0A0C) */
+  --lb-bar: #0C0B0F;
+  /* Fh1, F1: the bar's bottom hairline. On dark it is --gb-rule-row's value, on parchment it is
+     --gb-card-rule's — no one token carries both themes */
+  --lb-bar-line: rgba(244, 241, 234, 0.06);
+}
+[data-theme="light"] {
+  /* Fh1, "On parchment" */
+  --lb-bar: #F1EBDD;
+  --lb-bar-line: rgba(120, 92, 32, 0.14);
+}
+
+/* — The frame — the page never scrolls; the main region does. */
+html,
+body,
+#root {
+  height: 100%;
+}
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The title bar (Fh1, F1): 48px, and the window's drag region. The OS draws over its ends — a
+   Mac's traffic lights at the left (the crest starts 84px in), Windows' three caption buttons at
+   the right (3 × 46px, and the board's 18px before them) — so those ends are padding, chosen by
+   the platform main.tsx writes on <html>. */
+.lb-titlebar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 14px 0 16px;
+  background: var(--lb-bar);
+  border-bottom: 1px solid var(--lb-bar-line);
+  -webkit-app-region: drag;
+}
+[data-platform="darwin"] .lb-titlebar {
+  padding-left: 84px;
+}
+[data-platform="win32"] .lb-titlebar {
+  padding-right: 156px;
+}
+/* Anything pressed is cut out of the drag region, or the press would move the window instead. */
+.lb-titlebar :is(a, button, input) {
+  -webkit-app-region: no-drag;
+}

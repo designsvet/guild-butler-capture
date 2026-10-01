@@ -21,4 +21,4 @@ allowBuilds:
 # it is adopted here the day it is published — so that one exact version is let
 # through. Version-pinned on purpose: the next bump meets the gate again.
 minimumReleaseAgeExclude:
-  - '@guild-butler/design-system@0.7.0'
+  - '@guild-butler/design-system@0.11.0'
