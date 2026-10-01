@@ -72,6 +72,13 @@ const STATES = {
   restarting: { ...capturing, status: "restarting", albionSeen: false, restartAttempt: 1, restartDelayMs: 4_000 },
   stopping: { ...capturing, status: "stopping", stopRequested: true },
   error: { status: "error", errorKind: "permission", errorDetail: "bpf: Permission denied" },
+  // The v5 shell's notices (board Fh5): every kind of blocked capture, the logger stopping from the
+  // third restart in a row, a broken decoder over an idle capture.
+  errorNpcap: { status: "error", errorKind: "npcap-missing", errorDetail: "wpcap.dll not found" },
+  errorEngine: { status: "error", errorKind: "engine-missing", errorDetail: "No ao-loot-logger found" },
+  errorAbi: { status: "error", errorKind: "abi-mismatch", errorDetail: "NODE_MODULE_VERSION 127" },
+  restartingAgain: { ...capturing, status: "restarting", albionSeen: false, restartAttempt: 4, restartDelayMs: 8_000 },
+  healthIdle: { engineBroken: [{ handler: "EvOtherGrabbedLoot", failures: 5, calls: 5 }] },
 };
 
 const stateFor = (name) => ({ ...idle, ...STATES[name] });
@@ -107,16 +114,20 @@ const pairing = sc.paired
       upload: { state: "unpaired", sentTotal: 0, lastSentAt: null, failures: 0, lastError: null },
     };
 
+// sc.access, sc.engineMissing and sc.update shape the v5 shell's notices; the old check sets none.
 const setup = {
   platform: sc.platform,
-  engineEntry: "/engine/src/index.js",
-  engineRoot: "/engine",
-  engineSource: "bundled",
-  access: "ok",
+  engineEntry: sc.engineMissing ? null : "/engine/src/index.js",
+  engineRoot: sc.engineMissing ? null : "/engine",
+  engineSource: sc.engineMissing ? null : "bundled",
+  access: sc.access ?? "ok",
   appVersion: "0.0.0",
   builtAt: null,
 };
-const update = { phase: "off", version: null, percent: null, error: null };
+const update = { phase: "off", version: null, percent: null, error: null, ...sc.update };
+// sc.fixOutcome: what "Fix capture permissions…" answers (the password prompt closed, say);
+// sc.npcapPending: the driver install never answers, so the notice is shot while it fetches.
+const never = new Promise(() => {});
 // autoCapture off: the check must not press Start behind its own back.
 const settings = { autoCapture: false, language: sc.lang, theme: sc.theme };
 
@@ -129,8 +140,8 @@ contextBridge.exposeInMainWorld("gbc", {
   getState: () => ok(state),
   reveal: () => ok(true),
   getSetup: () => ok(setup),
-  fixMacPermissions: () => ok({ setup, outcome: null, detail: null }),
-  installNpcap: () => ok({ setup, install: { outcome: "cancelled", version: null, detail: null } }),
+  fixMacPermissions: () => ok({ setup, outcome: sc.fixOutcome ?? null, detail: null }),
+  installNpcap: () => (sc.npcapPending ? never : ok({ setup, install: { outcome: "cancelled", version: null, detail: null } })),
   openNpcapPage: () => ok(),
   pickEnginePath: () => ok(setup),
   onState: (listener) => {

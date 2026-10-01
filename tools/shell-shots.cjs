@@ -25,13 +25,20 @@
  * frames out side by side in one picture, `morph-strip.png` (STRIP=<file name> for another name;
  * FRAMES=<ms,ms,…> for other moments — the sheen, say, which laps on long after the drain).
  *
+ * The notices (board Fh5) and the broken decoder's dialog (Fh4, option D): the `notice-*` scenarios
+ * shoot every notice in the band, at 1440 and at 768, in both themes, and the `dialog-*` ones the
+ * dialog over the page. A scenario's `press` clicks a button first, as a member would — the fix that
+ * reports back (the password prompt closed), the driver install that is still fetching, "Later" on
+ * the dialog so the band shows on its own. Each band is also cropped out and laid in a sheet per theme
+ * and width, `notices-<theme>-<width>.png`, in Fh5's order (ONLY=notice for those alone).
+ *
  * Not a check: it measures nothing and passes everything. tools/shell-layout-check.cjs measures.
  */
 
 "use strict";
 
 const { app, BrowserWindow } = require("electron");
-const { mkdirSync, writeFileSync } = require("node:fs");
+const { mkdirSync, rmSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join, resolve } = require("node:path");
 
@@ -62,6 +69,38 @@ const MORPHS = [
 const FRAMES = (process.env.FRAMES ?? "0,110,220,330,440").split(",").map(Number);
 /** The bar's right end, where the change happens: the status's end, the button, the version, the gear. */
 const CROP_WIDTH = 520;
+
+/** "Later" on the broken decoder's dialog: the band alone, as it stays. */
+const LATER = "[data-dialog-later]";
+
+/**
+ * Every notice of board Fh5, in its order: what the stub bridge answers (layout-check-preload.cjs)
+ * and, where the board draws a notice after a press, the press. On the platform each belongs to;
+ * the decoder's own and the update's on Windows (the only platform that updates itself), except the
+ * Mac's "Get the update". The decoder's notices over a paired capture, so the foot says "Held until
+ * the update".
+ */
+const NOTICES = [
+  { notice: "mac-permission", title: "Capture is blocked — macOS", state: "error", access: "no-permission", platform: "darwin" },
+  { notice: "mac-cancelled", title: "…after the password prompt was closed", state: "error", access: "no-permission", fixOutcome: "cancelled", press: '[data-notice-action="fix-mac"]', platform: "darwin" },
+  { notice: "npcap-missing", title: "Capture is blocked — Windows", state: "errorNpcap", access: "npcap-missing", platform: "win32" },
+  { notice: "npcap-fetching", title: "…while it fetches", state: "errorNpcap", access: "npcap-missing", npcapPending: true, press: '[data-notice-action="install-npcap"]', platform: "win32" },
+  { notice: "npcap-admin", title: "The driver is there but locked to administrators", state: "error", access: "npcap-admin-only", platform: "win32" },
+  { notice: "engine-missing", title: "The engine folder is missing (idle: the setup probe knows)", state: "idle", engineMissing: true, platform: "darwin" },
+  { notice: "abi", title: "The engine needs a rebuild", state: "errorAbi", platform: "darwin" },
+  { notice: "decoder-ready", title: "A game update broke the decoder — the fix is downloaded", state: "health", update: { phase: "ready", version: "0.9.1" }, paired: true, upload: "held", press: LATER, platform: "win32" },
+  { notice: "decoder-not-out", title: "…the fix is not out yet", state: "health", update: { phase: "up-to-date" }, paired: true, upload: "held", press: LATER, platform: "win32" },
+  { notice: "decoder-downloading", title: "…while the fix downloads", state: "health", update: { phase: "downloading", version: "0.9.1", percent: 40 }, paired: true, upload: "held", press: LATER, platform: "win32" },
+  { notice: "decoder-manual", title: "…on a Mac, which does not update by itself", state: "health", update: { phase: "off" }, paired: true, upload: "held", press: LATER, platform: "darwin" },
+  { notice: "logger-stopping", title: "The logger keeps stopping (the fourth restart in a row)", state: "restartingAgain", paired: true, platform: "darwin" },
+  { notice: "update-ready", title: "An update is ready", state: "idle", update: { phase: "ready", version: "0.9.1" }, platform: "win32" },
+  { notice: "update-ready-capturing", title: "…while capturing", state: "capturing", update: { phase: "ready", version: "0.9.1" }, paired: true, platform: "win32" },
+];
+/** The dialog a broken decoder interrupts with (Fh4, option D): once found, and once the fix is down. */
+const DIALOGS = [
+  { dialog: "fix-ready", state: "health", update: { phase: "ready", version: "0.9.1" }, paired: true, upload: "held", platform: "win32" },
+  { dialog: "not-out", state: "health", update: { phase: "up-to-date" }, paired: true, upload: "held", platform: "darwin" },
+];
 
 app.commandLine.appendSwitch("force-prefers-reduced-motion");
 app.commandLine.appendSwitch("force-device-scale-factor", SCALE);
@@ -108,6 +147,24 @@ const scenarios = () => {
   // system's own border, and Stop keeps its square. `forced` turns the emulation on.
   for (const state of ["idle", "capturing", "starting", "error"]) {
     add({ state, theme: "obsidian", platform: "win32", width: 1440, height: 900, forced: true, name: `forced-colors-${state}-win32-1440x900` });
+  }
+  // …and a notice in the band, and the dialog, under it (not laid in the sheets).
+  const npcap = NOTICES.find((n) => n.notice === "npcap-missing");
+  add({ ...npcap, theme: "obsidian", width: 1440, height: 900, forced: true, sheet: false, name: "forced-colors-notice-npcap-missing-win32-1440x900" });
+  add({ ...DIALOGS[0], theme: "obsidian", width: 1440, height: 900, forced: true, name: "forced-colors-dialog-fix-ready-win32-1440x900" });
+  // The notices in the band (Fh5) and the broken decoder's dialog (Fh4 D), at 1440 and 768, both themes.
+  for (const theme of ["obsidian", "parchment"]) {
+    for (const [width, height] of [
+      [1440, 900],
+      [768, 620],
+    ]) {
+      for (const n of NOTICES) {
+        add({ ...n, theme, width, height, name: `notice-${n.notice}-${theme}-${n.platform}-${width}x${height}` });
+      }
+      for (const d of DIALOGS) {
+        add({ ...d, theme, width, height, name: `dialog-${d.dialog}-${theme}-${d.platform}-${width}x${height}` });
+      }
+    }
   }
   // The Start/Stop morph, frame by frame (board Fh1's button), in both themes.
   for (const theme of ["obsidian", "parchment"]) {
@@ -181,6 +238,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const run = async () => {
   mkdirSync(OUT, { recursive: true });
   const strip = [];
+  /** The bands, cropped, by theme and width — laid out as one sheet each (sheetPage). */
+  const sheets = new Map();
   for (const sc of scenarios()) {
     const win = new BrowserWindow({
       show: false,
@@ -227,6 +286,16 @@ const run = async () => {
     }
     win.webContents.off("console-message", onConsole);
     refused.push(...refusedAtLoad);
+    if (sc.press != null) {
+      // as a member would: the button, pressed (an offscreen window takes no clicks, so the page's own)
+      const pressed = await win.webContents.executeJavaScript(
+        `(() => { const el = document.querySelector(${JSON.stringify(sc.press)}); el?.click(); return el != null; })()`,
+      );
+      if (!pressed) {
+        throw new Error(`${sc.name}: nothing to press at ${sc.press}`);
+      }
+      await wait(150);
+    }
     if (OS_CHROME) {
       await win.webContents.executeJavaScript(osChrome(sc.platform));
     }
@@ -236,6 +305,26 @@ const run = async () => {
       continue;
     }
     await wait(150);
+    if (sc.notice != null && sc.sheet !== false) {
+      const band = await win.webContents.executeJavaScript(
+        "(() => { const r = document.querySelector('.lb-notice')?.getBoundingClientRect(); return r == null ? null : { x: r.x, y: r.y, width: r.width, height: r.height, kind: document.querySelector('.lb-notice').dataset.notice }; })()",
+      );
+      if (band == null) {
+        throw new Error(`${sc.name}: no notice in the band`);
+      }
+      const pad = 12;
+      const crop = {
+        x: Math.max(0, Math.floor(band.x - pad)),
+        y: Math.max(0, Math.floor(band.y - pad)),
+        width: Math.ceil(band.width + 2 * pad),
+        height: Math.ceil(band.height + 2 * pad),
+      };
+      const shot = await win.webContents.capturePage(crop);
+      const px = Math.round(crop.width * Number(SCALE));
+      const png = (shot.getSize().width === px ? shot : shot.resize({ width: px, quality: "best" })).toPNG();
+      const key = `${sc.theme}-${sc.width}`;
+      sheets.set(key, [...(sheets.get(key) ?? []), { title: sc.title, kind: band.kind, png, width: crop.width, height: crop.height }]);
+    }
     // Offscreen windows render at the screen's own scale whatever the switch says: bring the
     // picture to the scale asked for, so SCALE=1 gives a 1440×900 window as 1440×900 pixels.
     const shot = await win.webContents.capturePage();
@@ -248,6 +337,41 @@ const run = async () => {
   if (strip.length > 0) {
     await shootStrip(strip);
   }
+  for (const [key, rows] of sheets) {
+    await shootSheet(`notices-${key}.png`, key, rows);
+  }
+};
+
+/** The bands of one theme and width, one under another in Fh5's order, each under its scenario's name. */
+const shootSheet = async (file, key, rows) => {
+  const dark = key.startsWith("obsidian");
+  const body = rows
+    .map(
+      (row) =>
+        `<section><h2>${row.title} <span>${row.kind}</span></h2><img src="data:image/png;base64,${row.png.toString("base64")}" width="${row.width}" height="${row.height}" alt=""></section>`,
+    )
+    .join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+    body { margin: 0; padding: 24px 28px 28px; background: ${dark ? "#1b1a20" : "#e8e1d0"}; color: ${dark ? "#e9e5dc" : "#2a2418"}; font: 13px/1.4 system-ui, sans-serif; }
+    h1 { margin: 0 0 14px; font-size: 17px; }
+    h2 { margin: 16px 0 6px; font: 600 12px/1.3 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
+    h2 span { font-weight: 400; opacity: .6; text-transform: none; letter-spacing: 0; }
+    img { display: block; }
+  </style></head><body><h1>The notices in the band — ${key.replace("-", " · ")} px (board Fh5's order; tools/shell-shots.cjs)</h1>${body}</body></html>`;
+  const win = new BrowserWindow({ show: false, width: 1600, height: 400, useContentSize: true, frame: false, webPreferences: { offscreen: true } });
+  // From a file, not a data: URL — fourteen bands of pictures run past what a URL may carry.
+  const page = join(OUT, `.${file}.html`);
+  writeFileSync(page, html);
+  await win.loadFile(page);
+  rmSync(page, { force: true });
+  const size = await win.webContents.executeJavaScript("[document.documentElement.scrollWidth, document.documentElement.scrollHeight]");
+  win.setContentSize(size[0], size[1]);
+  await wait(300);
+  const shot = await win.webContents.capturePage();
+  const px = Math.round(size[0] * Number(SCALE));
+  writeFileSync(join(OUT, file), (shot.getSize().width === px ? shot : shot.resize({ width: px, quality: "best" })).toPNG());
+  win.destroy();
+  console.log(`sheet ${file} (${rows.length} notices)`);
 };
 
 /**

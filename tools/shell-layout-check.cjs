@@ -25,7 +25,10 @@
  * - any `securitypolicyviolation` (heard from the page's first moment, shell-layout-preload.cjs),
  *   and any error the page logs;
  * - a page that did not draw: the landmarks, the route marked current in the sidebar, a page in
- *   the panel;
+ *   the panel, and the notice the state calls for in the band — or one it does not call for;
+ * - the broken decoder's dialog (board Fh4, option D) open when it should be and not otherwise, held
+ *   inside the window under the title bar without scrolling, the focus inside it and the rest of
+ *   the window inert while it is open; a box under the dialog's scrim is not "under" the dialog;
  * - while the title bar's Start/Stop changes face (MORPHS, measured every 55ms of it with motion
  *   on): any of the above in the bar, the version or the gear moving, a change that did not play,
  *   and a button still holding its eased width, or a leaving word, once it is over.
@@ -107,30 +110,82 @@ const PLATFORMS = ["darwin", "win32"];
  * The states that change the layout, as the stub bridge spells them (layout-check-preload.cjs).
  * Every capture state the shell draws differently — the bar's words and its button, the hero card,
  * the meta line — each with the guild connection that gives the sidebar's foot (board Fh2) one of
- * its shapes, then the foot's remaining states over a running capture. The engine-health state is
- * not here: slice 0 draws nothing for it, so it is the capturing page.
+ * its shapes, then the foot's remaining states over a running capture; then every notice of board
+ * Fh5 in the band, at its tallest, and the broken decoder's dialog (Fh4, option D).
+ *
+ * `notice` is the band's notice the state must draw (null: none — a band that appears where it
+ * should not is a fault too), `dialog` whether the dialog must be open. `press` clicks a button
+ * first, as a member would — "Later", the fix that reports back, the install still fetching —
+ * required on the platforms named (`on`), not tried on the others, where the card has no such
+ * button; `waitFor` is what the press must bring before measuring.
  */
+const LATER = { selector: "[data-dialog-later]", on: ["darwin", "win32"] };
 const STATES = [
   // The first run: Start in gold, the pair card in the right column, "Connect a guild" in the foot.
-  { name: "idle", state: "idle", paired: false },
-  { name: "starting", state: "starting", paired: false },
-  { name: "waiting", state: "waiting", paired: false },
+  { name: "idle", state: "idle", paired: false, notice: null },
+  { name: "starting", state: "starting", paired: false, notice: null },
+  { name: "waiting", state: "waiting", paired: false, notice: null },
   // Past 90 s of waiting the three reasons join the hero card, beside the pair card: the tallest page.
-  { name: "waiting-long", state: "waitingLong", paired: false },
+  { name: "waiting-long", state: "waitingLong", paired: false, notice: null },
   // The bar at its longest — a name, "capturing 1 h 0 min", Stop — and the foot's longest line, the
   // device's name (cut, titled) over "1,284 lines sent · 1 min ago".
-  { name: "capturing", state: "capturing", paired: true, sentAgoMs: 60_000 },
+  { name: "capturing", state: "capturing", paired: true, sentAgoMs: 60_000, notice: null },
   // Before Albion names the character: "Capturing · detecting… · 20 s"; nothing sent yet.
-  { name: "capturing-unnamed", state: "capturingNew", paired: true, sent: 0 },
-  // The bar's longest words, "The logger hiccupped — restarting it… · in 4 s".
-  { name: "restarting", state: "restarting", paired: true, upload: "retrying" },
-  { name: "stopping", state: "stopping", paired: true, upload: "sending" },
-  // The danger words, a neutral Start, and the foot's one state in words, which wraps.
-  { name: "error", state: "error", paired: true, upload: "unauthorized" },
-  { name: "send-blocked", state: "capturing", paired: true, upload: "blocked" },
-  { name: "bot-outdated", state: "capturing", paired: true, upload: "bot-outdated" },
-  { name: "send-off", state: "capturing", paired: true, uploadEnabled: false },
+  { name: "capturing-unnamed", state: "capturingNew", paired: true, sent: 0, notice: null },
+  // The bar's longest words, "The logger hiccupped — restarting it… · in 4 s". The first restart:
+  // no notice yet (from the third in a row).
+  { name: "restarting", state: "restarting", paired: true, upload: "retrying", notice: null },
+  { name: "stopping", state: "stopping", paired: true, upload: "sending", notice: null },
+  // The danger words, a neutral Start, the foot's one state in words, which wraps — and the band's
+  // fix: macOS blocking capture on a Mac, Npcap for administrators only on Windows.
+  { name: "error", state: "error", paired: true, upload: "unauthorized", notice: "blocked" },
+  { name: "send-blocked", state: "capturing", paired: true, upload: "blocked", notice: null },
+  { name: "bot-outdated", state: "capturing", paired: true, upload: "bot-outdated", notice: null },
+  { name: "send-off", state: "capturing", paired: true, uploadEnabled: false, notice: null },
+  // The notices (Fh5). The tallest blocked cards: the Mac's after its password prompt was closed (its
+  // note under the sentence), the driver's while it fetches (two controls and a note).
+  {
+    name: "blocked-mac-cancelled",
+    state: "error",
+    access: "no-permission",
+    fixOutcome: "cancelled",
+    paired: false,
+    press: { selector: '[data-notice-action="fix-mac"]', on: ["darwin"] },
+    waitFor: ".lb-notice-note",
+    notice: "blocked",
+  },
+  {
+    name: "blocked-npcap-fetching",
+    state: "errorNpcap",
+    access: "npcap-missing",
+    npcapPending: true,
+    paired: false,
+    press: { selector: '[data-notice-action="install-npcap"]', on: ["win32"] },
+    waitFor: ".lb-notice-note",
+    notice: "blocked",
+  },
+  // Idle, and the setup probe already knows: the bar's red, a blocked hero, the gold fix in the band.
+  { name: "blocked-engine", state: "idle", engineMissing: true, paired: false, notice: "blocked" },
+  { name: "blocked-abi", state: "errorAbi", paired: false, notice: "blocked" },
+  // The broken decoder after "Later": the band alone, each of the fix's four steps, over a paired
+  // capture held until the update.
+  { name: "decoder-ready", state: "health", update: { phase: "ready", version: "0.9.1" }, paired: true, upload: "held", press: LATER, notice: "decoder" },
+  { name: "decoder-not-out", state: "health", update: { phase: "up-to-date" }, paired: true, upload: "held", press: LATER, notice: "decoder" },
+  { name: "decoder-downloading", state: "health", update: { phase: "downloading", version: "0.9.1", percent: 40 }, paired: true, upload: "held", press: LATER, notice: "decoder" },
+  { name: "decoder-manual", state: "health", update: { phase: "off" }, paired: true, upload: "held", press: LATER, notice: "decoder" },
+  // Over an idle capture: "Update now" in gold, and Start stepped back to its neutral face.
+  { name: "decoder-idle", state: "healthIdle", update: { phase: "ready", version: "0.9.1" }, paired: false, press: LATER, notice: "decoder" },
+  // The dialog itself, when the break is found and when the fix is down.
+  { name: "dialog-fix-ready", state: "health", update: { phase: "ready", version: "0.9.1" }, paired: true, upload: "held", notice: "decoder", dialog: true },
+  { name: "dialog-not-out", state: "health", update: { phase: "up-to-date" }, paired: true, upload: "held", notice: "decoder", dialog: true },
+  { name: "logger-stopping", state: "restartingAgain", paired: true, upload: "retrying", notice: "logger-stopping" },
+  { name: "update-ready", state: "idle", update: { phase: "ready", version: "0.9.1" }, paired: false, notice: "update-ready" },
+  { name: "update-ready-capturing", state: "capturing", update: { phase: "ready", version: "0.9.1" }, paired: true, notice: "update-ready" },
 ];
+
+/** The scrim is a veil over the page, not a box on it; the dialog's layer is over everything else. */
+const VEILS = [".lb-scrim"];
+const OVERLAY = ".lb-overlay";
 
 /**
  * The cuts the shell makes on purpose: a device's name in the sidebar's foot, which is whatever a
@@ -179,8 +234,18 @@ const loads = ({ ROUTES, SUPPORTED_LANGS }) => {
     for (const platform of PLATFORMS) {
       for (const theme of THEMES) {
         for (const lang of SUPPORTED_LANGS) {
-          for (const { name, ...stub } of STATES) {
-            list.push({ route, platform, theme, lang, stateName: name, sc: { lang, theme, platform, ...stub } });
+          for (const { name, notice, dialog, press, waitFor, ...stub } of STATES) {
+            list.push({
+              route,
+              platform,
+              theme,
+              lang,
+              stateName: name,
+              expect: { notice, dialog: dialog === true },
+              press: press != null && press.on.includes(platform) ? press.selector : null,
+              waitFor: press != null && press.on.includes(platform) ? (waitFor ?? null) : null,
+              sc: { lang, theme, platform, ...stub },
+            });
           }
         }
       }
@@ -221,7 +286,7 @@ const rightOfButton = () => {
  * browser global. Returns the problems (empty = fits), the ellipses it allowed, and the routes the
  * sidebar offers.
  */
-const measure = ({ route, zones, mayCut, surfaces, scope }) => {
+const measure = ({ route, zones, mayCut, surfaces, scope, veils = [], overlay = null, expect = null }) => {
   const problems = new Set();
   const marked = new Set();
   const root = document.documentElement;
@@ -335,6 +400,37 @@ const measure = ({ route, zones, mayCut, surfaces, scope }) => {
     if (panel == null || panel.textContent.trim() === "") {
       problems.add(`#/${route} drew no page`);
     }
+    if (expect != null) {
+      // The notice the state calls for, and none it does not: a band missing is a fix nobody
+      // sees; a band where nothing is wrong pushes the page down for nothing.
+      const shown = [...document.querySelectorAll("main .lb-notice")].map((el) => el.dataset.notice);
+      const wanted = expect.notice == null ? [] : [expect.notice];
+      if (shown.join(",") !== wanted.join(",")) {
+        problems.add(`the band shows ${shown.length === 0 ? "no notice" : shown.join(" and ")}, not ${wanted.length === 0 ? "nothing" : wanted[0]}`);
+      }
+      const dialog = document.querySelector("[role='alertdialog']");
+      if ((dialog != null) !== expect.dialog) {
+        problems.add(expect.dialog ? "the broken decoder's dialog is not open" : "a dialog is open");
+      }
+      if (dialog != null) {
+        // Under the title bar, inside the window, whole: a dialog that scrolls hides its buttons.
+        const r = dialog.getBoundingClientRect();
+        if (r.top < 48 - T || r.left < -T || r.right > W + T || r.bottom > H + T) {
+          problems.add("the dialog does not fit the window under the title bar");
+        }
+        if (dialog.scrollHeight > dialog.clientHeight + T) {
+          problems.add(`the dialog scrolls (${dialog.scrollHeight}px of it in ${dialog.clientHeight}px)`);
+        }
+        if (!dialog.contains(document.activeElement)) {
+          problems.add("the dialog is open and the focus is not in it");
+        }
+        for (const part of ["header.lb-titlebar", ".lb-body", ".gb-skip"]) {
+          if (document.querySelector(part)?.inert !== true) {
+            problems.add(`${part} is not inert under the dialog`);
+          }
+        }
+      }
+    }
 
     // Sideways scroll: the window, then anything in it that scrolls.
     if (root.scrollWidth > W + T) {
@@ -405,11 +501,18 @@ const measure = ({ route, zones, mayCut, surfaces, scope }) => {
   // any two boxes the eye sees, neither of which holds the other. A box too wide for its column
   // that does not make the page scroll lands on its neighbour instead, and its words can still all
   // be inside it.
+  // A dialog's layer lies over the page on purpose: a box in it and a box under it are not on one
+  // another, and the scrim between them is a veil, not a box.
+  const veiled = (el) => veils.some((selector) => el.matches(selector));
+  const lifted = (el) => overlay != null && el.closest(overlay) != null;
   const drawn = [...within.querySelectorAll("*")].filter(
-    (el) => !layer(el) && drawsABox(css(el), el) && !unseen(el) && !parked(el) && el.getClientRects().length > 0,
+    (el) => !layer(el) && !veiled(el) && drawsABox(css(el), el) && !unseen(el) && !parked(el) && el.getClientRects().length > 0,
   );
   for (const [i, a] of drawn.entries()) {
     for (const b of drawn.slice(i + 1)) {
+      if (lifted(a) !== lifted(b)) {
+        continue;
+      }
       if (!a.contains(b) && !b.contains(a) && overlap(box(a.getBoundingClientRect()), box(b.getBoundingClientRect()))) {
         problems.add(`${say(a)} and ${say(b)} overlap`);
       }
@@ -487,7 +590,7 @@ const measure = ({ route, zones, mayCut, surfaces, scope }) => {
  * loaded. Polled, so a slow machine waits longer instead of measuring a half-built page (the old
  * check's fixed 700ms is how its ru-pair-details came to fail now and then).
  */
-const settled = ({ lang, theme, platform, width, height, timeoutMs }) => `new Promise((resolve) => {
+const settled = ({ lang, theme, platform, width, height, timeoutMs, notice = undefined, dialog = undefined, waitFor = null }) => `new Promise((resolve) => {
   const started = performance.now();
   const missing = () => {
     const root = document.documentElement;
@@ -500,6 +603,9 @@ const settled = ({ lang, theme, platform, width, height, timeoutMs }) => `new Pr
     if (document.querySelector('.lb-bar-version') == null) out.push('the setup');
     if (document.querySelector('.lb-foot') == null) out.push('the pairing');
     if (document.querySelector('button[role="switch"]:disabled') != null) out.push('the settings');
+    ${notice === undefined ? "" : `if ((document.querySelector('main .lb-notice')?.dataset.notice ?? null) !== ${JSON.stringify(notice)}) out.push('the notice ${notice}');`}
+    ${dialog === undefined ? "" : `if ((document.querySelector('[role=alertdialog]') != null) !== ${JSON.stringify(dialog)}) out.push('the dialog ${dialog ? "open" : "closed"}');`}
+    ${waitFor == null ? "" : `if (document.querySelector(${JSON.stringify(waitFor)}) == null) out.push(${JSON.stringify(`what the press brings (${waitFor})`)});`}
     return out;
   };
   const tick = () => {
@@ -576,19 +682,40 @@ const run = async () => {
       }
     });
     await win.loadFile(PAGE, { hash: `/${load.route}` });
+    const pressFailed = [];
+    if (load.press != null) {
+      // as a member would, once the page has drawn what the press is on
+      const ready = await win.webContents.executeJavaScript(
+        `new Promise((r) => { const t0 = performance.now(); const tick = () => { const el = document.querySelector(${JSON.stringify(load.press)}); if (el != null) { el.click(); r(true); } else if (performance.now() - t0 > 5000) { r(false); } else { setTimeout(tick, 10); } }; tick(); })`,
+      );
+      if (!ready) {
+        pressFailed.push(`there was nothing to press at ${load.press}`);
+      }
+    }
     const results = [];
     for (const width of WIDTHS) {
       if (width !== WIDTHS[0]) {
         win.setContentSize(width, HEIGHT);
       }
       const waitingFor = await win.webContents.executeJavaScript(
-        settled({ lang: load.lang, theme: load.theme, platform: load.platform, width, height: HEIGHT, timeoutMs: 5000 }),
+        settled({
+          lang: load.lang,
+          theme: load.theme,
+          platform: load.platform,
+          width,
+          height: HEIGHT,
+          timeoutMs: 5000,
+          notice: load.expect.notice,
+          dialog: load.expect.dialog,
+          waitFor: load.waitFor,
+        }),
       );
       const { problems, marked, offered } = await win.webContents.executeJavaScript(
-        `(${measure.toString()})(${JSON.stringify({ route: load.route, zones: OS_ZONES[load.platform], mayCut: MAY_CUT, surfaces: SURFACES })})`,
+        `(${measure.toString()})(${JSON.stringify({ route: load.route, zones: OS_ZONES[load.platform], mayCut: MAY_CUT, surfaces: SURFACES, veils: VEILS, overlay: OVERLAY, expect: load.expect })})`,
       );
       const refused = await win.webContents.executeJavaScript("window.gbcCheck.refused()");
       const all = [
+        ...pressFailed,
         ...(waitingFor.length > 0 ? [`the page never settled: no ${waitingFor.join(", no ")}`] : []),
         ...problems,
         ...refused.map((r) => `the content-security policy refused ${r}`),
