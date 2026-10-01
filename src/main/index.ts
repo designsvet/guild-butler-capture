@@ -149,7 +149,9 @@ const dispatch = (ev: TSessionEvent): void => {
   if (toBot && fresh.length > 0) {
     forwardEngineHealth(fresh);
   }
-  if (toBot && heldUploadOn() && !lootBroken(brokenBefore) && lootBroken(state.engineBroken)) {
+  // The flag last: it reads settings.json from disk, and this runs for every line the engine prints —
+  // only the one event that breaks the decoder for loot should pay for that read.
+  if (toBot && !lootBroken(brokenBefore) && lootBroken(state.engineBroken) && heldUploadOn()) {
     // The guild upload is held from this moment (uploader.ts): a pass now records where in the
     // file, rather than at the next tick, up to ten seconds on — and the foot says so at once.
     appLog("upload: held until the update — the decoder is broken where loot is concerned");
@@ -403,7 +405,9 @@ const ensureUploader = (): TUploader => {
     // Sticky for the app session, as the break is: only the updated app clears it. Behind the v5
     // flag for now, as everything new is (SPEC ground rules): the old window says nothing of a
     // hold, and 0.8.x ships as it was. Ranges recorded under the flag are honoured either way.
-    held: () => heldUploadOn() && lootBroken(state.engineBroken),
+    // The break first: the flag reads settings.json, and a healthy decoder (the old window's every
+    // pass) need not read it at all.
+    held: () => lootBroken(state.engineBroken) && heldUploadOn(),
     holds: createHeldStore(HELD_UPLOADS_FILE, appLog),
   });
   return uploader;

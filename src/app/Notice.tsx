@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import { Button, OpenLink } from "@guild-butler/design-system/react";
 
@@ -152,29 +152,37 @@ export const DecoderDialog = ({
     };
   }, []);
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onLater();
-      return;
-    }
-    if (event.key !== "Tab" || dialog.current == null) {
-      return;
-    }
-    const list = focusables(dialog.current);
-    const first = list[0];
-    const last = list[list.length - 1];
-    if (first == null || last == null) {
-      return;
-    }
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
+  // The keys are heard on the document, not on the dialog: a click on the scrim, or on the dialog's
+  // words, leaves the focus on the page's body — outside the dialog — and Escape must still be
+  // "Later" then, and Tab must still land inside.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onLater();
+        return;
+      }
+      if (event.key !== "Tab" || dialog.current == null) {
+        return;
+      }
+      const list = focusables(dialog.current);
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (first == null || last == null) {
+        return;
+      }
+      const active = document.activeElement;
+      const inside = active != null && dialog.current.contains(active);
+      if (event.shiftKey ? !inside || active === first : !inside || active === last) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onLater]);
 
   // The dialog's held line is its second paragraph, set a step brighter (Fh4); the notes after it
   // (main refusing the install) stay with the band.
@@ -191,7 +199,6 @@ export const DecoderDialog = ({
           aria-describedby={bodyId}
           className="gb-dialog lb-dialog"
           data-dialog={view.kind}
-          onKeyDown={onKeyDown}
         >
           <div className="lb-dialog-head">
             <span className="lb-tile lb-tile--notice" aria-hidden="true">

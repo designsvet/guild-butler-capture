@@ -344,8 +344,9 @@ Fr for the frame, Fa for the keyboard and the screen reader.
   again when the fix has downloaded (each its own event; the window keeps the ones it was given
   "Later" for). "Later" closes the dialog, never the notice — which is in the band under it from the
   first moment, so nothing on the page moves when it closes. It is the package's dialog and scrim
-  under the title bar; the rest of the window is inert, Tab stays inside, Escape is "Later", the
-  focus starts on "Later" (the other button stops a capture) and goes back where it was.
+  under the title bar; the rest of the window is inert, Tab stays inside, Escape is "Later" — even
+  after a click on the scrim has left the focus outside it (the keys are heard on the document) —
+  the focus starts on "Later" (the other button stops a capture) and goes back where it was.
 - **The held upload** (main process, `src/main/uploader.ts`; ADR 0159's amendment of 2026-10-01):
   while the decoder is broken where loot is concerned (`lootBroken` in `src/shared/engineHealth.ts`:
   any broken handler but the five that feed no loot — an unknown one counts as feeding it, the safe
@@ -461,7 +462,10 @@ and both platforms — 1,728 more, from 24 windows, measured on the bar. 4,224 i
   panel, and the notice its state calls for in the band — or one it does not call for;
 - the broken decoder's dialog open when it should not be, or shut when it should be open; a dialog
   that does not fit the window under the title bar, or scrolls; the focus outside it, or the rest of
-  the window not inert. A box under its scrim is not "over" one in the dialog;
+  the window not inert. A box under its scrim is not "over" one in the dialog. Then the dialog is
+  answered from the keyboard — a click on its scrim (which leaves the focus outside it), then Escape
+  — and must close with the band still holding its notice, the window alive again and the focus on
+  the page;
 - in the morph: a word outside the button at any frame, the version or the gear moving by half a
   pixel, a change that did not play its drain, its width or its words (a run whose morph never
   played proves nothing), and a button that keeps its eased width, or a leaving word, once the

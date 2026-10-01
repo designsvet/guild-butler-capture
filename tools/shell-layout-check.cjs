@@ -28,7 +28,9 @@
  *   the panel, and the notice the state calls for in the band — or one it does not call for;
  * - the broken decoder's dialog (board Fh4, option D) open when it should be and not otherwise, held
  *   inside the window under the title bar without scrolling, the focus inside it and the rest of
- *   the window inert while it is open; a box under the dialog's scrim is not "under" the dialog;
+ *   the window inert while it is open; a box under the dialog's scrim is not "under" the dialog.
+ *   Then, answered from the keyboard (a click on the scrim, then Escape — `dialogKeys`): closed,
+ *   the band still holding its notice, the window alive again and the focus on the page;
  * - while the title bar's Start/Stop changes face (MORPHS, measured every 55ms of it with motion
  *   on): any of the above in the bar, the version or the gear moving, a change that did not play,
  *   and a button still holding its eased width, or a leaving word, once it is over.
@@ -621,6 +623,43 @@ const settled = ({ lang, theme, platform, width, height, timeoutMs, notice = und
   tick();
 })`;
 
+/**
+ * The broken decoder's dialog, answered from the keyboard once its window has been measured: a click
+ * on the scrim first — it leaves the focus on the page's body, outside the dialog, where a key
+ * handler on the dialog alone would never hear Escape — then Escape, which is "Later". The dialog
+ * must close, the band keep the decoder's notice ("Later" answers the dialog, never the notice), the
+ * rest of the window come back to life, and the focus land on the page, which the dialog opened over
+ * (nothing held the focus before it). Real input through DevTools, as a member's would arrive.
+ * Returns the problems; empty = it behaved.
+ */
+const dialogKeys = async (win) => {
+  const cdp = win.webContents.debugger;
+  cdp.attach("1.3");
+  try {
+    await cdp.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+    const height = await win.webContents.executeJavaScript("innerHeight");
+    for (const type of ["mousePressed", "mouseReleased"]) {
+      await cdp.sendCommand("Input.dispatchMouseEvent", { type, x: 8, y: height - 8, button: "left", clickCount: 1 });
+    }
+    for (const type of ["keyDown", "keyUp"]) {
+      await cdp.sendCommand("Input.dispatchKeyEvent", { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    }
+    return await win.webContents.executeJavaScript(`new Promise((resolve) => setTimeout(() => {
+      const out = [];
+      if (document.querySelector("[role='alertdialog']") != null) out.push("Escape after a click on the scrim did not close the dialog");
+      const band = document.querySelector("main .lb-notice")?.dataset.notice ?? null;
+      if (band !== "decoder") out.push("after Later the band shows " + (band ?? "nothing") + ", not the decoder's notice");
+      for (const part of ["header.lb-titlebar", ".lb-body", ".gb-skip"]) {
+        if (document.querySelector(part)?.inert === true) out.push(part + " is still inert after the dialog closed");
+      }
+      if (document.activeElement?.id !== "main") out.push("after Later the focus is on " + (document.activeElement?.tagName ?? "nothing") + ", not the page");
+      resolve(out);
+    }, 100))`);
+  } finally {
+    cdp.detach();
+  }
+};
+
 const run = async () => {
   const { ROUTES, SUPPORTED_LANGS } = readLists();
   const lists = [
@@ -735,6 +774,18 @@ const run = async () => {
         }
       }
       results.push({ width, all });
+    }
+    if (load.expect.dialog) {
+      // Measured at every width, the dialog is answered at the last one: no scenario of its own (the
+      // count stays the product of the lists), its faults are the last width's.
+      const keys = await dialogKeys(win);
+      const last = results.at(-1);
+      if (keys.length > 0 && last != null) {
+        if (last.all.length === 0) {
+          failed += 1;
+        }
+        last.all.push(...keys);
+      }
     }
     win.destroy();
     const bad = results.filter((r) => r.all.length > 0);
