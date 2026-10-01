@@ -361,7 +361,8 @@ running capture. 1,152 scenarios, from 288 windows each shrunk through the four 
 The routes and the languages are read from the source (`ROUTES` in `src/app/router.ts`,
 `SUPPORTED_LANGS` in `src/shared/i18n.ts`); the sidebar must offer exactly those routes, and the run
 must measure exactly the product of its lists, none of them empty — so an empty route list, or a run
-that stops early, fails. Each measurement waits until the page says it has settled (its language and
+that stops early, fails, and a source that no longer compiles fails at once rather than leaving
+Electron waiting with no window. Each measurement waits until the page says it has settled (its language and
 theme applied, every slice of the bridge drawn, the faces loaded) rather than a fixed time.
 `OUT=<dir>` writes a PNG of each failing scenario. About a minute on an Apple-silicon Mac.
 

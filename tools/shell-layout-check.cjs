@@ -74,8 +74,15 @@ const fromSource = (file) => {
   return module.exports;
 };
 
-const { ROUTES } = fromSource("src/app/router.ts");
-const { SUPPORTED_LANGS } = fromSource("src/shared/i18n.ts");
+/**
+ * Read inside the run, not when Electron loads this file: a throw at load — a source that no
+ * longer compiles, or touches `window` on import — leaves Electron up with no window (it reports
+ * the error and waits), and CI would sit through to its timeout. Inside the run a throw exits 1.
+ */
+const readLists = () => ({
+  ROUTES: fromSource("src/app/router.ts").ROUTES,
+  SUPPORTED_LANGS: fromSource("src/shared/i18n.ts").SUPPORTED_LANGS,
+});
 
 /**
  * The narrowest width of each of the shell's layouts — 768 (the smallest window: the rail, one
@@ -140,7 +147,7 @@ const OS_ZONES = {
 };
 
 /** One page load per entry; each is measured at every width. */
-const loads = () => {
+const loads = ({ ROUTES, SUPPORTED_LANGS }) => {
   const list = [];
   for (const route of ROUTES) {
     for (const platform of PLATFORMS) {
@@ -442,6 +449,7 @@ const settled = ({ lang, theme, platform, width, height, timeoutMs }) => `new Pr
 })`;
 
 const run = async () => {
+  const { ROUTES, SUPPORTED_LANGS } = readLists();
   const lists = [
     ["route", ROUTES],
     ["width", WIDTHS],
@@ -463,7 +471,7 @@ const run = async () => {
   const allowed = new Map();
   let measured = 0;
   let failed = 0;
-  for (const load of loads()) {
+  for (const load of loads({ ROUTES, SUPPORTED_LANGS })) {
     const label = `#/${load.route} ${load.platform} ${load.theme} ${load.lang} ${load.stateName}`;
     const win = new BrowserWindow({
       show: false,
