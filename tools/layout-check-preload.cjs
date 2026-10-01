@@ -154,7 +154,7 @@ const store = (patch) => {
 
 const ok = (value) => Promise.resolve(value);
 
-contextBridge.exposeInMainWorld("gbc", {
+const bridge = {
   platform: sc.platform,
   start: () => ok(),
   stop: () => ok(),
@@ -188,4 +188,25 @@ contextBridge.exposeInMainWorld("gbc", {
   setTheme: (theme) => store({ theme }),
   updateCheckNow: () => ok(update),
   copyText: () => ok(),
-});
+};
+
+// Every call the page makes, in order, by name and arguments — the subscriptions (on*) apart — so a
+// tool can tell that a control reached the bridge at all: the v5 check presses each of the settings
+// drawer's controls and reads the calls back from `gbcStub.calls()`. The old check never asks.
+const calls = [];
+const recorded = Object.fromEntries(
+  Object.entries(bridge).map(([name, value]) =>
+    typeof value !== "function" || /^on[A-Z]/.test(name)
+      ? [name, value]
+      : [
+          name,
+          (...args) => {
+            calls.push({ name, args });
+            return value(...args);
+          },
+        ],
+  ),
+);
+
+contextBridge.exposeInMainWorld("gbc", recorded);
+contextBridge.exposeInMainWorld("gbcStub", { calls: () => calls.map((call) => ({ name: call.name, args: call.args })) });

@@ -37,7 +37,9 @@
  *   bar and of its own button, not scrolling, the focus on one of its rows. A box in the drawer and
  *   one under its scrim are not "on" one another, nor the menu and the rows it floats over. Then
  *   the keys (`settingsKeys`): Tab held inside, a theme and a language picked from the keyboard and
- *   kept, Escape closing the menu alone and then the drawer, and the focus back on the gear;
+ *   kept, every other control pressed from the keyboard making its own bridge call (WIRES, read
+ *   back from the stub), Escape closing the menu alone and then the drawer, and the focus back on
+ *   the gear;
  * - while the title bar's Start/Stop changes face (MORPHS, measured every 55ms of it with motion
  *   on): any of the above in the bar, the version or the gear moving, a change that did not play,
  *   and a button still holding its eased width, or a leaving word, once it is over.
@@ -134,6 +136,19 @@ const LATER = { selector: "[data-dialog-later]", on: ["darwin", "win32"] };
 const GEAR = "[data-settings-gear]";
 const SETTINGS = { selector: GEAR, on: ["darwin", "win32"] };
 const LANGUAGE_MENU = { selector: [GEAR, "[data-language-picker]"], on: ["darwin", "win32"] };
+/**
+ * The settings drawer's controls that go to the bridge, in Tab order from the theme tiles (the
+ * switch comes round after Close), each with the key that presses it and the call it must make —
+ * the old gear popover's (src/renderer/renderer.ts). The theme and the language are held apart, by
+ * what they do to the page.
+ */
+const WIRES = [
+  { control: "[data-settings-action='check-updates']", key: "Enter", call: "updateCheckNow" },
+  { control: "[data-settings-action='reveal']", key: "Enter", call: "reveal" },
+  { control: "[data-settings-action='choose-engine']", key: "Enter", call: "pickEnginePath" },
+  { control: ".lb-set-links a[href]", key: "Enter", call: "openPrivacy" },
+  { control: "[role='switch']", key: " ", call: "setAutoCapture" },
+];
 const STATES = [
   // The first run: Start in gold, the pair card in the right column, "Connect a guild" in the foot.
   { name: "idle", state: "idle", paired: false, notice: null },
@@ -748,11 +763,15 @@ const dialogKeys = async (win) => {
  *
  * With its language menu open: a row picked with the keys (End — Português — or, where that is the
  * scenario's own language, Home and ↓ — English) and Enter must close the menu onto its button and
- * put the page in that language, the drawer still open; ↓ on the button opens the menu again, and
- * Escape closes the menu alone, onto its button; a second Escape closes the drawer.
+ * put the page in that language, the drawer still open, and give it to the bridge to store; ↓ on the
+ * button opens the menu again, and Escape closes the menu alone, onto its button; a second Escape
+ * closes the drawer.
  *
  * Without it: the focus starts on Close; Shift+Tab goes round to the drawer's last stop and Tab back
- * to Close; Enter on the other theme's tile puts the page in that theme and keeps the focus there.
+ * to Close; Enter on the other theme's tile puts the page in that theme, keeps the focus there and
+ * gives the theme to the bridge to store. Over a running capture, every other control (WIRES) is
+ * reached by Tab and pressed — Enter, Space for the switch — and must make its bridge call and no
+ * other (the stub records them), the drawer still open and the page not navigated away.
  * Then the drawer is closed — over a running capture by a click on its words (which leaves the focus
  * on the page's body, outside it) and Escape; opened again with Enter on the gear, interrupted by the
  * broken decoder's dialog (the drawer inert under it, the focus back in the drawer once "Later" is
@@ -771,6 +790,7 @@ const settingsKeys = async (win, load) => {
     End: ["End", 35],
     Home: ["Home", 36],
     ArrowDown: ["ArrowDown", 40],
+    " ": ["Space", 32],
   };
   const press = async (name, shift = false) => {
     const [code, vk] = KEYS[name];
@@ -781,11 +801,13 @@ const settingsKeys = async (win, load) => {
         code,
         windowsVirtualKeyCode: vk,
         modifiers: shift ? 8 : 0,
-        // Enter activates a button through the character it types
-        ...(name === "Enter" && type === "keyDown" ? { text: "\r" } : {}),
+        // Enter and Space activate a button through the character they type
+        ...((name === "Enter" || name === " ") && type === "keyDown" ? { text: name === "Enter" ? "\r" : " " } : {}),
       });
     }
   };
+  // what the page has asked of the bridge since it loaded, reads (get*) apart: the stub records it
+  const asked = () => js("window.gbcStub.calls().filter((c) => !c.name.startsWith('get')).map((c) => ({ name: c.name, arg: c.args[0] ?? null }))");
   const click = async (x, y) => {
     for (const type of ["mousePressed", "mouseReleased"]) {
       await cdp.sendCommand("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
@@ -836,6 +858,9 @@ const settingsKeys = async (win, load) => {
       const lang = await js("document.documentElement.lang");
       if (lang !== want) {
         out.push(`a language picked from the keys left the page in ${lang}, not ${want}`);
+      }
+      if ((await asked()).filter((c) => c.name === "setLanguage").at(-1)?.arg !== want) {
+        out.push(`a language picked from the keys was not given to the bridge to store (setLanguage("${want}"))`);
       }
       if ((await js("document.querySelector('.lb-drawer') != null")) !== true) {
         out.push("picking a language closed the drawer too");
@@ -892,6 +917,41 @@ const settingsKeys = async (win, load) => {
       }
       if ((await js(`document.activeElement?.dataset.themePick ?? null`)) !== pick) {
         out.push(`after the ${pick} tile was picked the focus left it`);
+      }
+      if ((await asked()).filter((c) => c.name === "setTheme").at(-1)?.arg !== pick) {
+        out.push(`Enter on the ${pick} tile did not give it to the bridge to store (setTheme("${pick}"))`);
+      }
+    }
+    if (!load.sc.engineMissing) {
+      // Every other control reaches the bridge: Tab on from the tile to each in turn and press it as
+      // a keyboard does, and the stub must have recorded that control's call and no other — with
+      // the drawer still open, and the page where it was (the privacy policy is main's to open, in
+      // the browser; a link left to navigate would take the window with it).
+      const href = await js("location.href");
+      for (const wire of WIRES) {
+        let reached = false;
+        for (let i = 0; i < 20 && !reached; i += 1) {
+          await press("Tab");
+          reached = (await js(`document.activeElement?.matches(${JSON.stringify(`.lb-drawer ${wire.control}`)}) === true`)) === true;
+        }
+        if (!reached) {
+          out.push(`Tab never reached the drawer's ${wire.call} control (${wire.control})`);
+          continue;
+        }
+        const before = (await asked()).length;
+        await press(wire.key);
+        await settle();
+        const made = (await asked()).slice(before).map((c) => c.name);
+        if (made.length !== 1 || made[0] !== wire.call) {
+          out.push(`${wire.key === " " ? "Space" : wire.key} on ${wire.control} asked the bridge for ${made.length === 0 ? "nothing" : made.join(", ")}, not ${wire.call}`);
+        }
+      }
+      if ((await js("document.querySelector('.lb-settings')?.dataset.state")) !== "open") {
+        out.push("pressing the drawer's controls closed it");
+      }
+      if ((await js("location.href")) !== href) {
+        out.push("a control in the drawer navigated the page away");
+        return out;
       }
     }
     if (load.sc.engineMissing) {

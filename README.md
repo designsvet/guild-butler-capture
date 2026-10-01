@@ -469,8 +469,11 @@ lays the bands out in a sheet per theme and width, `notices-<theme>-<width>.png`
 shoots the broken decoder's dialog. `ONLY=settings` shoots the settings drawer open over a running
 capture — at 1440 and 768 in both themes, at 768 in German, Ukrainian and French, and with its
 language menu open at both sizes (a `press` may be a list: the gear, then the language) — with the
-folders a real install reports, at their longest (`longPaths` in the stub bridge). It measures
-nothing; the layout check below does.
+folders a real install reports, at their longest (`longPaths` in the stub bridge) — and twice more
+from the keyboard alone (a scenario's `keys`): Tab from the top of the page to the gear, Enter, Tab
+on to the Parchment tile, Enter, so the shot is the page re-themed behind the open drawer, and the
+tool prints what the page asked of the bridge on the way (the stub records every call,
+`gbcStub.calls()`). It measures nothing; the layout check below does.
 
 **Checking it.** `pnpm check:layout:v5` (`tools/shell-layout-check.cjs`, in CI under xvfb beside the
 old window's check) drives the built page behind the same stub bridge and measures every route at
@@ -517,8 +520,12 @@ on the bar. 4,512 in all. It fails on:
   under its scrim are each in their own layer, and a box fixed to the window (the menu) is held to
   the window, not to the boxes around it in the page. Then the keys, at the last width: the focus
   starts on Close; Shift+Tab goes round to the drawer's last stop and Tab back; Enter on the other
-  theme's tile puts the page in that theme and keeps the focus; a language picked from the menu with
-  the keys puts the page in it and closes the menu onto its button; ↓ opens the menu again and
+  theme's tile puts the page in that theme, keeps the focus and gives the theme to the bridge to
+  store; every other control, reached by Tab and pressed from the keyboard (Space for the switch),
+  makes its own bridge call and no other — Check for updates, Open folder, Choose engine folder…,
+  the privacy policy (without the window navigating), the auto-start switch — read back from the
+  stub's record; a language picked from the menu with the keys puts the page in it, is given to the
+  bridge to store and closes the menu onto its button; ↓ opens the menu again and
   Escape closes it alone; the drawer closes by Escape (after a click on its words, which leaves the
   focus outside it) and by a press on the scrim, opens again by Enter on the gear, goes inert under
   the broken decoder's dialog and has its focus back once "Later" is pressed — and every close

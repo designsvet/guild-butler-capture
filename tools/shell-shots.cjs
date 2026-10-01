@@ -36,7 +36,10 @@
  * drawer open over a running capture — at 1440 and 768, in both themes, in the languages that run
  * longest at 768 — and once more with the language dropdown open (a `press` may be a list, pressed
  * in order). The stub bridge answers with a real install's folders at their longest (`longPaths`),
- * so the paths wrap as a member's would. ONLY=settings for those alone.
+ * so the paths wrap as a member's would. ONLY=settings for those alone. The `settings-keys-*` ones
+ * get there from the keyboard alone (a scenario's `keys`: Tab from the top of the page to the gear,
+ * Enter, Tab on to the Parchment tile, Enter) and shoot the page re-themed behind the open drawer,
+ * printing what the page asked of the bridge on the way (the stub records it).
  *
  * Not a check: it measures nothing and passes everything. tools/shell-layout-check.cjs measures.
  */
@@ -190,6 +193,24 @@ const scenarios = () => {
   }
   add({ state: "capturing", theme: "obsidian", platform: "darwin", width: 1440, height: 900, paired: true, press: [GEAR, LANGUAGE], name: "settings-language-open-obsidian-darwin-1440x900" });
   add({ state: "capturing", theme: "parchment", platform: "win32", width: 768, height: 620, paired: true, press: [GEAR, LANGUAGE], name: "settings-language-open-parchment-win32-768x620" });
+  // …and from the keyboard alone, in Obsidian: Tab from the top of the page to the gear, Enter, Tab
+  // on to the Parchment tile, Enter — the page behind the open drawer goes to parchment, the focus
+  // ring stays on the tile, and the tool prints what the page asked of the bridge.
+  for (const [platform, width, height] of [
+    ["darwin", 1440, 900],
+    ["win32", 768, 620],
+  ]) {
+    add({
+      state: "capturing",
+      theme: "obsidian",
+      platform,
+      width,
+      height,
+      paired: true,
+      keys: [{ tabTo: GEAR }, "Enter", { tabTo: "[data-theme-pick='parchment']" }, "Enter"],
+      name: `settings-keys-obsidian-to-parchment-${platform}-${width}x${height}`,
+    });
+  }
   // The Start/Stop morph, frame by frame (board Fh1's button), in both themes.
   for (const theme of ["obsidian", "parchment"]) {
     for (const m of MORPHS) {
@@ -259,6 +280,59 @@ const osChrome = (platform) => `(() => {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * A scenario's `keys`, typed as a keyboard does (DevTools' input, the page told it has the focus —
+ * an offscreen window is never the focused one): a key's name presses it; `{ tabTo }` presses Tab
+ * from wherever the focus is until that selector has it, and fails the shot if forty presses never
+ * get there. Whatever a key set moving plays out before the next. Returns what the page asked of the
+ * bridge meanwhile — the stub records it (layout-check-preload.cjs), reads (get*) apart.
+ */
+const typeKeys = async (win, sc) => {
+  const cdp = win.webContents.debugger;
+  if (!cdp.isAttached()) {
+    cdp.attach("1.3");
+  }
+  await cdp.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+  const js = (code) => win.webContents.executeJavaScript(code);
+  const CODES = { Tab: ["Tab", 9], Enter: ["Enter", 13], Escape: ["Escape", 27], " ": ["Space", 32] };
+  const press = async (key) => {
+    const [code, vk] = CODES[key];
+    for (const type of ["keyDown", "keyUp"]) {
+      await cdp.sendCommand("Input.dispatchKeyEvent", {
+        type,
+        key,
+        code,
+        windowsVirtualKeyCode: vk,
+        // Enter and Space press a button through the character they type
+        ...((key === "Enter" || key === " ") && type === "keyDown" ? { text: key === "Enter" ? "\r" : " " } : {}),
+      });
+    }
+    await js(
+      "new Promise((r) => setTimeout(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {}))).then(() => r()), 60))",
+    );
+  };
+  const before = await js("window.gbcStub.calls().length");
+  for (const key of sc.keys) {
+    if (typeof key === "string") {
+      await press(key);
+      continue;
+    }
+    let there = false;
+    for (let i = 0; i < 40 && !there; i += 1) {
+      await press("Tab");
+      there = (await js(`document.activeElement?.matches(${JSON.stringify(key.tabTo)}) === true`)) === true;
+    }
+    if (!there) {
+      throw new Error(`${sc.name}: Tab never reached ${key.tabTo}`);
+    }
+  }
+  const calls = await js("window.gbcStub.calls().map((c) => ({ name: c.name, args: c.args }))");
+  return calls
+    .slice(before)
+    .filter((c) => !c.name.startsWith("get"))
+    .map((c) => `${c.name}(${c.args.map((a) => JSON.stringify(a)).join(", ")})`);
+};
+
 const run = async () => {
   mkdirSync(OUT, { recursive: true });
   const strip = [];
@@ -324,6 +398,7 @@ const run = async () => {
         "Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {})))",
       );
     }
+    const asked = sc.keys == null ? null : await typeKeys(win, sc);
     if (OS_CHROME) {
       await win.webContents.executeJavaScript(osChrome(sc.platform));
     }
@@ -360,7 +435,9 @@ const run = async () => {
     const picture = shot.getSize().width === width ? shot : shot.resize({ width, quality: "best" });
     writeFileSync(join(OUT, `${sc.name}.png`), picture.toPNG());
     win.destroy();
-    console.log(`${refused.length > 0 ? "CSP " : "shot"} ${sc.name}${refused.length > 0 ? `  refused: ${refused.join(" | ")}` : ""}`);
+    console.log(
+      `${refused.length > 0 ? "CSP " : "shot"} ${sc.name}${asked != null ? `  asked the bridge: ${asked.join(", ") || "nothing"}` : ""}${refused.length > 0 ? `  refused: ${refused.join(" | ")}` : ""}`,
+    );
   }
   if (strip.length > 0) {
     await shootStrip(strip);
