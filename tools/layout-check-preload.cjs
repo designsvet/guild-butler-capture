@@ -12,7 +12,7 @@
 
 "use strict";
 
-const { contextBridge } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
 const arg = process.argv.find((a) => a.startsWith("--gbc-scenario="));
 const sc = JSON.parse(Buffer.from(arg.slice("--gbc-scenario=".length), "base64").toString("utf8"));
@@ -74,7 +74,19 @@ const STATES = {
   error: { status: "error", errorKind: "permission", errorDetail: "bpf: Permission denied" },
 };
 
-const state = { ...idle, ...STATES[sc.state] };
+const stateFor = (name) => ({ ...idle, ...STATES[name] });
+const state = stateFor(sc.state);
+
+// A state pushed later, as main pushes one: the v5 shell's tools (tools/shell-shots.cjs,
+// tools/shell-layout-check.cjs) send a state's name on this channel to play a change — the
+// title bar's Start/Stop morph. The old check never sends it.
+const onStateListeners = new Set();
+ipcRenderer.on("gbc-stub:state", (_event, name) => {
+  const next = stateFor(name);
+  for (const listener of onStateListeners) {
+    listener(next);
+  }
+});
 
 const pairing = sc.paired
   ? {
@@ -121,7 +133,12 @@ contextBridge.exposeInMainWorld("gbc", {
   installNpcap: () => ok({ setup, install: { outcome: "cancelled", version: null, detail: null } }),
   openNpcapPage: () => ok(),
   pickEnginePath: () => ok(setup),
-  onState: () => () => {},
+  onState: (listener) => {
+    onStateListeners.add(listener);
+    return () => {
+      onStateListeners.delete(listener);
+    };
+  },
   getPairing: () => ok(pairing),
   // Every code is refused: the failure sentence is the tallest thing the steps can hold.
   pair: () => ok({ ok: false, status: pairing, failure: "refused" }),

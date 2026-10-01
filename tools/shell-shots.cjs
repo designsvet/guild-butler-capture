@@ -17,6 +17,14 @@
  * and the running light under a live tab does not run. SCALE=2 shoots at 2x (default 1x, so a
  * 1440×900 window is a 1440×900 picture). ONLY=<substring> shoots the scenarios whose name has it.
  *
+ * The one thing it shoots in motion is the title bar's Start/Stop changing face (StartStop.tsx):
+ * the `morph-*` scenarios open a window in one capture state with motion allowed again (DevTools'
+ * media emulation over the switch above), push the next state through the stub bridge, stop every
+ * animation in the button the moment the change lands, and photograph the bar at each of FRAMES —
+ * the page's own animations, sought to that millisecond, not a timer racing them. Then they lay the
+ * frames out side by side in one picture, `morph-strip.png` (STRIP=<file name> for another name;
+ * FRAMES=<ms,ms,…> for other moments — the sheen, say, which laps on long after the drain).
+ *
  * Not a check: it measures nothing and passes everything. tools/shell-layout-check.cjs measures.
  */
 
@@ -27,12 +35,29 @@ const { mkdirSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join, resolve } = require("node:path");
 
+const morph = require("./shell-morph.cjs");
+
 const ROOT = resolve(__dirname, "..");
 const PAGE = join(ROOT, "dist", "web", "app", "index.html");
 const OUT = resolve(process.env.OUT ?? join(tmpdir(), "gbc-shell-shots"));
 const SCALE = process.env.SCALE ?? "1";
 const OS_CHROME = process.env.OS_CHROME !== "0";
 const ONLY = process.env.ONLY ?? "";
+const STRIP = process.env.STRIP ?? "morph-strip.png";
+
+/**
+ * The morph in both directions, as the logger really goes: Start pressed (idle → starting: the gold
+ * drains to a dimmed, refusing Stop with the sheen over it) and the logger stopped (stopping → idle:
+ * the gold refills). Frames every 110ms across the 440ms drain (FRAMES=… for others), the first
+ * one the instant of the change, the last its end.
+ */
+const MORPHS = [
+  { morph: "start", from: "idle", to: "starting", title: "Start capture → Stop", note: "Start pressed: idle → starting" },
+  { morph: "stop", from: "stopping", to: "idle", title: "Stop → Start capture", note: "the logger stopped: stopping → idle" },
+];
+const FRAMES = (process.env.FRAMES ?? "0,110,220,330,440").split(",").map(Number);
+/** The bar's right end, where the change happens: the status's end, the button, the version, the gear. */
+const CROP_WIDTH = 520;
 
 app.commandLine.appendSwitch("force-prefers-reduced-motion");
 app.commandLine.appendSwitch("force-device-scale-factor", SCALE);
@@ -75,7 +100,38 @@ const scenarios = () => {
     add({ state: "restarting", theme: "obsidian", platform: "win32", width: 768, height: 620, lang, name: `restarting-${lang}-obsidian-win32-768x620` });
     add({ state: "waitingLong", theme: "obsidian", platform: "darwin", width: 1024, height: 768, lang, name: `waitingLong-${lang}-obsidian-darwin-1024x768` });
   }
+  // The Start/Stop morph, frame by frame (board Fh1's button), in both themes.
+  for (const theme of ["obsidian", "parchment"]) {
+    for (const m of MORPHS) {
+      add({ ...m, state: m.from, theme, platform: "darwin", width: 1440, height: 900, name: `morph-${m.morph}-${theme}` });
+    }
+  }
   return list.filter((sc) => sc.name.includes(ONLY));
+};
+
+/** The frames, side by side: a row per direction, a section per theme, the times along the top. */
+const stripPage = (rows) => {
+  const cell = (png) => `<img src="data:image/png;base64,${png.toString("base64")}" width="${CROP_WIDTH}" height="48" alt="">`;
+  const body = rows
+    .map(
+      (row) => `<section><h2>${row.title} <span>${row.theme} · ${row.note}</span></h2><div class="row">${row.frames
+        .map((f) => `<figure>${cell(f.png)}<figcaption>${f.t} ms · ${f.width.toFixed(1)}px wide</figcaption></figure>`)
+        .join("")}</div></section>`,
+    )
+    .join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    body { margin: 0; padding: 28px 32px 32px; background: #1b1a20; color: #e9e5dc; font: 13px/1.4 system-ui, sans-serif; }
+    h1 { margin: 0 0 4px; font-size: 18px; }
+    p { margin: 0 0 22px; color: #a7a39b; max-width: 1100px; }
+    h2 { margin: 18px 0 8px; font-size: 14px; }
+    h2 span { font-weight: 400; color: #a7a39b; }
+    .row { display: flex; gap: 14px; }
+    figure { margin: 0; }
+    img { display: block; border-radius: 6px; outline: 1px solid rgba(128, 128, 128, .35); }
+    figcaption { margin-top: 5px; font: 11px/1.3 ui-monospace, monospace; color: #a7a39b; }
+  </style></head><body><h1>The title bar's Start / Stop — the morph, frame by frame</h1>
+  <p>The built page, the gold draining off the ember face beneath it over 440 ms and refilling on the way back, the words rolling (out upward 170 ms, in from below 260 ms), the box easing to the new words' width while the version and the gear stay put. Each frame is the page's own animations stopped at that millisecond (tools/shell-shots.cjs).</p>
+  ${body}</body></html>`;
 };
 
 /**
@@ -115,6 +171,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const run = async () => {
   mkdirSync(OUT, { recursive: true });
+  const strip = [];
   for (const sc of scenarios()) {
     const win = new BrowserWindow({
       show: false,
@@ -157,6 +214,11 @@ const run = async () => {
     if (OS_CHROME) {
       await win.webContents.executeJavaScript(osChrome(sc.platform));
     }
+    if (sc.morph != null) {
+      strip.push(await shootMorph(win, sc, refused));
+      win.destroy();
+      continue;
+    }
     await wait(150);
     // Offscreen windows render at the screen's own scale whatever the switch says: bring the
     // picture to the scale asked for, so SCALE=1 gives a 1440×900 window as 1440×900 pixels.
@@ -167,6 +229,57 @@ const run = async () => {
     win.destroy();
     console.log(`${refused.length > 0 ? "CSP " : "shot"} ${sc.name}${refused.length > 0 ? `  refused: ${refused.join(" | ")}` : ""}`);
   }
+  if (strip.length > 0) {
+    await shootStrip(strip);
+  }
+};
+
+/**
+ * One direction of the morph in one theme: motion allowed in this window alone, the change pushed,
+ * the button's animations stopped at its first frame, then sought through FRAMES in order — forwards
+ * only, since a frame past an animation's end lets the page tidy up after it (the old words go, the
+ * width lets go), as it does in use.
+ */
+const shootMorph = async (win, sc, refused) => {
+  await morph.allowMotion(win);
+  await wait(150);
+  const playing = await morph.play(win, sc.to);
+  if (playing == null) {
+    throw new Error(`${sc.name}: the button did not change when ${sc.to} was pushed`);
+  }
+  const crop = { x: sc.width - CROP_WIDTH, y: 0, width: CROP_WIDTH, height: 48 };
+  const frames = [];
+  for (const t of FRAMES) {
+    const { width, held } = await morph.seekTo(win, t);
+    const shot = await win.webContents.capturePage(crop);
+    const px = Math.round(CROP_WIDTH * Number(SCALE));
+    const png = (shot.getSize().width === px ? shot : shot.resize({ width: px, quality: "best" })).toPNG();
+    writeFileSync(join(OUT, `${sc.name}-${String(t).padStart(3, "0")}ms.png`), png);
+    frames.push({ t, width, held, png });
+  }
+  // and the width the button rests at once the morph has played out
+  const after = await morph.playOut(win);
+  const rest = await morph.seekTo(win, 0);
+  console.log(
+    `${refused.length > 0 ? "CSP " : "shot"} ${sc.name} ×${FRAMES.length}  (${playing.join(", ")})${refused.length > 0 ? `  refused: ${refused.join(" | ")}` : ""}`,
+  );
+  console.log(
+    `      widths ${frames.map((f) => `${f.t}:${f.width.toFixed(2)}${f.held ? "*" : ""}`).join(" ")} · at rest ${rest.width.toFixed(2)}${after.held ? " (STILL HELD)" : ""} (* the ease holds it)`,
+  );
+  return { title: sc.title, note: sc.note, theme: sc.theme === "parchment" ? "Parchment" : "Obsidian", frames };
+};
+
+const shootStrip = async (rows) => {
+  const win = new BrowserWindow({ show: false, width: 1600, height: 400, useContentSize: true, frame: false, webPreferences: { offscreen: true } });
+  await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(stripPage(rows))}`);
+  const size = await win.webContents.executeJavaScript("[document.documentElement.scrollWidth, document.documentElement.scrollHeight]");
+  win.setContentSize(size[0], size[1]);
+  await wait(300);
+  const shot = await win.webContents.capturePage();
+  const px = Math.round(size[0] * Number(SCALE));
+  writeFileSync(join(OUT, STRIP), (shot.getSize().width === px ? shot : shot.resize({ width: px, quality: "best" })).toPNG());
+  win.destroy();
+  console.log(`strip ${STRIP} (${rows.length} rows × ${FRAMES.length} frames)`);
 };
 
 app.on("window-all-closed", () => {});
