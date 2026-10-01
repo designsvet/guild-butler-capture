@@ -3,8 +3,9 @@ import { Fragment } from "react";
 import { Button } from "@guild-butler/design-system/react";
 
 import type { TStrings } from "../shared/strings.js";
-import { GEAR, Icon, PLAY } from "./icons.js";
+import { GEAR, Icon } from "./icons.js";
 import type { TBarAction, TBarStatus } from "./model.js";
+import { StartStop } from "./StartStop.js";
 
 /**
  * The title bar (board Fh1; F1): the crest and the wordmark at the left, then the capture's
@@ -41,31 +42,6 @@ const Status = ({ status }: { status: TBarStatus }) => {
   );
 };
 
-const Action = ({ action, s, onStart, onStop }: { action: TBarAction; s: TStrings; onStart: () => void; onStop: () => void }) => {
-  if (action.kind === "stop") {
-    // Outlined danger with a small square before the word (Fh1). Dimmed and refusing the press
-    // while the logger starts or stops — `disabled`, which the package draws at 40%.
-    return (
-      <Button
-        variant="outline-danger"
-        className="lb-stop"
-        disabled={action.disabled}
-        onClick={onStop}
-        icon={<span className="lb-stop-mark" aria-hidden="true" />}
-      >
-        {s.shell.bar.stop}
-      </Button>
-    );
-  }
-  // Gold when idle; neutral in the error state, whose fix lives in the page's notice — one gold
-  // button per window.
-  return (
-    <Button variant={action.look === "primary" ? "primary" : "secondary"} onClick={onStart} icon={<Icon paths={PLAY} />}>
-      {s.buttons.start}
-    </Button>
-  );
-};
-
 export const TitleBar = ({
   s,
   status,
@@ -91,7 +67,10 @@ export const TitleBar = ({
     </span>
     <div className="lb-bar-fill" />
     {status != null ? <Status status={status} /> : null}
-    {action != null ? <Action action={action} s={s} onStart={onStart} onStop={onStop} /> : null}
+    {/* Stop while the logger runs, Start capture when it does not — one button that changes face
+        (StartStop.tsx): outlined danger with a small square, gold when idle, neutral in the error
+        state, whose fix lives in the page's notice (one gold button per window). */}
+    {action != null ? <StartStop action={action} s={s} onStart={onStart} onStop={onStop} /> : null}
     {version != null ? (
       <>
         <span className="lb-bar-divider lb-wide" aria-hidden="true" />
