@@ -8,6 +8,16 @@
  * and retried, never escalated. Nothing here can stop the engine, block a
  * Start, or throw into the capture session.
  *
+ * One thing outranks even that, and it is about the guild's numbers, not the
+ * member's capture: **while the decoder is broken where loot is concerned, nothing
+ * is sent, and what the engine writes meanwhile is never sent** (raid-bot ADR
+ * 0159, amendment 2026-10-01). A game update had bank deposits logged as loot for
+ * five days in September 2026, and 72 of them were cleaned out of the bot by hand.
+ * So while `held()` says so, every pass records where the hold began in the file
+ * it would read (`THeldRange`, kept on disk by heldUploads.ts so an app restart —
+ * the update — does not forget it), and sends nothing; and every pass, held or
+ * not, sends a file only up to its hold.
+ *
  * Every dependency is injected — no Electron, no direct `fs`, no timers of its
  * own beyond the tick it is driven by — so the whole loop is testable.
  */
@@ -22,10 +32,14 @@ import {
 import {
   advanceCursor,
   ENewRunReason,
+  heldRangeFor,
+  heldRangeOn,
   MAX_BATCH_LINES,
   newRunReason,
   nextBatch,
+  sendableLines,
   splitLines,
+  type THeldRange,
   type TUploadCursor,
 } from "./uploadPlan.js";
 
@@ -50,6 +64,12 @@ export enum EUploaderState {
    * but it IS retried, so the app resumes by itself once the bot is updated.
    */
   BotOutdated = "bot-outdated",
+  /**
+   * The decoder is broken where loot is concerned: nothing is sent until the
+   * app updates, and what is logged meanwhile never is ("Held until the
+   * update" in the v5 shell's sidebar foot).
+   */
+  Held = "held",
 }
 
 export type TUploaderStatus = {
@@ -87,6 +107,16 @@ export type TUploaderDeps = {
   newRunId: () => string;
   now: () => number;
   log: (line: string) => void;
+  /**
+   * The decoder is broken where loot is concerned (src/shared/engineHealth.ts
+   * `lootBroken` over the session's sticky list): hold everything.
+   */
+  held: () => boolean;
+  /** The held ranges, remembered across app restarts (heldUploads.ts). */
+  holds: {
+    list: () => readonly THeldRange[];
+    add: (range: THeldRange) => boolean;
+  };
 };
 
 /** Backoff between retries, capped. Uploading is not urgent; the file is safe. */
@@ -133,6 +163,28 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
 
   const set = (patch: Partial<TUploaderStatus>): void => {
     status = { ...status, ...patch };
+  };
+
+  /**
+   * The hold reaches the file the engine is writing: from where this uploader stands in it, or
+   * from its first line when it has sent none of it. Once per file — the first record is the one
+   * that counts, and a later pass, standing no further on, would only say the same.
+   */
+  const recordHold = (): void => {
+    const file = deps.currentFile();
+    if (file == null || heldRangeOn(deps.holds.list(), file) != null) {
+      return;
+    }
+    const range = heldRangeFor(cursor, file, deps.now());
+    deps.holds.add(range);
+    deps.log(`[upload] held: nothing from line ${range.from} of ${file} on is sent — the decoder is broken`);
+  };
+
+  /** Held shows unless the device itself needs a human first (pairing again, a stuck line). */
+  const showHeld = (): void => {
+    if (status.state !== EUploaderState.Unauthorized && status.state !== EUploaderState.Blocked) {
+      set({ state: EUploaderState.Held });
+    }
   };
 
   const onFailure = (result: Extract<TUploadResult, { outcome: Exclude<EUploadOutcome, EUploadOutcome.Accepted> }>) => {
@@ -185,6 +237,12 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
       // cursor. Same lesson as the bot's own non-overlapping sweeps.
       return;
     }
+    if (deps.held()) {
+      // First, before pairing, the switch or a backoff can return: the hold is
+      // about the lines, whoever might send them later, and it must be on disk
+      // before the app can restart into the fixed build.
+      recordHold();
+    }
     const token = deps.token();
     if (token == null) {
       set({ state: EUploaderState.Unpaired });
@@ -196,6 +254,10 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
     }
     if (status.state === EUploaderState.Unauthorized || status.state === EUploaderState.Blocked) {
       // Both need a human. Keep the state visible rather than flapping.
+      return;
+    }
+    if (deps.held()) {
+      set({ state: EUploaderState.Held });
       return;
     }
     if (deps.now() < nextAttemptAt) {
@@ -216,22 +278,40 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
         // Next tick sees the new one; nothing to report.
         return;
       }
+      if (deps.held()) {
+        // The verdict landed while the file was read: what was read may already
+        // hold its lines. Nothing goes; the finally below records where.
+        return;
+      }
       const lines = splitLines(text);
-      const reason = newRunReason(cursor, file, lines.length);
+      const hold = heldRangeOn(deps.holds.list(), file);
+      // A held file's cursor stands at its hold, so a file shorter than that reads as "shrank" on
+      // every pass; it is not a new run — nothing from the hold on is ever sent anyway.
+      const found = newRunReason(cursor, file, lines.length);
+      const reason = found === ENewRunReason.FileShrank && hold != null ? null : found;
       if (reason != null) {
         // A new file gets a NEW run id, or its line numbers would collide with
         // the previous file's under the server's (run, line_no) key and be
-        // swallowed as duplicates. See `newRunReason`.
-        cursor = { run: deps.newRunId(), file, sentThrough: 0 };
+        // swallowed as duplicates. See `newRunReason`. A held file instead
+        // resumes the run its first lines went under, at its hold: nothing
+        // before it is sent twice, and nothing after it ever.
+        cursor =
+          hold != null
+            ? { run: hold.run ?? deps.newRunId(), file, sentThrough: hold.from }
+            : { run: deps.newRunId(), file, sentThrough: 0 };
         if (reason !== ENewRunReason.FirstFile) {
           deps.log(`[upload] new run for ${file} (${reason})`);
+        }
+        if (hold != null) {
+          deps.log(`[upload] ${file} is held from line ${hold.from}: nothing from there on is sent`);
         }
       }
       const active = cursor;
       if (active == null) {
         return;
       }
-      const batch = nextBatch(active.sentThrough, lines, batchCap);
+      const sendable = sendableLines(deps.holds.list(), file, lines.length);
+      const batch = nextBatch(active.sentThrough, lines.slice(0, sendable), batchCap);
       if (batch == null) {
         set({ state: EUploaderState.UpToDate, failures: 0, lastError: null });
         return;
@@ -250,7 +330,7 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
       batchCap = MAX_BATCH_LINES;
       lastBatchLines = MAX_BATCH_LINES;
       set({
-        state: active.sentThrough >= lines.length ? EUploaderState.UpToDate : EUploaderState.Sending,
+        state: active.sentThrough >= sendable ? EUploaderState.UpToDate : EUploaderState.Sending,
         sentTotal: status.sentTotal + result.reply.accepted,
         lastSentAt: deps.now(),
         failures: 0,
@@ -258,6 +338,12 @@ export const createUploader = (deps: TUploaderDeps): TUploader => {
       });
     } finally {
       running = false;
+      if (deps.held()) {
+        // The verdict landed during this pass — mid-read, or while a batch read
+        // before it was in flight: the hold starts where this pass left off.
+        recordHold();
+        showHeld();
+      }
     }
   };
 

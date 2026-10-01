@@ -1,3 +1,7 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,6 +14,10 @@ import {
   uploadBatch,
 } from "../src/main/uploadClient.js";
 import { createUploader, EUploaderState, retryDelayMs } from "../src/main/uploader.js";
+import type { THeldRange } from "../src/main/uploadPlan.js";
+import { createHeldStore, heldUploadsFilePath, loadHeldRanges } from "../src/main/heldUploads.js";
+import type { TBrokenHandler } from "../src/shared/captureTypes.js";
+import { lootBroken } from "../src/shared/engineHealth.js";
 import { decryptToken, encryptPairing, EStoreOutcome, type TSafeStorage } from "../src/main/pairingStore.js";
 import { defaultDeviceName, isValidPairCodeShape, normalizePairCode, PAIR_CODE_ALPHABET } from "../src/shared/pairing.js";
 
@@ -217,6 +225,18 @@ describe("uploadBatch", () => {
 
 // --- the loop ----------------------------------------------------------------
 
+/** Held ranges kept in memory, as heldUploads.ts keeps them on disk. */
+const memoryHolds = (initial: THeldRange[] = []): { list: () => readonly THeldRange[]; add: (r: THeldRange) => boolean } => {
+  const ranges = [...initial];
+  return {
+    list: () => ranges,
+    add: (range) => {
+      ranges.push(range);
+      return true;
+    },
+  };
+};
+
 type THarness = {
   calls: Array<{ run: string; from: number; count: number }>;
   setReply: (fn: (from: number) => { status: number; body: unknown }) => void;
@@ -257,6 +277,8 @@ const harness = (): { uploader: ReturnType<typeof createUploader>; h: THarness }
     newRunId: () => `run-${++runSeq}`,
     now: () => h.clock.now,
     log: (l) => h.logs.push(l),
+    held: () => false,
+    holds: memoryHolds(),
   });
   return { uploader, h };
 };
@@ -380,6 +402,8 @@ describe("uploader loop", () => {
       newRunId: () => "r",
       now: () => 1,
       log: () => undefined,
+      held: () => false,
+      holds: memoryHolds(),
     });
     await unpaired.tick();
     expect(unpaired.status().state).toBe(EUploaderState.Unpaired);
@@ -402,6 +426,8 @@ describe("uploader loop", () => {
       newRunId: () => "r",
       now: () => 1,
       log: () => undefined,
+      held: () => false,
+      holds: memoryHolds(),
     });
     await expect(uploader.tick()).resolves.toBeUndefined();
     expect(uploader.status().state).not.toBe(EUploaderState.Blocked);
@@ -505,5 +531,324 @@ describe("a refusal shrinks the batch instead of parking the device", () => {
     await uploader.tick();
     expect(uploader.status().state).toBe(EUploaderState.Unauthorized);
     expect(h.calls).toHaveLength(1);
+  });
+});
+
+describe("the held upload: a broken decoder's lines never reach the guild", () => {
+  /**
+   * raid-bot ADR 0159, amendment 2026-10-01. A game update in September 2026 had bank deposits
+   * logged as loot for five days; 72 of them were uploaded and had to be cleaned out of the bot by
+   * hand. So while the decoder is broken where loot is concerned, nothing is sent, and what the
+   * engine writes meanwhile is never sent — not after the update either. This is money data on the
+   * guild's side, so every way a held line could still leave is tried here: a restart, a new file,
+   * a verdict landing mid-pass, a pairing made while held.
+   *
+   * Every line is unique, and every line the bot ever received is collected, so "never sent" is
+   * checked against the whole history, not one call.
+   */
+  const ATTACH = { handler: "EvAttachItemContainer", failures: 5, calls: 5 };
+  const FESTIVITIES = { handler: "EvFestivitiesUpdate", failures: 5, calls: 5 };
+  const ENERGY = { handler: "OpGuildEnergyDrain", failures: 6, calls: 6 };
+
+  type TWorld = {
+    files: Map<string, string[]>;
+    current: string | null;
+    broken: TBrokenHandler[] | null;
+    token: string | null;
+    received: Array<{ run: string; file: string; from: number; lines: string[] }>;
+    clock: { now: number };
+    logs: string[];
+    runs: number;
+  };
+
+  const world = (): TWorld => ({
+    files: new Map(),
+    current: "/logs/a.txt",
+    broken: null,
+    token: "tok",
+    received: [],
+    clock: { now: 1_000 },
+    logs: [],
+    runs: 0,
+  });
+
+  /** Lines `from`…`to - 1` of a file, each unique: "a.txt:7". */
+  const write = (w: TWorld, file: string, to: number): void => {
+    const lines = w.files.get(file) ?? [];
+    for (let i = lines.length; i < to; i += 1) {
+      lines.push(`${file.split("/").at(-1)}:${i}`);
+    }
+    w.files.set(file, lines);
+  };
+
+  /** One app: an uploader over the world, with the hold rule main uses (lootBroken). */
+  const app = (
+    w: TWorld,
+    holds: { list: () => readonly THeldRange[]; add: (r: THeldRange) => boolean },
+    over: { fetchLike?: Parameters<typeof createUploader>[0]["fetchLike"]; readFile?: (path: string) => Promise<string> } = {},
+  ) =>
+    createUploader({
+      fetchLike:
+        over.fetchLike ??
+        (async (_url, init) => {
+          const body = JSON.parse(init.body) as { run: string; file: string; from: number; lines: string[] };
+          w.received.push(body);
+          const reply = { accepted: body.lines.length, duplicate: 0, rejected: 0, nextFrom: body.from + body.lines.length };
+          return { ok: true, status: 200, text: async () => JSON.stringify(reply) };
+        }),
+      base: "https://bot",
+      token: () => w.token,
+      enabled: () => true,
+      currentFile: () => w.current,
+      readFile: over.readFile ?? (async (path) => `${(w.files.get(path) ?? []).join("\n")}\n`),
+      newRunId: () => `run-${++w.runs}`,
+      now: () => w.clock.now,
+      log: (line) => w.logs.push(line),
+      held: () => lootBroken(w.broken),
+      holds,
+    });
+
+  const sentLines = (w: TWorld): string[] => w.received.flatMap((r) => r.lines);
+
+  it("sends nothing while broken, and holds from where it stood", async () => {
+    const w = world();
+    const holds = memoryHolds();
+    const up = app(w, holds);
+    write(w, "/logs/a.txt", 5);
+    await up.tick();
+    expect(sentLines(w)).toEqual(["a.txt:0", "a.txt:1", "a.txt:2", "a.txt:3", "a.txt:4"]);
+
+    write(w, "/logs/a.txt", 7);
+    w.broken = [ATTACH];
+    await up.tick();
+    write(w, "/logs/a.txt", 12);
+    w.clock.now += 10 * 60_000;
+    await up.tick();
+    await up.tick();
+
+    expect(w.received).toHaveLength(1);
+    expect(up.status().state).toBe(EUploaderState.Held);
+    expect(holds.list()).toEqual([{ file: "/logs/a.txt", from: 5, run: "run-1", at: w.clock.now - 10 * 60_000 }]);
+    // the five lines written before the verdict but not yet sent are held too: the verdict lags the break
+    expect(sentLines(w).filter((l) => Number(l.split(":")[1]) >= 5)).toEqual([]);
+  });
+
+  it("the held range survives an app restart: the fixed app sends none of it, and nothing twice", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gbc-held-"));
+    const file = heldUploadsFilePath(dir);
+    const w = world();
+
+    // The broken app: five lines go, then the verdict, then the engine writes on.
+    const broken = app(w, createHeldStore(file, () => undefined));
+    write(w, "/logs/a.txt", 5);
+    await broken.tick();
+    w.broken = [ATTACH];
+    write(w, "/logs/a.txt", 40);
+    await broken.tick();
+    expect(loadHeldRanges(file).ranges).toEqual([{ file: "/logs/a.txt", from: 5, run: "run-1", at: 1_000 }]);
+
+    // The update is an app restart: a new process, a new uploader, the break forgotten (it is
+    // sticky only for an app session) — and, the worst case, the held file handed to it again.
+    w.broken = null;
+    w.runs = 0;
+    const fixed = app(w, createHeldStore(file, () => undefined));
+    write(w, "/logs/a.txt", 60);
+    for (let i = 0; i < 5; i += 1) {
+      w.clock.now += 60_000;
+      await fixed.tick();
+    }
+    expect(w.received).toHaveLength(1);
+    expect(fixed.status().state).toBe(EUploaderState.UpToDate);
+  });
+
+  it("lines written while broken are never sent, even after the fix — however the file comes back", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gbc-held-"));
+    const file = heldUploadsFilePath(dir);
+    const w = world();
+    const broken = app(w, createHeldStore(file, () => undefined));
+    // Broken before this uploader sent anything of the file: all of it is held.
+    w.broken = [ATTACH];
+    write(w, "/logs/a.txt", 30);
+    await broken.tick();
+    expect(loadHeldRanges(file).ranges).toEqual([{ file: "/logs/a.txt", from: 0, run: null, at: 1_000 }]);
+
+    w.broken = null;
+    const fixed = app(w, createHeldStore(file, () => undefined));
+    // The file comes back as the current one, grows, shrinks (replaced), grows again.
+    write(w, "/logs/a.txt", 50);
+    await fixed.tick();
+    w.files.set("/logs/a.txt", ["a.txt:0"]);
+    await fixed.tick();
+    write(w, "/logs/a.txt", 80);
+    await fixed.tick();
+    fixed.resetSession();
+    await fixed.tick();
+    expect(sentLines(w)).toEqual([]);
+  });
+
+  it("lines written after the fix are sent: the fixed engine's new file goes whole", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gbc-held-"));
+    const file = heldUploadsFilePath(dir);
+    const w = world();
+    const broken = app(w, createHeldStore(file, () => undefined));
+    write(w, "/logs/a.txt", 3);
+    await broken.tick();
+    w.broken = [ATTACH];
+    write(w, "/logs/a.txt", 9);
+    await broken.tick();
+
+    w.broken = null;
+    const fixed = app(w, createHeldStore(file, () => undefined));
+    w.current = "/logs/b.txt";
+    write(w, "/logs/b.txt", 4);
+    await fixed.tick();
+    expect(w.received.at(-1)).toEqual({ run: "run-2", file: "/logs/b.txt", from: 0, lines: ["b.txt:0", "b.txt:1", "b.txt:2", "b.txt:3"] });
+    write(w, "/logs/b.txt", 6);
+    await fixed.tick();
+    expect(sentLines(w)).toEqual(["a.txt:0", "a.txt:1", "a.txt:2", "b.txt:0", "b.txt:1", "b.txt:2", "b.txt:3", "b.txt:4", "b.txt:5"]);
+    expect(fixed.status().state).toBe(EUploaderState.UpToDate);
+  });
+
+  it("a broken handler that feeds no loot holds nothing", async () => {
+    const w = world();
+    const holds = memoryHolds();
+    const up = app(w, holds);
+    w.broken = [ENERGY, FESTIVITIES];
+    write(w, "/logs/a.txt", 4);
+    await up.tick();
+    expect(sentLines(w)).toEqual(["a.txt:0", "a.txt:1", "a.txt:2", "a.txt:3"]);
+    expect(holds.list()).toEqual([]);
+    expect(up.status().state).toBe(EUploaderState.UpToDate);
+
+    // …until one that does joins them.
+    w.broken = [ATTACH, ENERGY, FESTIVITIES];
+    write(w, "/logs/a.txt", 8);
+    await up.tick();
+    expect(w.received).toHaveLength(1);
+    expect(holds.list()).toEqual([expect.objectContaining({ file: "/logs/a.txt", from: 4 })]);
+  });
+
+  it("an engine restart while broken writes a new file: held from its first line", async () => {
+    const w = world();
+    const holds = memoryHolds();
+    const up = app(w, holds);
+    write(w, "/logs/a.txt", 3);
+    await up.tick();
+    w.broken = [ATTACH];
+    await up.tick();
+    w.current = "/logs/b.txt";
+    write(w, "/logs/b.txt", 10);
+    await up.tick();
+    up.resetSession();
+    w.current = "/logs/c.txt";
+    write(w, "/logs/c.txt", 2);
+    await up.tick();
+    expect(holds.list().map((r) => [r.file, r.from, r.run])).toEqual([
+      ["/logs/a.txt", 3, "run-1"],
+      ["/logs/b.txt", 0, null],
+      ["/logs/c.txt", 0, null],
+    ]);
+    expect(sentLines(w)).toEqual(["a.txt:0", "a.txt:1", "a.txt:2"]);
+  });
+
+  it("holds even unpaired or switched off — pairing while broken sends nothing", async () => {
+    const w = world();
+    w.token = null;
+    const holds = memoryHolds();
+    const up = app(w, holds);
+    w.broken = [ATTACH];
+    write(w, "/logs/a.txt", 6);
+    await up.tick();
+    expect(up.status().state).toBe(EUploaderState.Unpaired);
+    expect(holds.list()).toEqual([expect.objectContaining({ file: "/logs/a.txt", from: 0 })]);
+
+    w.token = "tok";
+    up.refresh();
+    await up.tick();
+    expect(w.received).toEqual([]);
+    expect(up.status().state).toBe(EUploaderState.Held);
+  });
+
+  it("a verdict that lands while a batch is in flight: that batch (read before it) goes, nothing after it", async () => {
+    const w = world();
+    const holds = memoryHolds();
+    let release: () => void = () => {};
+    const inFlight = new Promise<void>((r) => {
+      release = r;
+    });
+    const up = app(w, holds, {
+      fetchLike: async (_url, init) => {
+        const body = JSON.parse(init.body) as { run: string; file: string; from: number; lines: string[] };
+        await inFlight;
+        w.received.push(body);
+        const reply = { accepted: body.lines.length, duplicate: 0, rejected: 0, nextFrom: body.from + body.lines.length };
+        return { ok: true, status: 200, text: async () => JSON.stringify(reply) };
+      },
+    });
+    write(w, "/logs/a.txt", 5);
+    const pass = up.tick();
+    await new Promise((r) => setTimeout(r, 0));
+    w.broken = [ATTACH];
+    write(w, "/logs/a.txt", 9);
+    // A second pass while the first is in flight does nothing (non-overlapping).
+    await up.tick();
+    release();
+    await pass;
+    expect(holds.list()).toEqual([expect.objectContaining({ file: "/logs/a.txt", from: 5, run: "run-1" })]);
+    expect(up.status().state).toBe(EUploaderState.Held);
+    w.clock.now += 60_000;
+    await up.tick();
+    expect(sentLines(w)).toEqual(["a.txt:0", "a.txt:1", "a.txt:2", "a.txt:3", "a.txt:4"]);
+  });
+
+  it("a verdict that lands while the file is being read: nothing of what was read is sent", async () => {
+    const w = world();
+    const holds = memoryHolds();
+    let release: () => void = () => {};
+    const reading = new Promise<void>((r) => {
+      release = r;
+    });
+    const up = app(w, holds, {
+      readFile: async (path) => {
+        await reading;
+        return `${(w.files.get(path) ?? []).join("\n")}\n`;
+      },
+    });
+    write(w, "/logs/a.txt", 5);
+    const pass = up.tick();
+    await new Promise((r) => setTimeout(r, 0));
+    w.broken = [ATTACH];
+    release();
+    await pass;
+    expect(w.received).toEqual([]);
+    expect(holds.list()).toEqual([expect.objectContaining({ file: "/logs/a.txt", from: 0 })]);
+    expect(up.status().state).toBe(EUploaderState.Held);
+  });
+
+  it("says Held at once, even while backing off from a failed send", async () => {
+    const w = world();
+    const up = app(w, memoryHolds(), {
+      fetchLike: async () => ({ ok: false, status: 503, text: async () => "{}" }),
+    });
+    write(w, "/logs/a.txt", 2);
+    await up.tick();
+    expect(up.status().state).toBe(EUploaderState.Retrying);
+    w.broken = [ATTACH];
+    // still inside the backoff: no attempt is due, but the foot must not keep saying "retrying"
+    await up.tick();
+    expect(up.status().state).toBe(EUploaderState.Held);
+  });
+
+  it("a device that needs pairing again still says so while held", async () => {
+    const w = world();
+    const up = app(w, memoryHolds(), {
+      fetchLike: async () => ({ ok: false, status: 401, text: async () => "{}" }),
+    });
+    write(w, "/logs/a.txt", 2);
+    await up.tick();
+    expect(up.status().state).toBe(EUploaderState.Unauthorized);
+    w.broken = [ATTACH];
+    await up.tick();
+    expect(up.status().state).toBe(EUploaderState.Unauthorized);
   });
 });
