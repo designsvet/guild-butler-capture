@@ -3,6 +3,7 @@ import { useId, type ReactNode } from "react";
 import { Button, Switch } from "@guild-butler/design-system/react";
 
 import type { TStrings } from "../shared/strings.js";
+import { CONNECTION_PANEL_ID } from "./ConnectionPanel.js";
 import { APPEARS, FOLDER, HERO, Icon, INFO, PLAY, PLUG } from "./icons.js";
 import type { THero } from "./model.js";
 
@@ -13,8 +14,9 @@ import type { THero } from "./model.js";
  * below that it moves under the page (board Fr).
  *
  * Buttons inside cards are outlined (the bar holds the window's one filled button). Pair with
- * Discord is inert until the pairing step; Open folder is the bridge's reveal, as the old window's
- * Reveal is; the switch is the stored auto-start, as the old window's.
+ * Discord opens the guild connection's panel — the one the sidebar's foot opens (Fh2) — and shows
+ * itself pressed while it is open; Open folder is the bridge's reveal, as the old window's Reveal
+ * is; the switch is the stored auto-start, as the old window's.
  */
 
 const Card = ({ title, icon, children }: { title: string; icon: readonly string[]; children: ReactNode }) => {
@@ -79,6 +81,8 @@ export const SessionPage = ({
   platform,
   paired,
   autoCapture,
+  connectionOpen,
+  onPair,
   onReveal,
   onAutoCapture,
 }: {
@@ -88,6 +92,9 @@ export const SessionPage = ({
   /** Null until the pairing is known: the pair card waits rather than flash past a paired member. */
   paired: boolean | null;
   autoCapture: boolean | null;
+  /** The guild connection's panel is open (from here or from the sidebar's foot). */
+  connectionOpen: boolean;
+  onPair: () => void;
   onReveal: () => void;
   onAutoCapture: (enabled: boolean) => void;
 }) => {
@@ -118,7 +125,16 @@ export const SessionPage = ({
             <p className="lb-card-text">{s.pairing.intro}</p>
             <p className="lb-card-small">{page.pairOptional}</p>
             <div className="lb-card-actions">
-              <Button variant="outline">{s.pairing.pair}</Button>
+              <Button
+                variant="outline"
+                aria-haspopup="dialog"
+                aria-expanded={connectionOpen}
+                aria-controls={connectionOpen ? CONNECTION_PANEL_ID : undefined}
+                data-connection-opener="session"
+                onClick={onPair}
+              >
+                {s.pairing.pair}
+              </Button>
             </div>
           </Card>
         ) : null}
