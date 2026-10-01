@@ -64,7 +64,8 @@ const STATES = {
   waitingLong: { status: "waiting", startedAt: now - 900_000, runStartedAt: now - 900_000 },
   capturing,
   health: { ...capturing, engineBroken: [{ handler: "EvOtherGrabbedLoot", failures: 5, calls: 5 }] },
-  // The states only the v5 shell's shots use (tools/shell-shots.cjs); the old check never asks.
+  // The states only the v5 shell's tools use (tools/shell-shots.cjs, tools/shell-layout-check.cjs);
+  // the old check never asks.
   starting: { status: "starting", startedAt: now - 3_000, runStartedAt: now - 3_000 },
   // Capturing before Albion has named the character: the bar says "detecting…".
   capturingNew: { ...capturing, character: null, linesThisRun: 0, heartbeatSeen: false, startedAt: now - 20_000 },
@@ -82,7 +83,7 @@ const pairing = sc.paired
       guildId: "1",
       pairedAt: now,
       uploadEnabled: sc.uploadEnabled ?? true,
-      // sc.upload picks the uploader's state for the v5 shell's sidebar foot; the old check never sets it
+      // sc.upload, sc.sent and sc.uploadEnabled shape the v5 shell's sidebar foot; the old check sets none
       upload: { state: sc.upload ?? "idle", sentTotal: sc.sent ?? 1284, lastSentAt: now - (sc.sentAgoMs ?? 0), failures: 0, lastError: null },
     }
   : {
