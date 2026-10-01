@@ -1962,3 +1962,14 @@ body {
     background: CanvasText;
   }
 }
+
+/* Windows high contrast paints every background with the system colour, so the state dots — the
+   title bar's, the foot's, the connection panel's — vanished with it. They keep their authored colour
+   (each sits beside words, so the colour is a second signal, never the only one). */
+@media (forced-colors: active) {
+  .lb-status-dot,
+  .lb-foot-dot,
+  .lb-pair-dot {
+    forced-color-adjust: none;
+  }
+}
