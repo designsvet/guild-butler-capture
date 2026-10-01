@@ -17,7 +17,7 @@
  * and the running light under a live tab does not run. SCALE=2 shoots at 2x (default 1x, so a
  * 1440×900 window is a 1440×900 picture). ONLY=<substring> shoots the scenarios whose name has it.
  *
- * Not a check: it measures nothing and passes everything. The v5 layout check is step 4.
+ * Not a check: it measures nothing and passes everything. tools/shell-layout-check.cjs measures.
  */
 
 "use strict";
