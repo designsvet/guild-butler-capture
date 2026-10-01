@@ -9,7 +9,7 @@
  * mismatch is detected and explained by the AbiMismatch error path.
  */
 
-import { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, screen, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import {
@@ -60,7 +60,7 @@ import { installNpcap, parseSignatureOutput, type TSignatureCheck } from "./plat
 import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpcap.js";
 import { loadSettings, saveSettings, settingsFilePath, wantsV5Shell, withLanguage, withTheme } from "./settings.js";
 import { asLang, detectLang } from "../shared/i18n.js";
-import { asTheme, type TTheme } from "../shared/captureTypes.js";
+import { asTheme } from "../shared/captureTypes.js";
 import { stringsFor } from "../shared/strings.js";
 import { decryptToken, encryptPairing, EStoreOutcome } from "./pairingStore.js";
 import {
@@ -77,10 +77,20 @@ import electronUpdater from "electron-updater";
 
 import { createUpdateController, updaterEnabled, type TUpdateController } from "./updateController.js";
 import { createUploader, type TUploader } from "./uploader.js";
+import { placeWindow, windowStateOf, type TPlacement } from "./windowBounds.js";
+import { isOwnPage, overlayFor, shellOverlayFor, windowOptions } from "./windowOptions.js";
+import {
+  createWindowStateKeeper,
+  loadWindowState,
+  saveWindowState,
+  windowStateFilePath,
+} from "./windowState.js";
 import type { TEngineEvent } from "./engineAdapter.js";
 
 const APP_ROOT = app.getAppPath();
 const SETTINGS_FILE = settingsFilePath(app.getPath("userData"));
+/** The v5 window's size and place — its own file, never settings.json (see windowState.ts). */
+const WINDOW_STATE_FILE = windowStateFilePath(app.getPath("userData"));
 const APP_LOG = join(app.getPath("userData"), "logs", "capture-app.log");
 
 /** Build timestamp stamped by tools/build-static.mjs — identifies WHICH build runs. */
@@ -96,6 +106,8 @@ const BUILT_AT: string | null = (() => {
 })();
 
 let win: BrowserWindow | null = null;
+/** Whether `win` is the v5 shell's window — its Windows caption buttons take the shell's colours. */
+let winIsShell = false;
 let state: TCaptureState = initialCaptureState;
 let supervisor: TEngineSupervisor | null = null;
 let tracker: TLogFileTracker | null = null;
@@ -587,55 +599,105 @@ const appLang = (): ReturnType<typeof detectLang> => {
   return asLang(loadSettings(SETTINGS_FILE).language) ?? detectLang(app.getLocale());
 };
 
-/** Windows overlay window-controls, tinted to match the active theme's title bar. */
-const overlayFor = (theme: TTheme): { color: string; symbolColor: string; height: number } => {
-  return theme === "parchment"
-    ? { color: "#ece3cf", symbolColor: "#6b6353", height: 48 }
-    : { color: "#0c0b0f", symbolColor: "#a7a39b", height: 48 };
+/** How long the v5 window must be still after a move or resize before its place is written. */
+const WINDOW_STATE_DELAY_MS = 500;
+
+/** Where the v5 window opens: the remembered place when it is still on a screen (windowBounds.ts). */
+const placeShellWindow = (): TPlacement => {
+  return placeWindow({
+    stored: loadWindowState(WINDOW_STATE_FILE),
+    workAreas: screen.getAllDisplays().map((display) => display.workArea),
+    primary: screen.getPrimaryDisplay().workArea,
+  });
+};
+
+/**
+ * The v5 window remembers its size and place: written once it has been still after a move or a
+ * resize, and when it closes. Registered before the window's own close handler, whose first move
+ * on a Mac is to return — there, closing the window is not quitting, and the next window (a click
+ * on the dock icon) opens from this file.
+ */
+const rememberPlace = (w: BrowserWindow): void => {
+  const keeper = createWindowStateKeeper({
+    read: () =>
+      w.isDestroyed()
+        ? null
+        : windowStateOf({ normalBounds: w.getNormalBounds(), maximized: w.isMaximized(), fullScreen: w.isFullScreen() }),
+    write: (next) => {
+      const ok = saveWindowState(WINDOW_STATE_FILE, next);
+      if (!ok) {
+        appLog(`window: could not write ${WINDOW_STATE_FILE}`);
+      }
+      return ok;
+    },
+    delayMs: WINDOW_STATE_DELAY_MS,
+    setTimer: (fn, ms) => setTimeout(fn, ms),
+    clearTimer: (handle) => clearTimeout(handle as NodeJS.Timeout),
+  });
+  w.on("move", keeper.schedule);
+  w.on("resize", keeper.schedule);
+  w.on("maximize", keeper.schedule);
+  w.on("unmaximize", keeper.schedule);
+  w.on("close", keeper.flush);
+  w.on("closed", keeper.dispose);
+};
+
+/**
+ * The v5 page stays the only page in its window: a navigation anywhere else is refused, and so is
+ * every new window (the page opens links through the bridge, as the old one does). Logged, so a
+ * button that "does nothing" because of this is one grep away. The page is compared as Chromium
+ * spells it (`getURL()`), not as Node would, so a data folder with an unusual character in its
+ * path cannot make the page a stranger to itself.
+ */
+const guardShellPage = (w: BrowserWindow): void => {
+  w.webContents.on("will-navigate", (event) => {
+    if (!isOwnPage(event.url, w.webContents.getURL())) {
+      event.preventDefault();
+      appLog(`window: refused navigation to ${event.url.slice(0, 200)}`);
+    }
+  });
+  w.webContents.setWindowOpenHandler(({ url }) => {
+    appLog(`window: refused a new window for ${url.slice(0, 200)}`);
+    return { action: "deny" };
+  });
 };
 
 const createWindow = (): void => {
   const theme = appSettings().theme;
-  // Which page this window loads: the old greeting (the default, as 0.8.x ships it) or the v5
-  // shell preview (dist/web/app, tools/build-app.mjs). The window itself is the old one either
-  // way until the v5 window lands — only the page differs.
+  // Which window opens: the old greeting (the default, as 0.8.x ships it) or the v5 shell
+  // preview (dist/web/app, tools/build-app.mjs) in its own resizable window.
   const v5 = wantsV5Shell(process.env, loadSettings(SETTINGS_FILE));
-  win = new BrowserWindow({
-    // ONE window size for every state (owner ruling, 2026-08-29): the hero
-    // zone flexes inside; idle gives its room to the pairing card. Content
-    // size, not outer size — the merged title bar is part of the content.
-    width: 660,
-    height: 620,
-    useContentSize: true,
-    resizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    // Merged OS chrome: the app's own 48px header IS the title bar. macOS
-    // keeps its traffic lights over the app surface; Windows gets overlay
-    // window controls in the same strip. Anywhere else (dev on Linux) the
-    // normal frame stays — the CSS drag region is inert there.
-    ...(process.platform === "darwin"
-      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 18, y: 18 } }
-      : process.platform === "win32"
-        ? { titleBarStyle: "hidden" as const, titleBarOverlay: overlayFor(theme) }
-        : {}),
-    // Matches --gb-bg so the flash before first paint is the brand ground,
-    // not a grey rectangle — the design system's values (ds/tokens.css: the
-    // light theme and the dark default); test/designSystem.test.ts pins them.
-    backgroundColor: theme === "parchment" ? "#F6F1E6" : "#0A0A0C",
-    title: "Guild Butler Capture",
-    webPreferences: {
+  const placement = v5 ? placeShellWindow() : null;
+  win = new BrowserWindow(
+    windowOptions({
+      platform: process.platform,
+      theme,
+      // Matches --gb-bg so the flash before first paint is the brand ground,
+      // not a grey rectangle — the design system's values (ds/tokens.css: the
+      // light theme and the dark default); test/designSystem.test.ts pins them.
+      backgroundColor: theme === "parchment" ? "#F6F1E6" : "#0A0A0C",
       preload: join(APP_ROOT, "dist", "preload", "index.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
+      shell: placement,
+    }),
+  );
+  winIsShell = placement != null;
   win.removeMenu?.();
-  if (v5) {
-    appLog("window: the v5 shell preview (GBC_SHELL=v5 or settings.shell)");
+  const page = join(APP_ROOT, "dist", "web", v5 ? "app" : "renderer", "index.html");
+  if (placement != null) {
+    const { x, y, width, height } = placement.bounds;
+    appLog(
+      `window: the v5 shell preview (GBC_SHELL=v5 or settings.shell), ${placement.source} ` +
+        `${width}x${height} at ${x},${y}${placement.maximized ? ", maximized" : ""}`,
+    );
+    guardShellPage(win);
+    rememberPlace(win);
+    if (placement.maximized) {
+      // Created hidden (windowOptions), so it appears already maximized.
+      win.maximize();
+      win.show();
+    }
   }
-  void win.loadFile(join(APP_ROOT, "dist", "web", v5 ? "app" : "renderer", "index.html"));
+  void win.loadFile(page);
   win.webContents.on("did-finish-load", () => {
     win?.webContents.send(IPC.stateChanged, state);
   });
@@ -841,7 +903,7 @@ const registerIpc = (): void => {
     saveSettings(SETTINGS_FILE, withTheme(loadSettings(SETTINGS_FILE), narrowed));
     if (process.platform === "win32") {
       try {
-        win?.setTitleBarOverlay(overlayFor(narrowed));
+        win?.setTitleBarOverlay(winIsShell ? shellOverlayFor(narrowed) : overlayFor(narrowed));
       } catch {
         // overlay retint is cosmetic; never let it fail the theme switch
       }
