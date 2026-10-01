@@ -42,12 +42,21 @@ const allowMotion = async (win) => {
 const arm = () => {
   window.__lbMorph = new Promise((resolve) => {
     const button = document.querySelector(".lb-act");
+    // The change is the button taking another face. A mutation that leaves the face as it was is
+    // not it — the hover's grace lifting (`is-settling`, 350ms after the logger last landed, which
+    // the stop morph sets off just before the next width's start), a width let go — and stopping
+    // everything then catches none of the morph, which then plays on unseen.
+    const face = () => `${button.dataset.kind}|${button.dataset.surface}|${button.getAttribute("aria-disabled")}`;
+    const from = face();
     // a push that changes nothing in the button must fail the caller, not leave it waiting
     const giveUp = setTimeout(() => {
       observer.disconnect();
       resolve(null);
     }, 3000);
     const observer = new MutationObserver(() => {
+      if (face() === from) {
+        return;
+      }
       clearTimeout(giveUp);
       observer.disconnect();
       const animations = document.getAnimations().filter((a) => a.effect?.target?.closest?.(".lb-act") != null);
