@@ -416,18 +416,20 @@ body {
 }
 
 /* Hover and press, the package's paints on the layers — not while refusing, and not in the beat
-   after the logger lands under a resting pointer (.is-settling). */
+   after the logger lands under a resting pointer (.is-settling). A press is also a hover, so each
+   press rule carries every condition its hover rule does and comes after it: one condition fewer
+   and the hover's gradient outranks the press's, and a pressed Start never darkens. */
 .lb-act[data-kind="start"][data-surface="gold"]:not([aria-disabled="true"]):not(.is-settling):hover .lb-act-top {
   background: var(--gb-grad-gold-hover);
 }
-.lb-act[data-kind="start"][data-surface="gold"]:not([aria-disabled="true"]):active .lb-act-top {
+.lb-act[data-kind="start"][data-surface="gold"]:not([aria-disabled="true"]):not(.is-settling):active .lb-act-top {
   background: var(--gb-grad-gold-press);
   box-shadow: var(--gb-gold-press-shadow);
 }
 .lb-act[data-kind="start"][data-surface="lift"]:not([aria-disabled="true"]):not(.is-settling):hover .lb-act-top {
   background: var(--gb-lift-hover);
 }
-.lb-act[data-kind="start"][data-surface="lift"]:not([aria-disabled="true"]):active .lb-act-top {
+.lb-act[data-kind="start"][data-surface="lift"]:not([aria-disabled="true"]):not(.is-settling):active .lb-act-top {
   background: var(--gb-lift-press);
   box-shadow: var(--gb-sunk);
 }
@@ -440,7 +442,9 @@ body {
 }
 
 /* Windows high contrast takes the paint away: the layers go, and the button keeps a border of the
-   system's own. */
+   system's own. Stop's small square is a background, which the system paints over with its own
+   ground, leaving a gap before the word: it keeps its paint, in the system's button text (scoped
+   to the button, so it outranks the plain .lb-stop-mark rule further down). */
 @media (forced-colors: active) {
   .lb-act {
     border: 1px solid ButtonText;
@@ -448,6 +452,10 @@ body {
   }
   .lb-act-layer {
     display: none;
+  }
+  .lb-act .lb-stop-mark {
+    forced-color-adjust: none;
+    background: ButtonText;
   }
 }
 

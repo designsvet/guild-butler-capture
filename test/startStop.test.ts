@@ -193,3 +193,27 @@ describe("the morph keeps the old window's rhythm", () => {
     expect(`${settle}ms`).toBe(shell.get("--lb-t-settle"));
   });
 });
+
+describe("the button's paints on its layers", () => {
+  // A press is also a hover. The package keeps its press over its hover by order alone, the two
+  // selectors weighing the same; the layers' rules carry more conditions (refusing, settling), and
+  // a press rule with one condition fewer than its hover loses to it — a pressed Start that never
+  // darkened. So every press rule must be its hover rule's twin, later in the file.
+  const selectors: string[] = [];
+  postcss.parse(readFileSync(join(ROOT_DIR, "src", "app", "shell.css"), "utf8")).walkRules((rule) => {
+    selectors.push(...rule.selectors);
+  });
+  const presses = selectors.filter((sel) => sel.startsWith(".lb-act") && /:active\b/.test(sel) && !sel.includes(":is("));
+
+  it("finds the press rules it holds (a renamed class would leave this test holding nothing)", () => {
+    expect(presses.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("each press rule is its hover rule with :active for :hover, and comes after it", () => {
+    for (const press of presses) {
+      const hover = selectors.indexOf(press.replace(":active", ":hover"));
+      expect(hover, `no hover twin for ${press}`).toBeGreaterThanOrEqual(0);
+      expect(selectors.indexOf(press), `${press} comes before its hover`).toBeGreaterThan(hover);
+    }
+  });
+});

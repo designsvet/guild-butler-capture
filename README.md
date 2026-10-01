@@ -358,7 +358,11 @@ button in layers, never two that swap:
 Every timing is a `--lb-t-*` in `src/app/shell.css` — the old window owns the `--gb-t-*` names —
 and `test/startStop.test.ts` holds them to the old window's. The sequence is CSS alone, so the
 component keeps no time; it answers the browser's animation events. Under reduced motion every
-duration is zero, the sheen goes, and the end states are the same.
+duration is zero, the sheen goes, and the end states are the same. Hover and press paint the layers
+with the package's own gradients; a press rule must carry every condition its hover rule does, or
+the hover outranks it (the test holds each press to its hover twin). Under Windows' high contrast
+the layers give way to a border in the system's colours, and Stop's square is drawn in its button
+text.
 
 Every new string is in `src/shared/strings.ts` in the six languages; the count of lines sent picks
 its plural form with `Intl.PluralRules` (`src/shared/plural.ts`).
