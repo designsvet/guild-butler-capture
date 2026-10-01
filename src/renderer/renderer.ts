@@ -22,7 +22,6 @@ import {
   type TPermissionFixResult,
   EPairFailure,
   initialPairingStatus,
-  type TPairAttempt,
   type TPairingStatus,
   type TSetupStatus,
   ERestartRefusal,
@@ -37,6 +36,7 @@ import {
 import { asLang, detectLang, LANG_NAMES, SUPPORTED_LANGS, type TLang } from "../shared/i18n.js";
 import { PAIR_COMMAND } from "../shared/ipc.js";
 import { stringsFor } from "../shared/strings.js";
+import type { TGbc } from "../shared/bridge.js";
 import { EHealthAction, EHealthLine, engineRunning, healthCard } from "../shared/engineHealth.js";
 
 // The OS decides the DEFAULT language; a stored override (the gear's picker)
@@ -45,36 +45,6 @@ import { EHealthAction, EHealthLine, engineRunning, healthCard } from "../shared
 let LANG: TLang = detectLang(navigator.language);
 let STR = stringsFor(LANG);
 document.documentElement.lang = LANG;
-
-type TGbc = {
-  platform: string;
-  start: () => Promise<void>;
-  stop: () => Promise<void>;
-  getState: () => Promise<TCaptureState>;
-  reveal: () => Promise<boolean>;
-  getSetup: () => Promise<TSetupStatus>;
-  fixMacPermissions: () => Promise<TPermissionFixResult>;
-  installNpcap: () => Promise<TNpcapFixResult>;
-  openNpcapPage: () => Promise<void>;
-  pickEnginePath: () => Promise<TSetupStatus>;
-  onState: (listener: (state: TCaptureState) => void) => () => void;
-  getPairing: () => Promise<TPairingStatus>;
-  pair: (code: string) => Promise<TPairAttempt>;
-  unpair: () => Promise<TPairingStatus>;
-  setUpload: (enabled: boolean) => Promise<TPairingStatus>;
-  openLoot: () => Promise<void>;
-  openPrivacy: () => Promise<void>;
-  onPairing: (listener: (status: TPairingStatus) => void) => () => void;
-  getUpdate: () => Promise<TUpdateStatus>;
-  updateRestart: () => Promise<TRestartResult>;
-  onUpdate: (listener: (status: TUpdateStatus) => void) => () => void;
-  getSettings: () => Promise<TAppSettings>;
-  setAutoCapture: (enabled: boolean) => Promise<TAppSettings>;
-  setLanguage: (lang: string | null) => Promise<TAppSettings>;
-  setTheme: (theme: string) => Promise<TAppSettings>;
-  updateCheckNow: () => Promise<TUpdateStatus>;
-  copyText: (text: string) => Promise<void>;
-};
 
 const gbc = (window as unknown as { gbc: TGbc }).gbc;
 
