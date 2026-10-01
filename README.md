@@ -290,8 +290,9 @@ that theme, and that the faces are the package's files, byte for byte, with thei
 them.
 
 **What is in it.** The shell around one page, drawn from the canvas's boards (page v5): Fh1 for the
-title bar, Fh2 for the sidebar's foot, Fh3 and Fh7 for Session, Fh4 and Fh5 for the notices, F1 and
-Fr for the frame, Fa for the keyboard and the screen reader.
+title bar, Fh2 for the sidebar's foot, Fh3 and Fh7 for Session, Fh4 and Fh5 for the notices, Fh6
+(option C) and F1s for the settings drawer, F1 and Fr for the frame, Fa for the keyboard and the
+screen reader.
 
 - **The title bar** says the capture's state in the app's own words, with a dot beside them: while
   capturing, the character and how long (`Bors · capturing 1 h 20 min`), or `Capturing · detecting…`
@@ -302,7 +303,8 @@ Fr for the frame, Fa for the keyboard and the screen reader.
   Stop (dimmed and refusing the press while the logger starts or stops, with a sheen crossing it),
   Start capture in gold when idle, a neutral Start whenever the band below holds the next step
   (capture blocked, or a notice carrying the gold fix: one gold button per window) — the version,
-  and the gear. The button changes face the way the old window's pill does (below).
+  and the gear, which opens the settings (below) and shows itself pressed while they are open. The
+  button changes face the way the old window's pill does (below).
   Below 1024px it keeps the name and the time and drops the version. The guild and the zone are not
   drawn: the app does not know them yet.
 - **The sidebar** lists only the pages that exist — Session, under Live — 208px with labels from
@@ -347,6 +349,40 @@ Fr for the frame, Fa for the keyboard and the screen reader.
   under the title bar; the rest of the window is inert, Tab stays inside, Escape is "Later" — even
   after a click on the scrim has left the focus outside it (the keys are heard on the document) —
   the focus starts on "Later" (the other button stops a capture) and goes back where it was.
+- **The settings** (Fh6, option C — the floating drawer of F1s; `src/app/SettingsDrawer.tsx`, its
+  words and its menu's place pure in `src/app/settings.ts`): the gear opens a drawer at the right,
+  the package's drawer — 440px, 16px in from the window's edges under the title bar, the dialog's
+  opaque surface over the one scrim — so the page stays in view beside it and a new theme or
+  language is seen as it lands. It slides in over 300ms, decelerating, and leaves on the package's
+  quicker, accelerating exit; under reduced motion it fades in and out instead. Its body scrolls
+  when the window is shorter than its settings. What it holds is the old window's gear popover, in
+  its words and wired to the same bridge calls, plus the folder the logs go to:
+  - **Capture**: the auto-start switch (the same stored setting as Session's).
+  - **Appearance**: the theme as two tiles, each a small window drawn in its own theme's colours
+    (the picture carries the package's `data-theme`, so its tokens are that theme's whatever the
+    page wears); the chosen one wears the chosen wash, the gold outline, its name in gold and a
+    check. The language as the kit's dropdown, not a native select: a well with the choice and a
+    chevron, and a vellum menu — System, then each language in itself — fixed to the window over
+    the drawer, inside its edges, below its button or above it when there is more room (it opens
+    upward in the smallest window); the arrows, Home, End and a typed letter move through it, Enter
+    or a click picks, Escape closes the menu alone. Both apply at once, then keep what main stored.
+  - **Updates**: the version and how the updater stands, in the old popover's sentences (a Mac's
+    "Auto-update is off in this build — this opens the download page."), and Check for updates —
+    which, where the app cannot update itself, opens the download page, as before. The beta channel
+    the board draws is not built: it needs the release pipeline first.
+  - **Files**: the folder the engine writes its logs into and Open folder (the old window's Reveal).
+    The setup probe now names that folder (`captureDir`, the engine's working folder:
+    `<data folder>/captures` for the bundled engine); the old window does not read it.
+  - **Advanced — engine**: the engine's folder, or the old window's "not found" sentence, and Choose
+    engine folder….
+  - **About**: the version, the engine's credit, and the privacy policy as a link that main opens
+    in the browser.
+  A folder's path is shown whole, in mono, breaking only between folders — never at a hyphen in
+  `guild-butler-capture` — with the whole path in its title. Modal (board Fa): the rest of the
+  window is inert, Tab stays inside, Escape closes it — heard on the document, so a click on its
+  words does not strand the keys — and so does a press outside it; the focus starts on Close and
+  goes back to the gear. The broken decoder's dialog can still interrupt it: the drawer is inert
+  under the dialog, and "Later" gives it its focus back.
 - **The held upload** (main process, `src/main/uploader.ts`; ADR 0159's amendment of 2026-10-01):
   while the decoder is broken where loot is concerned (`lootBroken` in `src/shared/engineHealth.ts`:
   any broken handler but the five that feed no loot — an unknown one counts as feeding it, the safe
@@ -364,8 +400,9 @@ Fr for the frame, Fa for the keyboard and the screen reader.
   `get*` calls, then the three `on*` subscriptions — a push that lands while a get is in flight wins
   — and the setup probed again on window focus. It also keeps the little the notices' buttons need
   that main does not: a fix attempt's outcome, a running install or check, Stop capture and
-  update's wait for the engine, and the dialog's answered events. Auto-start runs once per window over an idle
-  capture, as the old window's does. `src/app/router.ts` keeps the page in the hash (`#/session`);
+  update's wait for the engine, and the dialog's answered events. The settings drawer's theme and
+  language go through it too, drawn at once and then set to what main stored. Auto-start runs once
+  per window over an idle capture, as the old window's does. `src/app/router.ts` keeps the page in the hash (`#/session`);
   any hash not starting `#/`, like the skip link's `#main`, is left alone. The stored theme and
   language apply as they arrive. What each state says is pure (`src/app/model.ts`), held to the
   boards by `test/shellModel.test.ts`; the store and the router by `test/shellStore.test.ts`. The
@@ -429,21 +466,27 @@ Windows' high contrast (DevTools' forced-colours emulation). `ONLY=notice-` shoo
 Fh5 in the band, at 1440 and 768, in both themes — pressing first where the board draws a notice
 after a press (the password prompt closed, the driver still fetching, "Later" on the dialog) — and
 lays the bands out in a sheet per theme and width, `notices-<theme>-<width>.png`; `ONLY=dialog-`
-shoots the broken decoder's dialog. It measures nothing; the layout check below does.
+shoots the broken decoder's dialog. `ONLY=settings` shoots the settings drawer open over a running
+capture — at 1440 and 768 in both themes, at 768 in German, Ukrainian and French, and with its
+language menu open at both sizes (a `press` may be a list: the gear, then the language) — with the
+folders a real install reports, at their longest (`longPaths` in the stub bridge). It measures
+nothing; the layout check below does.
 
 **Checking it.** `pnpm check:layout:v5` (`tools/shell-layout-check.cjs`, in CI under xvfb beside the
 old window's check) drives the built page behind the same stub bridge and measures every route at
 768, 1024, 1280 and 1440 — the narrowest width of each of the shell's layouts, and the boards' width
 — all at the window's smallest height, 620, in both themes, the six languages, both platforms and
-the twenty-six states that change the layout: every capture state the shell draws, each with a guild
+the twenty-nine states that change the layout: every capture state the shell draws, each with a guild
 connection that gives the sidebar's foot one of its shapes, the foot's remaining states over a
 running capture, and every notice of Fh5 at its tallest — the blocked cards with their notes, the
-decoder's four steps over a held upload, the logger stopping, an update ready — and the broken
-decoder's dialog itself: 2,496 scenarios, from 624 windows each shrunk through the four widths. Then the
-title bar's button changing face, the one part of the shell that moves its own layout: in a window
-with motion back on, both directions as the logger goes (Start pressed, the logger stopped), at
-every 55ms from the change to the drain's end, at the four widths, in both themes, the six languages
-and both platforms — 1,728 more, from 24 windows, measured on the bar. 4,224 in all. It fails on:
+decoder's four steps over a held upload, the logger stopping, an update ready — the broken
+decoder's dialog itself, and the settings drawer: open over a running capture, with its language
+menu open, and over an idle capture with no engine found: 2,784 scenarios, from 696 windows each
+shrunk through the four widths. Then the title bar's button changing face, the one part of the shell
+that moves its own layout: in a window with motion back on, both directions as the logger goes
+(Start pressed, the logger stopped), at every 55ms from the change to the drain's end, at the four
+widths, in both themes, the six languages and both platforms — 1,728 more, from 24 windows, measured
+on the bar. 4,512 in all. It fails on:
 
 - sideways scroll — the window, or anything in it that scrolls, wider than it is;
 - clipped text — words cut by a box that hides its overflow, or past the window's edge. Two cuts are
@@ -466,6 +509,20 @@ and both platforms — 1,728 more, from 24 windows, measured on the bar. 4,224 i
   answered from the keyboard — a click on its scrim (which leaves the focus outside it), then Escape
   — and must close with the band still holding its notice, the window alive again and the focus on
   the page;
+- the settings drawer open when the gear was not pressed, or shut when it was; a drawer that does not
+  sit 16px in from the window's edges under the title bar, or is wider than 440px; the focus outside
+  it, the rest of the window not inert, or a gear that does not say its drawer is open. Its language
+  menu open when it should not be, or shut; outside the window or over the title bar, over its own
+  button, scrolling, or without the focus on one of its rows. Boxes in the drawer, in its menu and
+  under its scrim are each in their own layer, and a box fixed to the window (the menu) is held to
+  the window, not to the boxes around it in the page. Then the keys, at the last width: the focus
+  starts on Close; Shift+Tab goes round to the drawer's last stop and Tab back; Enter on the other
+  theme's tile puts the page in that theme and keeps the focus; a language picked from the menu with
+  the keys puts the page in it and closes the menu onto its button; ↓ opens the menu again and
+  Escape closes it alone; the drawer closes by Escape (after a click on its words, which leaves the
+  focus outside it) and by a press on the scrim, opens again by Enter on the gear, goes inert under
+  the broken decoder's dialog and has its focus back once "Later" is pressed — and every close
+  leaves the drawer gone, the window alive and the focus on the gear;
 - in the morph: a word outside the button at any frame, the version or the gear moving by half a
   pixel, a change that did not play its drain, its width or its words (a run whose morph never
   played proves nothing), and a button that keeps its eased width, or a leaving word, once the
@@ -476,10 +533,11 @@ The routes and the languages are read from the source (`ROUTES` in `src/app/rout
 must measure exactly the product of its lists, none of them empty — so an empty route list, or a run
 that stops early, fails, and a source that no longer compiles fails at once rather than leaving
 Electron waiting with no window. Each measurement waits until the page says it has settled (its language and
-theme applied, every slice of the bridge drawn, the faces loaded) rather than a fixed time.
-A state that is a press away (Later, the fix that reports back, the install still fetching) presses
-first, on the platforms whose card has that button, and waits for what the press brings.
-`OUT=<dir>` writes a PNG of each failing scenario. About four minutes on an Apple-silicon Mac.
+theme applied, every slice of the bridge drawn, the faces loaded, nothing that plays once still
+playing — the drawer's fade) rather than a fixed time. A state that is a press away (Later, the fix
+that reports back, the install still fetching, the gear and the language) presses first, on the
+platforms whose card has that button, and waits for what the press brings. `OUT=<dir>` writes a PNG
+of each failing scenario. About five minutes on an Apple-silicon Mac.
 
 **The window.** Behind the flag the window is the shell's own (`src/main/windowOptions.ts`):
 resizable down to 768×620, maximizable and full-screenable, and opening at 1280×800 the first time —
@@ -512,9 +570,11 @@ clamped to the screen's work area and centred on it — then wherever it was lef
 With the flag off, the old window's options are 0.8.8's byte for byte (`test/windowOptions.test.ts`
 compares them with JSON produced from 0.8.8's own source), and none of the above applies to it.
 
-**Not yet.** The gear does nothing, Pair with Discord does nothing, and the sidebar's foot opens
-nothing. The numbers a broken decoder feeds are not marked ("may be wrong since 14:41", Fh4): there
-are no numbers on Session yet. A notice shows no "Technical details" for an error (the old window's
+**Not yet.** Pair with Discord does nothing, and the sidebar's foot opens nothing. The settings
+have no beta channel (it needs the release pipeline), and a folder's path is shown as the OS gives
+it, not shortened the way the board draws it (`%APPDATA%\…`, `…\resources\engine`). The numbers
+a broken decoder feeds are not marked ("may be wrong since 14:41", Fh4): there are no numbers on
+Session yet. A notice shows no "Technical details" for an error (the old window's
 fold); the broken decoder's verdict is the only detail the band shows. Times of day are in the OS's
 format, which may not be the app language's. In full screen on a Mac the bar
 still pads 84px for the lights it no longer shows. The layout check cannot see the rail's tooltips
