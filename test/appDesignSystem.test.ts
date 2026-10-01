@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import postcss, { type ChildNode } from "postcss";
+import postcss, { type ChildNode, type Rule } from "postcss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
@@ -42,6 +42,12 @@ afterAll(() => {
 });
 
 const stripCssComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+/** A colour written out rather than named: a hex, or an rgb()/hsl() call. */
+const RAW_COLOUR = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?)\(/i;
+
+/** One spelling per colour, so `rgba(244, 241, 234, 0.06)` and the package's `rgba(244,241,234,.06)` compare equal. */
+const normalColour = (value: string): string => value.toLowerCase().replace(/\s+/g, "").replace(/([(,])0\./g, "$1.");
 
 /** How many times each custom property is DECLARED (`--name:`), as opposed to read. */
 const declarations = (css: string): Map<string, number> => {
@@ -136,6 +142,46 @@ describe("the v5 shell's stylesheet", () => {
       for (const name of declarations(readFileSync(join(ROOT, "src", "app", file), "utf8")).keys()) {
         expect(name, `src/app/${file} declares ${name}`).toMatch(/^--lb-/);
       }
+    }
+  });
+
+  it("writes a raw colour only as an --lb-* value, and never one a package token holds in that theme", () => {
+    // The package's value for every token, per theme. A token without a light value keeps its dark
+    // one on parchment (the package README), so the light map starts as a copy of the dark.
+    const dark = new Map<string, string>();
+    const light = new Map<string, string>();
+    postcss.parse(readFileSync(packageFile("tokens.css"), "utf8")).walkDecls(/^--gb-/, (decl) => {
+      const rule = decl.parent;
+      const selector = rule?.type === "rule" ? (rule as Rule).selector : "";
+      (selector.includes('data-theme="light"') ? light : dark).set(decl.prop, normalColour(decl.value));
+    });
+    expect(dark.size).toBeGreaterThan(100); // the parse found the package, not an empty file
+    const lightAll = new Map([...dark, ...light]);
+
+    const dir = join(ROOT, "src", "app");
+    for (const file of readdirSync(dir)) {
+      const source = readFileSync(join(dir, file), "utf8");
+      if (file.endsWith(".tsx") || file.endsWith(".ts")) {
+        // a Tailwind arbitrary colour (`text-[#fff]`) or an inline style is a raw colour too
+        expect(source, `src/app/${file} writes a raw colour`).not.toMatch(RAW_COLOUR);
+        continue;
+      }
+      if (!file.endsWith(".css")) {
+        continue;
+      }
+      postcss.parse(source).walkDecls((decl) => {
+        if (!RAW_COLOUR.test(decl.value)) {
+          return;
+        }
+        expect(decl.prop, `src/app/${file}: ${decl.prop}: ${decl.value} — a raw colour outside an --lb-* value`).toMatch(
+          /^--lb-/,
+        );
+        const rule = decl.parent;
+        const onLight = rule?.type === "rule" && (rule as Rule).selector.includes('data-theme="light"');
+        const theme = onLight ? lightAll : dark;
+        const twin = [...theme].find(([, value]) => value === normalColour(decl.value))?.[0];
+        expect(twin, `src/app/${file}: ${decl.prop} copies ${twin}'s value — name the token instead`).toBeUndefined();
+      });
     }
   });
 

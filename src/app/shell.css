@@ -9,16 +9,19 @@
    package's tokens.css ones, so on data-theme="light" the light block wins the same way. */
 :root,
 [data-theme="dark"] {
-  /* Fh1, F1: the title bar's ground, a shade under the page's --gb-bg (#0A0A0C) */
+  /* Fh1, F1: the title bar's ground, a shade lighter than the page's --gb-bg (#0A0A0C). No
+     token holds it: --gb-chrome (#121118) is the dashboard's frame, and the old window's
+     --gb-titlebar is not the package's */
   --lb-bar: #0C0B0F;
-  /* Fh1, F1: the bar's bottom hairline. On dark it is --gb-rule-row's value, on parchment it is
-     --gb-card-rule's — no one token carries both themes */
-  --lb-bar-line: rgba(244, 241, 234, 0.06);
+  /* Fh1, F1: the bar's bottom hairline. The board takes it from a different token in each theme
+     — --gb-rule-row on dark, --gb-card-rule on parchment — so it names those two rather than
+     copying their values, and follows the package if either moves */
+  --lb-bar-line: var(--gb-rule-row);
 }
 [data-theme="light"] {
   /* Fh1, "On parchment" */
   --lb-bar: #F1EBDD;
-  --lb-bar-line: rgba(120, 92, 32, 0.14);
+  --lb-bar-line: var(--gb-card-rule);
 }
 
 /* — The frame — the page never scrolls; the main region does. */

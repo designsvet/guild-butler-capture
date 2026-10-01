@@ -276,12 +276,15 @@ The page keeps the old window's content-security policy word for word. `pnpm typ
 (`tsconfig.app.json`). `test/appDesignSystem.test.ts` builds it into a temp dir and checks that no
 `@import` is left, that the package's sheets arrive whole and in order (Tailwind's preflight before
 `controls.css`), that no package token is declared again, that the app's own variables are all
-`--lb-*`, and that the faces are the package's files, byte for byte, with their licences beside them.
+`--lb-*`, that a colour is written out only as an `--lb-*` value no package token already holds in
+that theme, and that the faces are the package's files, byte for byte, with their licences beside
+them.
 
 **What is in it.** The frame: the 48px title bar with the crest, the wordmark and the gear, over an
 empty main region. The gear is the design system's `Button`, which shows the package's React entry
 rendering under the policy. A value a board draws that no token holds is a `--lb-*` variable in
-`src/app/shell.css`, defined for both themes.
+`src/app/shell.css`, defined for both themes; where the board takes a different token in each theme
+(the bar's hairline), the variable names the two tokens instead of copying their values.
 
 **Not yet.** The window is still the old 660×620 frame (the v5 window is the next step). The gear
 does nothing. There is no status, action, version, sidebar, page or skip link. The stored theme and
