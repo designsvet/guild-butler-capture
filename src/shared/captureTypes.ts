@@ -270,6 +270,12 @@ export type TPairingStatus = {
   deviceName: string | null;
   /** Discord guild id — used only to build the "View my loot" link. */
   guildId: string | null;
+  /**
+   * That link, built by main from the guild and the server address (src/shared/pairing.ts
+   * `lootPageUrl`): the v5 shell's "View my loot" is a real link to it, which main opens in the
+   * browser. Null when not paired. The old window reads the guild alone.
+   */
+  lootUrl: string | null;
   pairedAt: number | null;
   /** Auto-upload toggle. Default ON. */
   uploadEnabled: boolean;
@@ -297,6 +303,7 @@ export const initialPairingStatus: TPairingStatus = {
   paired: false,
   deviceName: null,
   guildId: null,
+  lootUrl: null,
   pairedAt: null,
   uploadEnabled: true,
   upload: { state: "unpaired", sentTotal: 0, lastSentAt: null, failures: 0, lastError: null },

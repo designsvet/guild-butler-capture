@@ -57,3 +57,19 @@ export const defaultDeviceName = (hostname: string, platform: string): string =>
   }
   return platform === "darwin" ? "Mac" : platform === "win32" ? "PC" : "Computer";
 };
+
+/**
+ * The member's loot page on the dashboard: "View my loot". Main opens it (`pairing:open-loot`) and
+ * hands it to the v5 shell as that link's address (`TPairingStatus.lootUrl`), so the two cannot
+ * drift.
+ *
+ * `tab=loot` lands them ON the Loot tab. Without it the dashboard follows the guild and stops on
+ * Overview, so every press ended with the member hunting for the tab themselves — the actual
+ * complaint, reported 2026-08-30. The dashboard checks the value against its own tab ids and
+ * ignores anything else, so an old build sending a renamed id degrades to that rather than
+ * breaking. Without a guild the deep link has no target: the dashboard's root, rather than a 404
+ * that reads as the feature being broken.
+ */
+export const lootPageUrl = (base: string, guildId: string | null): string => {
+  return guildId != null && guildId.length > 0 ? `${base}/?guild=${encodeURIComponent(guildId)}&tab=loot` : base;
+};
