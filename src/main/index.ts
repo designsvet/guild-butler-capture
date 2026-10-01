@@ -622,7 +622,12 @@ const rememberPlace = (w: BrowserWindow): void => {
     read: () =>
       w.isDestroyed()
         ? null
-        : windowStateOf({ normalBounds: w.getNormalBounds(), maximized: w.isMaximized(), fullScreen: w.isFullScreen() }),
+        : windowStateOf({
+            normalBounds: w.getNormalBounds(),
+            maximized: w.isMaximized(),
+            fullScreen: w.isFullScreen(),
+            minimized: w.isMinimized(),
+          }),
     write: (next) => {
       const ok = saveWindowState(WINDOW_STATE_FILE, next);
       if (!ok) {

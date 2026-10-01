@@ -191,14 +191,14 @@ describe("windowBounds: maximized is remembered over the normal bounds", () => {
   const normal: TRect = { x: 200, y: 150, width: 1300, height: 860 };
 
   it("a normal window saves its bounds, not maximized", () => {
-    expect(windowStateOf({ normalBounds: normal, maximized: false, fullScreen: false })).toEqual({
+    expect(windowStateOf({ normalBounds: normal, maximized: false, fullScreen: false, minimized: false })).toEqual({
       bounds: normal,
       maximized: false,
     });
   });
 
   it("a maximized window saves the size it un-maximizes to, and the flag", () => {
-    const state = windowStateOf({ normalBounds: normal, maximized: true, fullScreen: false });
+    const state = windowStateOf({ normalBounds: normal, maximized: true, fullScreen: false, minimized: false });
     expect(state).toEqual({ bounds: normal, maximized: true });
     // and reopens at those bounds, maximized over them
     expect(placeWindow({ stored: parseWindowState(JSON.parse(JSON.stringify(state))), workAreas: [MAC], primary: MAC })).toEqual(
@@ -207,15 +207,22 @@ describe("windowBounds: maximized is remembered over the normal bounds", () => {
   });
 
   it("full screen is not remembered: the window comes back at its normal bounds", () => {
-    expect(windowStateOf({ normalBounds: normal, maximized: true, fullScreen: true })).toEqual({
+    expect(windowStateOf({ normalBounds: normal, maximized: true, fullScreen: true, minimized: false })).toEqual({
       bounds: normal,
       maximized: false,
     });
   });
 
+  it("a minimized window says nothing: a Mac reports its zoomed frame as normal, both OSes say not maximized", () => {
+    // what a Mac reported for a maximized window minimized to the Dock (measured, macOS 26.6)
+    const zoomed: TRect = { x: 0, y: 30, width: 2560, height: 1325 };
+    expect(windowStateOf({ normalBounds: zoomed, maximized: false, fullScreen: false, minimized: true })).toBeNull();
+    expect(windowStateOf({ normalBounds: normal, maximized: false, fullScreen: false, minimized: true })).toBeNull();
+  });
+
   it("saves only the four numbers, whatever else the rectangle carries", () => {
     const extra = { ...normal, scale: 2 } as TRect;
-    expect(Object.keys(windowStateOf({ normalBounds: extra, maximized: false, fullScreen: false }).bounds)).toEqual([
+    expect(Object.keys(windowStateOf({ normalBounds: extra, maximized: false, fullScreen: false, minimized: false })?.bounds ?? {})).toEqual([
       "x",
       "y",
       "width",

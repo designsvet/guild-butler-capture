@@ -65,7 +65,11 @@ export type TWindowStateKeeper = {
  * When to write. A drag fires `move` dozens of times a second, so writes wait until the window
  * has been still for `delayMs`; closing writes at once. A state equal to the last one written is
  * not written again, and a failed write is not remembered as written, so the next change retries.
- * `read` returns null once the window is destroyed — nothing is written then.
+ *
+ * `read` returns null when the window cannot say where it is — minimized (windowStateOf), or
+ * destroyed. The keeper then writes the last place it DID say, read at every change as well as at
+ * the write: quitting with the window in the Dock or the taskbar keeps the place it had. Never
+ * read, nothing is written.
  */
 export const createWindowStateKeeper = (deps: {
   read: () => TWindowState | null;
@@ -76,6 +80,7 @@ export const createWindowStateKeeper = (deps: {
 }): TWindowStateKeeper => {
   let pending: unknown = null;
   let lastWritten: string | null = null;
+  let lastSeen: TWindowState | null = null;
 
   const cancel = (): void => {
     if (pending != null) {
@@ -84,9 +89,18 @@ export const createWindowStateKeeper = (deps: {
     }
   };
 
+  /** The window's state now, or the last one it gave when it cannot give one now. */
+  const look = (): TWindowState | null => {
+    const now = deps.read();
+    if (now != null) {
+      lastSeen = now;
+    }
+    return lastSeen;
+  };
+
   const writeNow = (): void => {
     cancel();
-    const state = deps.read();
+    const state = look();
     if (state == null) {
       return;
     }
@@ -101,6 +115,9 @@ export const createWindowStateKeeper = (deps: {
 
   return {
     schedule: () => {
+      // Read at the change as well: a maximize then a minimize inside the delay must still
+      // leave the maximized place to write.
+      look();
       cancel();
       pending = deps.setTimer(() => {
         pending = null;

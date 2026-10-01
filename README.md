@@ -297,7 +297,9 @@ clamped to the screen's work area and centred on it — then wherever it was lef
   handler's early return: closing the window there is not quitting, and the next window (a click on
   the dock icon) opens from the file.
 - A maximized window keeps the bounds it un-maximizes to and reopens maximized over them. Full
-  screen is not remembered.
+  screen is not remembered. A minimized window is not read at all — both OSes call it not
+  maximized, and a Mac reports the zoomed frame as its normal bounds — so quitting with it in the
+  Dock or the taskbar keeps the place it last had on screen.
 - A remembered place is dropped, and the first-open size used, when less than 160 px of its title
   bar would land on any screen's work area — most often a monitor since unplugged. The rules are
   pure (`src/main/windowBounds.ts`, `test/windowBounds.test.ts`); the file and its timing are

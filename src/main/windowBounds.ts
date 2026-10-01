@@ -145,12 +145,22 @@ export const placeWindow = (input: {
  * maximized over them. Full screen is not remembered: on a Mac it is a Space of its own, and
  * reopening into one is not what "remembers its size and place" means — the window comes back at
  * the bounds it had before.
+ *
+ * A minimized window says nothing (null): both OSes report it as not maximized, and a Mac also
+ * reports the zoomed frame as its normal bounds — measured: quitting from the Dock with a
+ * maximized window minimized saved the whole screen as an un-maximized size, and the size it
+ * un-maximizes to was gone. Its place is the one it had before it was minimized; the keeper
+ * (windowState.ts) writes that instead.
  */
 export const windowStateOf = (window: {
   normalBounds: TRect;
   maximized: boolean;
   fullScreen: boolean;
-}): TWindowState => {
+  minimized: boolean;
+}): TWindowState | null => {
+  if (window.minimized) {
+    return null;
+  }
   const { x, y, width, height } = window.normalBounds;
   return { bounds: { x, y, width, height }, maximized: window.maximized && !window.fullScreen };
 };

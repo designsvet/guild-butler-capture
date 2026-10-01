@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -242,7 +243,33 @@ describe("windowState: the keeper decides when to write", () => {
     expect(h.writes).toEqual([STATE]);
   });
 
-  it("writes nothing once the window is gone", () => {
+  it("a window that cannot say where it is (minimized) leaves the place it last said to be written", () => {
+    const maximized: TWindowState = { ...STATE, maximized: true };
+    const h = harness(maximized);
+    // maximized, then minimized before the write was due: the timer still writes the maximized place
+    h.keeper.schedule();
+    h.setState(null);
+    h.fire();
+    expect(h.writes).toEqual([maximized]);
+    // and quitting from the Dock or the taskbar writes nothing over it
+    h.keeper.flush();
+    expect(h.writes).toEqual([maximized]);
+  });
+
+  it("closing while minimized writes the place the window had on screen", () => {
+    const h = harness();
+    h.keeper.schedule();
+    h.fire();
+    const moved: TWindowState = { bounds: { ...STATE.bounds, x: 640 }, maximized: true };
+    h.setState(moved);
+    h.keeper.schedule();
+    h.setState(null);
+    h.keeper.flush();
+    expect(h.writes).toEqual([STATE, moved]);
+    expect(h.pending()).toBe(0);
+  });
+
+  it("writes nothing when the window never said where it was", () => {
     const h = harness(null);
     h.keeper.schedule();
     h.fire();
@@ -256,5 +283,20 @@ describe("windowState: the keeper decides when to write", () => {
     h.keeper.dispose();
     expect(h.pending()).toBe(0);
     expect(h.writes).toEqual([]);
+  });
+});
+
+describe("windowState: index.ts writes the place before the close handler can return", () => {
+  // On a Mac the window's own close handler returns at once (closing is not quitting there); the
+  // close-time write must already have run by then, or the next window opens from a stale file.
+  const INDEX = readFileSync(fileURLToPath(new URL("../src/main/index.ts", import.meta.url)), "utf8");
+  const createWindow = INDEX.slice(INDEX.indexOf("const createWindow = "));
+
+  it("rememberPlace — whose close listener flushes — is wired before win.on(\"close\")", () => {
+    expect(INDEX).toMatch(/w\.on\("close", keeper\.flush\);/);
+    const remember = createWindow.indexOf("rememberPlace(win);");
+    const closeHandler = createWindow.indexOf('win.on("close"');
+    expect(remember).toBeGreaterThan(-1);
+    expect(closeHandler).toBeGreaterThan(remember);
   });
 });
