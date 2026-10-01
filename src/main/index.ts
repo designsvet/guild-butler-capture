@@ -58,7 +58,7 @@ import {
 } from "./platform/macBpf.js";
 import { installNpcap, parseSignatureOutput, type TSignatureCheck } from "./platform/npcapInstall.js";
 import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpcap.js";
-import { loadSettings, saveSettings, settingsFilePath } from "./settings.js";
+import { loadSettings, saveSettings, settingsFilePath, wantsV5Shell, withLanguage, withTheme } from "./settings.js";
 import { asLang, detectLang } from "../shared/i18n.js";
 import { asTheme, type TTheme } from "../shared/captureTypes.js";
 import { stringsFor } from "../shared/strings.js";
@@ -596,6 +596,10 @@ const overlayFor = (theme: TTheme): { color: string; symbolColor: string; height
 
 const createWindow = (): void => {
   const theme = appSettings().theme;
+  // Which page this window loads: the old greeting (the default, as 0.8.x ships it) or the v5
+  // shell preview (dist/web/app, tools/build-app.mjs). The window itself is the old one either
+  // way until the v5 window lands — only the page differs.
+  const v5 = wantsV5Shell(process.env, loadSettings(SETTINGS_FILE));
   win = new BrowserWindow({
     // ONE window size for every state (owner ruling, 2026-08-29): the hero
     // zone flexes inside; idle gives its room to the pairing card. Content
@@ -628,7 +632,10 @@ const createWindow = (): void => {
     },
   });
   win.removeMenu?.();
-  void win.loadFile(join(APP_ROOT, "dist", "web", "renderer", "index.html"));
+  if (v5) {
+    appLog("window: the v5 shell preview (GBC_SHELL=v5 or settings.shell)");
+  }
+  void win.loadFile(join(APP_ROOT, "dist", "web", v5 ? "app" : "renderer", "index.html"));
   win.webContents.on("did-finish-load", () => {
     win?.webContents.send(IPC.stateChanged, state);
   });
@@ -825,21 +832,13 @@ const registerIpc = (): void => {
     return appSettings();
   });
   ipcMain.handle(IPC.settingsSetLanguage, (_event, lang: unknown): TAppSettings => {
-    const settings = loadSettings(SETTINGS_FILE);
-    const narrowed = asLang(lang);
-    if (narrowed == null) {
-      // "System" (or garbage): drop the override so the OS decides again.
-      delete settings.language;
-    } else {
-      settings.language = narrowed;
-    }
-    saveSettings(SETTINGS_FILE, settings);
+    // "System" (or garbage) narrows to null: the override goes and the OS decides again.
+    saveSettings(SETTINGS_FILE, withLanguage(loadSettings(SETTINGS_FILE), asLang(lang)));
     return appSettings();
   });
   ipcMain.handle(IPC.settingsSetTheme, (_event, theme: unknown): TAppSettings => {
-    const settings = loadSettings(SETTINGS_FILE);
     const narrowed = asTheme(theme) ?? "obsidian";
-    saveSettings(SETTINGS_FILE, { ...settings, theme: narrowed });
+    saveSettings(SETTINGS_FILE, withTheme(loadSettings(SETTINGS_FILE), narrowed));
     if (process.platform === "win32") {
       try {
         win?.setTitleBarOverlay(overlayFor(narrowed));
