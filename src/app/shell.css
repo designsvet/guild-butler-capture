@@ -1,5 +1,6 @@
-/* The shell's own layer: the values no package token holds, and the frame. Inlined last into
-   app.css. */
+/* The shell's own layer: the values no package token holds, the frame, and the shell's parts.
+   Inlined last into app.css, so a rule here wins over a package class of the same weight — which
+   is how a part keeps the package's look and takes the board's size. */
 
 /* — The shell's values —
    What a board draws that no token in @guild-butler/design-system holds, each defined once, for
@@ -11,31 +12,90 @@
 [data-theme="dark"] {
   /* Fh1, F1: the title bar's ground, a shade lighter than the page's --gb-bg (#0A0A0C). No
      token holds it: --gb-chrome (#121118) is the dashboard's frame, and the old window's
-     --gb-titlebar is not the package's */
+     --gb-titlebar is not the package's. The sidebar is the same ground (Fh3) */
   --lb-bar: #0C0B0F;
-  /* Fh1, F1: the bar's bottom hairline. The board takes it from a different token in each theme
-     — --gb-rule-row on dark, --gb-card-rule on parchment — so it names those two rather than
-     copying their values, and follows the package if either moves */
+  /* Fh1, F1: the bar's bottom hairline, and the sidebar's edge and its foot's rule (Fh3, Fh2).
+     The board takes it from a different token in each theme — --gb-rule-row on dark,
+     --gb-card-rule on parchment — so it names those two rather than copying their values, and
+     follows the package if either moves */
   --lb-bar-line: var(--gb-rule-row);
+  /* Fh1: the words of the error state and of Stop, a red lighter than --gb-red-text (#D2704A)
+     on dark. On parchment the board uses --gb-red-text itself */
+  --lb-danger-text: #E8A184;
+  /* Fh1: the soft ring around the bar's status dot, as a share of the dot's own colour — 18% on
+     dark, 16% on parchment; the grey dot's is 15% in both (--lb-halo-grey) */
+  --lb-halo: 18%;
+  --lb-halo-grey: 15%;
+  /* Fh3: the icon tiles' corner, a step inside --gb-r-sm (8px); the package's small tile uses
+     the same 7px */
+  --lb-r-tile: 7px;
 }
 [data-theme="light"] {
   /* Fh1, "On parchment" */
   --lb-bar: #F1EBDD;
   --lb-bar-line: var(--gb-card-rule);
+  --lb-danger-text: var(--gb-red-text);
+  --lb-halo: 16%;
 }
 
-/* — The frame — the page never scrolls; the main region does. */
+/* — The frame — the page never scrolls; the main region does. Text with no line-height of its
+   own sets at the face's natural height, as every board is drawn (base.css's 1.6 is the
+   marketing page's reading measure, and would stretch every unsized line on the boards). */
 html,
 body,
 #root {
   height: 100%;
 }
+body {
+  overflow: hidden;
+}
 #root {
   display: flex;
   flex-direction: column;
+  line-height: normal;
+}
+.lb-body {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+}
+.lb-main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  overflow: auto;
+  padding: 16px 24px 24px;
+}
+/* The page's parts keep their own heights: in a flex column that scrolls, a part with a min-height
+   of its own (the header's 40px) would otherwise be squeezed to it once the page outgrows the
+   window, and its contents would spill out of it. */
+.lb-main > * {
+  flex-shrink: 0;
+}
+@media (max-width: 1279px) {
+  .lb-main {
+    padding: 16px 20px 20px;
+  }
+}
+@media (max-width: 1023px) {
+  .lb-main {
+    padding: 14px 16px 16px;
+  }
 }
 
-/* The title bar (Fh1, F1): 48px, and the window's drag region. The OS draws over its ends — a
+/* The skip link (base.css's .gb-skip) lands over the title bar, which is the window's drag
+   region: without this a click on it would move the window instead. On a Mac it starts where the
+   wordmark does, clear of the three lights the OS draws over the page. */
+.gb-skip {
+  -webkit-app-region: no-drag;
+}
+[data-platform="darwin"] .gb-skip {
+  left: 84px;
+}
+
+/* — The title bar (Fh1, F1) — 48px, and the window's drag region. The OS draws over its ends — a
    Mac's traffic lights at the left (the crest starts 84px in), Windows' three caption buttons at
    the right (3 × 46px, and the board's 18px before them) — so those ends are padding, chosen by
    the platform main.tsx writes on <html>. */
@@ -59,4 +119,669 @@ body,
 /* Anything pressed is cut out of the drag region, or the press would move the window instead. */
 .lb-titlebar :is(a, button, input) {
   -webkit-app-region: no-drag;
+}
+.lb-bar-crest {
+  flex: none;
+  width: 26px;
+  height: 26px;
+}
+.lb-bar-fill {
+  flex: 1 1 0;
+}
+
+/* The status: a dot, the words, and the time after a "·". It gives up width before anything else
+   in the bar — the label ellipsizes, and its title keeps the whole line. */
+.lb-status {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--gb-muted);
+  white-space: nowrap;
+}
+.lb-status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lb-tone);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lb-tone) var(--lb-tone-halo), transparent);
+}
+.lb-status-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--gb-ink-2);
+}
+.lb-status-label--name {
+  color: var(--gb-ink);
+}
+.lb-status-label--danger {
+  color: var(--lb-danger-text);
+}
+.lb-status-sep {
+  flex: none;
+  color: var(--gb-dim);
+}
+.lb-status-detail {
+  flex: none;
+}
+/* The error's dot has no ring (Fh1). */
+.lb-status[data-tone="red"] .lb-status-dot {
+  box-shadow: none;
+}
+
+/* A dot's colour by tone: the package's status fills, and its label grey for a resting state. */
+[data-tone="grey"],
+[data-dot="grey"] {
+  --lb-tone: var(--gb-dim);
+  --lb-tone-halo: var(--lb-halo-grey);
+}
+[data-tone="amber"],
+[data-dot="amber"] {
+  --lb-tone: var(--gb-amber);
+  --lb-tone-halo: var(--lb-halo);
+}
+[data-tone="green"],
+[data-dot="green"] {
+  --lb-tone: var(--gb-green);
+  --lb-tone-halo: var(--lb-halo);
+}
+[data-tone="red"],
+[data-dot="red"] {
+  --lb-tone: var(--gb-red);
+  --lb-tone-halo: var(--lb-halo);
+}
+
+/* Stop: the package's outlined danger, in the board's lighter red, with a small square for an
+   icon. Its line is --gb-red at 55% in both themes (Fh1). */
+.lb-stop {
+  color: var(--lb-danger-text);
+  border-color: color-mix(in srgb, var(--gb-red) 55%, transparent);
+}
+.lb-stop-mark {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.lb-bar-divider {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: var(--gb-divider);
+}
+.lb-bar-version {
+  flex: none;
+  font-family: var(--gb-font-mono);
+  font-size: 11px;
+  color: var(--gb-dim);
+  white-space: nowrap;
+}
+/* The gear is the package's quiet icon button at 28px, drawn as Fh1 has it: a muted glyph, 15px. */
+.lb-gear {
+  color: var(--gb-muted);
+}
+.lb-gear svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Below 1024 the bar keeps the name and the time; the version and its divider go (Fh1). */
+.lb-short {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .lb-long,
+  .lb-wide {
+    display: none;
+  }
+  .lb-short {
+    display: inline;
+  }
+}
+
+/* — The sidebar (F1, Fh3; the rail: F1r1024, F1r768, Fr) — the frame's ground, 208px with labels
+   from 1280 up. Above the page, so the rail's tooltips can reach over it. */
+.lb-side {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 16px;
+  width: 208px;
+  padding: 14px 10px 12px;
+  background: var(--lb-bar);
+  border-right: 1px solid var(--lb-bar-line);
+}
+.lb-side-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lb-side-eyebrow {
+  padding: 0 10px 6px;
+  font-family: var(--gb-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gb-dim);
+  white-space: nowrap;
+}
+.lb-side-fill {
+  flex: 1 1 0;
+}
+
+/* A page: 36px, the second ink, its icon in the label grey. The page you are on is the chosen
+   wash, gold words and a lit icon (the package's navigation tokens). */
+.lb-nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--gb-r-sm);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--gb-ink-2);
+  text-decoration: none;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
+}
+.lb-nav-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--gb-dim);
+  transition: color 0.15s;
+}
+.lb-nav-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.lb-nav-label {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-nav:not(.is-active):hover {
+  color: var(--gb-ink);
+  background: var(--gb-neutral-wash);
+}
+.lb-nav:not(.is-active):hover .lb-nav-icon {
+  color: var(--gb-ink-2);
+}
+.lb-nav.is-active {
+  font-weight: 600;
+  color: var(--gb-gold-text);
+  background: var(--gb-chosen-wash);
+}
+.lb-nav.is-active .lb-nav-icon {
+  color: var(--gb-nav-icon);
+}
+
+/* The lit icon draws itself once on arrival (the boards' helmet, `lb-lit`): each stroke .8s, then
+   the glow comes up. Its resting state IS the end of that — drawn and glowing — so under reduced
+   motion, where base.css takes every animation away, the icon simply arrives lit. */
+.lb-lit {
+  filter: var(--gb-nav-glow);
+  animation: lb-glow var(--gb-motion-glow) ease-out calc(var(--gb-motion-draw) + 150ms) both;
+}
+.lb-lit path {
+  stroke-dasharray: 1;
+  animation: lb-draw var(--gb-motion-draw) cubic-bezier(0.65, 0, 0.35, 1) 150ms both;
+}
+@keyframes lb-draw {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+@keyframes lb-glow {
+  from {
+    filter: none;
+  }
+  to {
+    filter: var(--gb-nav-glow);
+  }
+}
+
+/* The foot (Fh2): one line — a dot and the device, or "Connect a guild" in gold — and a quieter
+   line under it, indented to the words. */
+.lb-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 10px 4px;
+  border-top: 1px solid var(--lb-bar-line);
+}
+.lb-foot-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gb-ink-2);
+  white-space: nowrap;
+}
+.lb-foot-line--connect {
+  color: var(--gb-gold-text);
+}
+.lb-foot-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lb-tone);
+}
+.lb-foot[data-dot="hollow"] .lb-foot-dot {
+  width: 8px;
+  height: 8px;
+  background: none;
+  border: 1.5px solid var(--gb-dim);
+}
+.lb-foot-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-foot-chevron {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+  color: var(--gb-dim);
+}
+/* The board sets the quiet line on one line; it wraps here instead, because it is a sentence —
+   "Sessions stay on this computer" (Windows) and most of the other languages run past the 153px
+   it has, and a sentence cut to "Sessions stay on this co…" says nothing. */
+.lb-foot-sub {
+  padding-left: 15px;
+  font-size: 12px;
+  color: var(--gb-muted);
+}
+
+/* The rail, below 1280: 60px of icons. The words stay in the markup — the link's name, the
+   group's label, the foot's two lines — and go from the eye; a page's label comes back as a
+   tooltip on hover and on focus (board Fa), drawn as the package's tooltip. */
+@media (max-width: 1279px) {
+  .lb-side {
+    align-items: center;
+    width: 60px;
+    padding: 14px 8px 12px;
+  }
+  .lb-side-eyebrow,
+  .lb-nav-label,
+  .lb-foot-text,
+  .lb-foot-sub {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .lb-nav {
+    justify-content: center;
+    gap: 0;
+    width: 44px;
+    height: 40px;
+    padding: 0;
+  }
+  .lb-nav::after {
+    /* The alternative text after the slash is empty: the link is already named by its label. */
+    content: attr(data-label) / "";
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 10px);
+    z-index: 2;
+    display: none;
+    padding: 6px 9px;
+    border-radius: var(--gb-r-sm);
+    background: var(--gb-tooltip);
+    box-shadow: var(--gb-tooltip-edge);
+    color: var(--gb-tooltip-ink);
+    font-size: var(--gb-text-caption);
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: nowrap;
+    pointer-events: none;
+    transform: translateY(-50%);
+  }
+  .lb-nav:hover::after,
+  .lb-nav:focus-visible::after {
+    display: block;
+  }
+  .lb-foot {
+    align-items: center;
+    gap: 0;
+    width: 44px;
+    padding: 8px 0 0;
+  }
+  .lb-foot-line {
+    justify-content: center;
+    width: 44px;
+    height: 28px;
+  }
+  .lb-foot-chevron {
+    display: none;
+  }
+}
+
+/* — The page header (F1) — the range tabs where the title would be, then the meta line: beside
+   them from 1280 up, under them below. The tabs are the package's (`gb-tabs--title`), set at the
+   board's 18px and centred in their 40px, the unchosen ones in the label grey. */
+.lb-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+}
+.lb-head-titles {
+  display: flex;
+  align-items: center;
+  column-gap: 18px;
+  min-width: 0;
+}
+.lb-head .gb-tabs {
+  flex: none;
+  align-items: center;
+  gap: 20px;
+  height: 40px;
+}
+.lb-head .gb-tabs-i {
+  align-items: center;
+  height: 40px;
+  padding: 0 1px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--gb-dim);
+}
+.lb-head .gb-tabs-i:hover,
+.lb-head .gb-tabs-i[aria-selected="true"] {
+  color: var(--gb-ink);
+}
+.lb-head-meta {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13.5px;
+  color: var(--gb-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 1279px) {
+  .lb-head-titles {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  .lb-head-meta {
+    flex-basis: 100%;
+    margin-top: -2px;
+  }
+}
+
+/* — Session before data (Fh3, Fh7) — the hero and What appears here at the left; the guild, the
+   folder and auto-start in the right column: 400px from 1280, 320px at 1024, under the page below
+   (Fr). */
+.lb-session {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 1279px) {
+  .lb-session {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+@media (max-width: 1023px) {
+  .lb-session {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.lb-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* An icon pressed into its card: the package's well and press, at the board's three sizes. */
+.lb-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--lb-r-tile);
+  background: var(--gb-well);
+  box-shadow: var(--gb-press);
+  color: var(--gb-ink-2);
+}
+.lb-tile--hero {
+  width: 44px;
+  height: 44px;
+}
+.lb-tile--head {
+  width: 22px;
+  height: 22px;
+}
+.lb-tile--row {
+  width: 30px;
+  height: 30px;
+}
+
+/* The hero: the state's card, padded wider than the others. */
+.lb-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  padding: 22px 24px;
+}
+.lb-hero-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.lb-hero-text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.lb-hero-title {
+  margin: 0;
+  font-family: var(--gb-font-display);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--gb-ink);
+}
+.lb-hero-line {
+  max-width: 640px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--gb-muted);
+  text-wrap: pretty;
+}
+.lb-hero-line--tight {
+  margin-top: -4px;
+}
+
+/* The waiting reasons: a bare list under the card's rule, run to the card's edges. */
+.lb-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 -24px;
+  padding: 16px 24px 0;
+  border-top: 1px solid var(--gb-card-rule);
+}
+.lb-eyebrow {
+  margin: 0;
+  font-family: var(--gb-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gb-dim);
+}
+.lb-reasons-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 -10px;
+  padding: 0;
+  list-style: none;
+}
+.lb-reasons-list li {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: baseline;
+  padding: 10px 0;
+}
+.lb-reasons-list li + li {
+  border-top: 1px solid var(--gb-rule-row);
+}
+.lb-reason-lead {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--gb-ink);
+}
+.lb-reason-body {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--gb-muted);
+}
+
+/* A card and its title row (Fh3): the package's card surface, at the board's padding, with a 22px
+   tile and a 15.5px title over a rule that runs to the card's edges. */
+.lb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 18px 16px;
+}
+.lb-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  /* The board's 30px row (content-box) under its 12px of padding and the rule; the page measures
+     border-box (base.css) */
+  min-height: 43px;
+  margin: 0 -18px;
+  padding: 0 18px 12px;
+  border-bottom: 1px solid var(--gb-card-rule);
+}
+/* The board keeps a title on one line; a title that does not fit wraps rather than lose its end
+   (the Russian "Send loot to your guild" in the 320px column at 1024). */
+.lb-card-title {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--gb-font-display);
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--gb-ink);
+}
+.lb-card-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--gb-muted);
+  text-wrap: pretty;
+}
+.lb-card-small {
+  margin: -4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--gb-dim);
+  text-wrap: pretty;
+}
+.lb-card-actions {
+  display: flex;
+  padding-top: 2px;
+}
+
+/* What appears here: four rows, two by two. */
+.lb-appears {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+  padding: 2px 0 0;
+  list-style: none;
+}
+.lb-appears li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.lb-appears-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lb-appears-lead {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--gb-ink);
+}
+.lb-appears-body {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--gb-muted);
+}
+
+/* The auto-start switch: the package's, its words at the board's size and in the first ink. A
+   flex row, so the inline label sits in no line box of its own (which would add a descender's
+   height under it). */
+.lb-switch-row {
+  display: flex;
+  align-items: center;
+}
+.lb-switch-row .gb-choice-label {
+  gap: 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--gb-ink);
+}
+
+/* Windows high contrast takes the washes away: the page you are on keeps an outline. */
+@media (forced-colors: active) {
+  .lb-nav.is-active {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }

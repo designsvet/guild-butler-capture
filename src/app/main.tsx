@@ -3,32 +3,28 @@
  * greeting only behind GBC_SHELL=v5 or settings.shell (src/main/settings.ts); bundled into
  * dist/web/app/main.js by tools/build-app.mjs, React included.
  *
- * So far the frame: the title bar with the crest and the wordmark, and one of the design
- * system's React components, which is what proves the toolchain end to end under the old
- * window's content-security policy. The store that mirrors the bridge — and with it the stored
- * theme and language — the sidebar and the pages come next.
+ * It makes the two stores the page reads — the bridge's mirror (store.ts) and the hash router
+ * (router.ts) — boots the first, and renders the shell over them. Booting happens here, once,
+ * outside React, so StrictMode's double effects cannot subscribe twice.
  */
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { detectLang } from "../shared/i18n.js";
-import { stringsFor } from "../shared/strings.js";
+import type { TGbc } from "../shared/bridge.js";
+import { createRouter } from "./router.js";
 import { Shell } from "./Shell.js";
+import { createShellStore } from "./store.js";
 
-// The preload's bridge (src/preload/index.cts) carries the platform synchronously, and the title
-// bar pads around the OS's own buttons by it. Read narrowly here; the bridge's full type moves
-// to src/shared with the store.
-const bridge = (window as unknown as { gbc?: { platform?: unknown } }).gbc;
-const platform = typeof bridge?.platform === "string" ? bridge.platform : "unknown";
+const gbc = (window as unknown as { gbc: TGbc }).gbc;
 
-// The OS's language for now: the stored override is a setting, and settings arrive with the store.
-const lang = detectLang(navigator.language);
-const strings = stringsFor(lang);
+// The title bar pads around the OS's own buttons by platform (shell.css), so it is on <html>
+// before the first paint.
+document.documentElement.dataset.platform = gbc.platform;
 
-document.documentElement.dataset.platform = platform;
-document.documentElement.lang = lang;
-document.title = strings.shell.appName;
+const store = createShellStore(gbc, window);
+const router = createRouter(window);
+void store.boot();
 
 const root = document.getElementById("root");
 if (root == null) {
@@ -36,6 +32,6 @@ if (root == null) {
 }
 createRoot(root).render(
   <StrictMode>
-    <Shell strings={strings} />
+    <Shell store={store} router={router} platform={gbc.platform} />
   </StrictMode>,
 );
