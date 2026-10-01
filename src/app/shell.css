@@ -1048,3 +1048,199 @@ body {
     outline-offset: -2px;
   }
 }
+
+/* — The notices (Fh5; Fh4 option D) — one slot at the top of every page, above the page header: the
+   band. A notice is an ordinary card — no coloured bar, no tinted ground (Fh5) — at the board's
+   padding, with a 34px tile; its weight is the icon, the colour of its title and its one action. An
+   alert (capture blocked, the broken decoder) sets the title and the icon in Stop's red; a quiet one
+   (the logger keeps stopping, an update is ready) in the inks. */
+.lb-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px 18px;
+}
+.lb-tile--notice {
+  width: 34px;
+  height: 34px;
+}
+.lb-notice[data-tone="alert"] .lb-tile--notice,
+.lb-dialog .lb-tile--notice {
+  color: var(--lb-danger-text);
+}
+.lb-notice-main {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+.lb-notice-text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.lb-notice-title {
+  margin: 0;
+  font-family: var(--gb-font-display);
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--gb-ink);
+}
+.lb-notice[data-tone="alert"] .lb-notice-title {
+  color: var(--lb-danger-text);
+}
+.lb-notice-body {
+  max-width: 780px;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--gb-muted);
+  text-wrap: pretty;
+}
+/* What a fix attempt did, and the held upload: a step smaller, a step brighter. */
+.lb-notice-note {
+  max-width: 780px;
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--gb-ink-2);
+  text-wrap: pretty;
+}
+/* What the engine said was broken, shown open: the technical detail (Fh5's mono line). A line too
+   long for a narrow card breaks rather than run out of it. */
+.lb-notice-details {
+  display: flex;
+  flex-direction: column;
+  margin: 3px 0 0;
+  font-family: var(--gb-font-mono);
+  font-size: var(--gb-text-caption);
+  line-height: 1.5;
+  color: var(--gb-dim);
+  overflow-wrap: anywhere;
+}
+/* The action sits at the right, centred on the card. A button and a link together keep a little
+   more air before them (Fh5's driver card); the link's own padding reaches into the card's, so its
+   words end where the card's padding does. */
+.lb-notice-actions {
+  display: flex;
+  flex: none;
+  align-self: center;
+  align-items: center;
+  gap: 8px;
+}
+.lb-notice-actions:has(> .gbtn:not(.gbtn-link)):has(> .gbtn-link) {
+  margin-left: 12px;
+}
+.lb-notice-actions > .lb-notice-link:last-child {
+  margin-right: -8px;
+}
+/* Below 1024 the words take the card's width and the action goes under them (Fh5, "In the
+   smallest window"), the link's words lined up with the text above. */
+@media (max-width: 1023px) {
+  .lb-notice-main {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .lb-notice-actions {
+    flex-wrap: wrap;
+    align-self: flex-start;
+    margin-left: 0;
+  }
+  .lb-notice-actions:has(> .gbtn:not(.gbtn-link)):has(> .gbtn-link) {
+    margin-left: 0;
+  }
+  .lb-notice-actions > .lb-notice-link:last-child {
+    margin-right: 0;
+  }
+  .lb-notice-actions > .lb-notice-link:first-child {
+    margin-left: -8px;
+  }
+}
+
+/* The broken decoder's dialog (Fh4, option D): the package's dialog and its one scrim, under the
+   title bar — the bar stays as it was, the window's handle and its state — centred in what is left.
+   The rest of the window is inert while it is open (Shell.tsx). It fades up, which reduced motion
+   (base.css) takes to nothing. */
+.lb-overlay {
+  position: fixed;
+  inset: 48px 0 0;
+  z-index: 50;
+}
+.lb-scrim {
+  top: 48px;
+  animation: lb-fade-in var(--gb-motion-normal) var(--gb-ease) both;
+}
+.lb-dialog-place {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.lb-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 520px;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  padding: 24px;
+  animation: lb-dialog-in var(--gb-motion-normal) var(--gb-ease) both;
+}
+.lb-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.lb-dialog-title {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--gb-font-display);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--lb-danger-text);
+}
+.lb-dialog-text {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lb-dialog-body,
+.lb-dialog-held {
+  margin: 0;
+  font-size: var(--gb-text-body);
+  line-height: 1.55;
+  color: var(--gb-muted);
+  text-wrap: pretty;
+}
+.lb-dialog-held {
+  color: var(--gb-ink-2);
+}
+.lb-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+@keyframes lb-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes lb-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}

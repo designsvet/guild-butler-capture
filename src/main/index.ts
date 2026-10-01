@@ -73,7 +73,8 @@ import {
   sendEngineHealth,
   sendFestivities,
 } from "./uploadClient.js";
-import { newlyBroken } from "../shared/engineHealth.js";
+import { lootBroken, newlyBroken } from "../shared/engineHealth.js";
+import { createHeldStore, heldUploadsFilePath } from "./heldUploads.js";
 import electronUpdater from "electron-updater";
 
 import { createUpdateController, updaterEnabled, type TUpdateController } from "./updateController.js";
@@ -93,6 +94,8 @@ const SETTINGS_FILE = settingsFilePath(app.getPath("userData"));
 /** The v5 window's size and place — its own file, never settings.json (see windowState.ts). */
 const WINDOW_STATE_FILE = windowStateFilePath(app.getPath("userData"));
 const APP_LOG = join(app.getPath("userData"), "logs", "capture-app.log");
+/** The lines the guild never gets — decoded while the decoder was broken (heldUploads.ts). */
+const HELD_UPLOADS_FILE = heldUploadsFilePath(app.getPath("userData"));
 
 /** Build timestamp stamped by tools/build-static.mjs — identifies WHICH build runs. */
 const BUILT_AT: string | null = (() => {
@@ -145,6 +148,19 @@ const dispatch = (ev: TSessionEvent): void => {
   const toBot = talksToBot(currentEngine?.source);
   if (toBot && fresh.length > 0) {
     forwardEngineHealth(fresh);
+  }
+  // The flag last: it reads settings.json from disk, and this runs for every line the engine prints —
+  // only the one event that breaks the decoder for loot should pay for that read.
+  if (toBot && !lootBroken(brokenBefore) && lootBroken(state.engineBroken) && heldUploadOn()) {
+    // The guild upload is held from this moment (uploader.ts): a pass now records where in the
+    // file, rather than at the next tick, up to ten seconds on — and the foot says so at once.
+    appLog("upload: held until the update — the decoder is broken where loot is concerned");
+    void ensureUploader()
+      .tick()
+      .then(pushPairing)
+      .catch((err: unknown) => {
+        appLog(`[upload] held pass failed: ${err instanceof Error ? err.message : "error"}`);
+      });
   }
   if (toBot && ev.type === "engine-line" && ev.event.kind === "festivities") {
     forwardFestivities(ev.event);
@@ -216,6 +232,13 @@ const updates: TUpdateController = createUpdateController({
 
 let uploader: TUploader | null = null;
 let uploadTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Whether a broken decoder holds the guild upload (uploader.ts): the v5 shell's rule, so on where the
+ * v5 shell is — the same test that picks the window (createWindow). The old window has no words for
+ * a hold, and 0.8.x ships unchanged until the shell becomes the default.
+ */
+const heldUploadOn = (): boolean => wantsV5Shell(process.env, loadSettings(SETTINGS_FILE));
 
 /** Every 10s while capturing. Uploading is not urgent; the file is safe. */
 const UPLOAD_TICK_MS = 10_000;
@@ -379,6 +402,13 @@ const ensureUploader = (): TUploader => {
     newRunId: () => randomUUID(),
     now: Date.now,
     log: appLog,
+    // Sticky for the app session, as the break is: only the updated app clears it. Behind the v5
+    // flag for now, as everything new is (SPEC ground rules): the old window says nothing of a
+    // hold, and 0.8.x ships as it was. Ranges recorded under the flag are honoured either way.
+    // The break first: the flag reads settings.json, and a healthy decoder (the old window's every
+    // pass) need not read it at all.
+    held: () => lootBroken(state.engineBroken) && heldUploadOn(),
+    holds: createHeldStore(HELD_UPLOADS_FILE, appLog),
   });
   return uploader;
 };

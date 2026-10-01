@@ -164,3 +164,81 @@ export const advanceCursor = (sentThrough: number, batch: TBatch, serverNextFrom
   const server = typeof serverNextFrom === "number" && Number.isSafeInteger(serverNextFrom) ? serverNextFrom : null;
   return Math.max(sentThrough, local, server ?? 0);
 };
+
+/**
+ * Lines the guild never gets: while a game update has the engine's decoder broken where loot is
+ * concerned (src/shared/engineHealth.ts `lootBroken`), what the engine writes is decoded wrong, and
+ * it is never sent — not while broken, and not after the update either (raid-bot ADR 0159,
+ * amendment 2026-10-01). It stays in the file on the member's computer; an officer can still take
+ * the file by hand.
+ *
+ * A range is every line of `file` from `from` to its end. To the end, because the break is sticky
+ * for the rest of the app session — only the updated app clears it — so nothing the same engine
+ * writes into that file afterwards is any better; and the engine starts a new file for every run
+ * (it names them by the second), so the fixed app's lines never land in a held one.
+ *
+ * `from` is where the uploader stood when the hold began: everything not yet sent then is held,
+ * even the lines of the last few seconds before the verdict, since the verdict lags the break by
+ * minutes (lines sent before it are the bot's to mark — the ADR). `run` is the run id those first
+ * `from` lines went under, so an uploader that meets the file again resumes that run at `from`
+ * instead of minting a new one and sending them all twice; null when nothing of the file was sent.
+ */
+export type THeldRange = {
+  file: string;
+  from: number;
+  run: string | null;
+  /** When the hold began, epoch ms — for the app log and support, not for any rule. */
+  at: number;
+};
+
+/** The range to record when the hold reaches `file`: from the cursor, if the cursor is on it. */
+export const heldRangeFor = (cursor: TUploadCursor | null, file: string, at: number): THeldRange => {
+  return cursor != null && cursor.file === file
+    ? { file, from: cursor.sentThrough, run: cursor.run, at }
+    : { file, from: 0, run: null, at };
+};
+
+/** The hold on `file`, if any — the one starting earliest, should a file somehow have two. */
+export const heldRangeOn = (ranges: readonly THeldRange[], file: string): THeldRange | null => {
+  let found: THeldRange | null = null;
+  for (const range of ranges) {
+    if (range.file === file && (found == null || range.from < found.from)) {
+      found = range;
+    }
+  }
+  return found;
+};
+
+/** How many of the file's lines may ever be sent: all of them, or those before its hold. */
+export const sendableLines = (ranges: readonly THeldRange[], file: string, lineCount: number): number => {
+  const hold = heldRangeOn(ranges, file);
+  return hold == null ? lineCount : Math.min(lineCount, hold.from);
+};
+
+/**
+ * The stored ranges, from untrusted JSON. One damaged entry must not cost the others — each keeps
+ * wrong loot away from a guild — and a damaged part of an entry errs toward holding: a file named
+ * with no readable start is held whole (nothing of it is sent), a run that cannot be read is
+ * forgotten (the file's lines before the hold were sent already, and nothing after it ever is).
+ * Only an entry with no file to name is dropped: it holds nothing.
+ */
+export const parseHeldRanges = (raw: unknown): THeldRange[] => {
+  const held = typeof raw === "object" && raw != null ? (raw as { held?: unknown }).held : undefined;
+  const out: THeldRange[] = [];
+  for (const entry of Array.isArray(held) ? held : []) {
+    if (typeof entry !== "object" || entry == null) {
+      continue;
+    }
+    const { file, from, run, at } = entry as Record<string, unknown>;
+    if (typeof file !== "string" || file === "") {
+      continue;
+    }
+    out.push({
+      file,
+      from: typeof from === "number" && Number.isSafeInteger(from) && from >= 0 ? from : 0,
+      run: typeof run === "string" && run !== "" ? run : null,
+      at: typeof at === "number" && Number.isFinite(at) ? at : 0,
+    });
+  }
+  return out;
+};

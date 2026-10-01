@@ -29,6 +29,40 @@ export const mergeBroken = (
   return [...byName.values()].sort((a, b) => a.handler.localeCompare(b.handler));
 };
 
+/**
+ * The engine's handlers that feed nothing the loot log writes: the daily-bonus rotation, the
+ * guild's energy total and its energy log. Read from the engine's own source
+ * (designsvet/ao-loot-logger@protocol18, ab6cc6b, 2026-09-28: src/data-handler/data-handler.js
+ * counts every handler by its `name`, and these five require neither the loot logger nor the loot
+ * and player stores). Every other handler reaches a loot line somehow — the pickup itself, the item
+ * it names, the chest it came from, the player and guild who took it (EvCharacterStats and OpJoin
+ * name them; EvAttachItemContainer is how a bank deposit was told from loot until 2026-09-23).
+ *
+ * A list of the harmless ones rather than of the loot ones, on purpose: a handler this app has
+ * never heard of — one a later engine adds — counts as feeding loot. Holding the guild upload for
+ * nothing costs an officer a file taken by hand; sending loot decoded wrong cost 72 rows cleaned
+ * out of the bot by hand (2026-09-28). The safe mistake is the first one.
+ */
+export const NON_LOOT_HANDLERS: ReadonlySet<string> = new Set([
+  "EvFestivitiesUpdate",
+  "EvGuildState",
+  "OpGuildLogRequest",
+  "OpGuildEnergyDrain",
+  "OpGuildLogPage",
+]);
+
+/** Does this broken handler make the loot log wrong? (Unknown handlers do — see NON_LOOT_HANDLERS.) */
+export const feedsLoot = (handler: string): boolean => !NON_LOOT_HANDLERS.has(handler);
+
+/**
+ * The decoder is broken where loot is concerned: some broken handler feeds the loot log. What holds
+ * the guild upload (src/main/uploader.ts) and what puts the notice and its dialog up
+ * (src/shared/notices.ts) — one rule, so the app never says "nothing is sent" while it sends, or
+ * holds without saying so.
+ */
+export const lootBroken = (broken: readonly TBrokenHandler[] | null): boolean =>
+  (broken ?? []).some((entry) => feedsLoot(entry.handler));
+
 /** Handlers `next` has that `prev` did not — the only thing worth telling the bot about. */
 export const newlyBroken = (
   prev: readonly TBrokenHandler[] | null,

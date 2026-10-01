@@ -42,6 +42,14 @@ export const isFatalErrorKind = (kind: EEngineErrorKind | null): boolean => {
 };
 
 /**
+ * An engine run that saw Albion, or simply lived this long, was healthy: the supervisor's restart
+ * backoff starts over after it (src/main/engineSupervisor.ts), and the v5 shell's "The logger keeps
+ * stopping" notice stands down once a relaunched run has lived it (src/shared/notices.ts). Here so
+ * both read one number.
+ */
+export const HEALTHY_RUN_MS = 60_000;
+
+/**
  * The one snapshot the renderer renders. Main owns it, every change is pushed
  * whole over IPC — the renderer never accumulates state of its own beyond a
  * 1-second clock for the "last seen Ns ago" style lines.

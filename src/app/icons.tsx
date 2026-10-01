@@ -122,3 +122,26 @@ export const PLUG = [
 
 /** "folder" — On this Mac, and its Open folder button. */
 export const FOLDER = ["M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2"] as const;
+
+/** The notices' icons (board Fh5; src/app/notices.ts `TNoticeIcon`). */
+export const NOTICE = {
+  /** "shield-lock" — macOS is blocking network capture. */
+  shield: [
+    "M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3",
+    "M12 11m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0",
+    "M12 12l0 2.5",
+  ],
+  /** "device-desktop" — the capture driver, and the engine on this computer. */
+  desktop: [
+    "M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10z",
+    "M7 20h10",
+    "M9 16v4",
+    "M15 16v4",
+  ],
+  /** "alert-triangle" — a game update broke loot logging. */
+  alert: HERO.alert,
+  /** "refresh" — the logger keeps stopping. */
+  refresh: HERO.refresh,
+  /** "download" — an update is ready. */
+  download: ["M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2", "M7 11l5 5l5 -5", "M12 4l0 12"],
+} as const;

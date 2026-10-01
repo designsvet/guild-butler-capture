@@ -2,14 +2,24 @@ import { describe, expect, it } from "vitest";
 
 import { formatClock, formatDuration } from "../src/app/format.js";
 import { barAction, barStatus, headerMeta, sessionHero, sidebarFoot, WAITING_REASONS_AFTER_MS } from "../src/app/model.js";
+import { holdsTheGold, noticeView, type TNoticeContext } from "../src/app/notices.js";
+import { INITIAL_UI } from "../src/app/store.js";
 import {
+  ECaptureAccess,
   ECaptureStatus,
   EEngineErrorKind,
+  ENpcapInstallOutcome,
+  EPermissionFixOutcome,
+  EUpdatePhase,
   initialCaptureState,
   initialPairingStatus,
+  initialUpdateStatus,
   type TCaptureState,
   type TPairingStatus,
+  type TSetupStatus,
 } from "../src/shared/captureTypes.js";
+import { EHealthAction, EHealthLine } from "../src/shared/engineHealth.js";
+import { EBlock, ENotice } from "../src/shared/notices.js";
 import { stringsFor } from "../src/shared/strings.js";
 
 /**
@@ -265,11 +275,14 @@ describe("sidebarFoot: the guild connection, one line and a quieter one (Fh2)", 
     expect(line("blocked")).toBe("red MacBook / Stuck — tell your officer");
     expect(line("unauthorized")).toBe("red Disconnected in Discord / Pair again to resume");
     expect(line("disabled")).toBe("grey MacBook / Auto-send off");
+    // the decoder is broken: the upload waits for the update (Fh2, Fh4 — amber, not a fault of the link)
+    expect(line("held")).toBe("amber MacBook / Held until the update");
   });
 
   it("a name may end in an ellipsis; a state in words may not — it wraps (unauthorized)", () => {
     const named = (state: string) => sidebarFoot(paired({ state }), NOW, "darwin", en)?.named;
-    expect(["up-to-date", "sending", "retrying", "bot-outdated", "blocked", "disabled"].map(named)).toEqual([
+    expect(["up-to-date", "sending", "retrying", "bot-outdated", "blocked", "disabled", "held"].map(named)).toEqual([
+      true,
       true,
       true,
       true,
@@ -284,5 +297,194 @@ describe("sidebarFoot: the guild connection, one line and a quieter one (Fh2)", 
   it("auto-send switched off wins over whatever the uploader last said", () => {
     const foot = sidebarFoot(paired({ state: "retrying" }, { uploadEnabled: false }), NOW, "darwin", en);
     expect(foot).toMatchObject({ dot: "grey", line2: "Auto-send off" });
+  });
+});
+
+describe("the bar and the hero when capture is blocked (Fh1, Fh4)", () => {
+  it("the dot goes red only when capture is blocked — an idle capture the probe knows cannot start", () => {
+    expect(barStatus(state({}), NOW, en, true)).toEqual({ tone: "red", look: "danger", label: "Something needs fixing", details: [], short: [] });
+    expect(barStatus(state({}), NOW, en, false)).toMatchObject({ tone: "grey", label: "Not capturing" });
+    // a broken decoder is the band's to say, not the bar's
+    expect(barStatus(state({ status: ECaptureStatus.Capturing, character: "Bors", engineBroken: [{ handler: "EvAttachItemContainer", failures: 5, calls: 5 }] }), NOW, en)?.tone).toBe("green");
+  });
+
+  it("Start steps back to the neutral face while the band holds the next step — one gold button per window", () => {
+    expect(barAction(state({}), true)).toEqual({ kind: "start", look: "neutral", disabled: false });
+    expect(barAction(state({}), false)).toEqual({ kind: "start", look: "primary", disabled: false });
+    expect(barAction(state({ status: ECaptureStatus.Capturing }), true)).toEqual({ kind: "stop", look: "danger", disabled: false });
+  });
+
+  it("the hero of a blocked idle capture says what blocks it, as the bar does", () => {
+    expect(sessionHero(state({}), NOW, "darwin", en, EBlock.MacPermission)).toMatchObject({
+      icon: "alert",
+      title: "Something needs fixing",
+      lines: [en.errors.permissionTitle],
+    });
+    expect(sessionHero(state({}), NOW, "win32", en, EBlock.EngineMissing)?.lines).toEqual([en.errors.engineMissingTitle]);
+    expect(sessionHero(state({}), NOW, "darwin", en, null)?.title).toBe("Not capturing");
+  });
+});
+
+describe("noticeView: each notice of board Fh5 in the app's own words, and its button", () => {
+  const setup = (patch: Partial<TSetupStatus> = {}): TSetupStatus => ({
+    platform: "darwin",
+    engineEntry: "/engine/src/index.js",
+    engineRoot: "/engine",
+    engineSource: "bundled",
+    access: ECaptureAccess.Ok,
+    appVersion: "0.8.8",
+    builtAt: null,
+    ...patch,
+  });
+  const ATTACH = { handler: "EvOtherGrabbedLoot", failures: 5, calls: 5 };
+  const ctx = (patch: Partial<TNoticeContext> = {}): TNoticeContext => ({
+    capture: state({}),
+    setup: setup(),
+    update: { ...initialUpdateStatus },
+    ui: INITIAL_UI,
+    s: en,
+    ...patch,
+  });
+  const blocked = (block: EBlock, c: Partial<TNoticeContext> = {}) => noticeView({ kind: ENotice.Blocked, block }, ctx(c));
+
+  it("macOS blocking capture: its title and sentence, the fix in gold; after the prompt was closed, the old window's note", () => {
+    expect(blocked(EBlock.MacPermission)).toEqual({
+      kind: ENotice.Blocked,
+      tone: "alert",
+      icon: "shield",
+      title: "macOS is blocking network capture",
+      body: en.errors.permission,
+      notes: [],
+      details: [],
+      buttons: [{ id: "fix-mac", label: "Fix capture permissions…", look: "primary", busy: false }],
+    });
+    const cancelled = { setup: setup({ access: ECaptureAccess.NoPermission }), outcome: EPermissionFixOutcome.Cancelled, detail: null };
+    expect(blocked(EBlock.MacPermission, { setup: cancelled.setup, ui: { ...INITIAL_UI, fixAttempt: cancelled } }).notes).toEqual([
+      en.setup.permissionFixCancelled,
+    ]);
+    // fixed: the note goes
+    expect(blocked(EBlock.MacPermission, { ui: { ...INITIAL_UI, fixAttempt: cancelled } }).notes).toEqual([]);
+  });
+
+  it("the capture driver: install in gold and the link beside it on Windows; while it fetches, dimmed, and the note says so", () => {
+    const win = { setup: setup({ platform: "win32" }) };
+    expect(blocked(EBlock.NpcapMissing, win)).toMatchObject({
+      icon: "desktop",
+      title: "One-time setup: the capture driver",
+      body: en.errors.npcapMissing,
+      buttons: [
+        { id: "install-npcap", label: "Install capture driver", look: "primary", busy: false },
+        { id: "get-npcap", label: "Download it myself", look: "link", busy: false },
+      ],
+    });
+    const fetching = blocked(EBlock.NpcapMissing, { ...win, ui: { ...INITIAL_UI, npcapBusy: true } });
+    expect(fetching.notes).toEqual(["Fetching the capture driver from npcap.com…"]);
+    expect(fetching.buttons[0]?.busy).toBe(true);
+    const done = { setup: setup({ platform: "win32" }), install: { outcome: ENpcapInstallOutcome.Installed, version: "1.80", detail: null } };
+    expect(blocked(EBlock.NpcapMissing, { ...win, ui: { ...INITIAL_UI, npcapAttempt: done } }).notes).toEqual([en.setup.npcapInstalled("1.80")]);
+  });
+
+  it("admin-only Npcap: the link alone; the rarer two the same card — the engine folder in gold, a rebuild with no button", () => {
+    expect(blocked(EBlock.NpcapAdminOnly).buttons).toEqual([{ id: "get-npcap", label: "Download it myself", look: "link", busy: false }]);
+    expect(blocked(EBlock.EngineMissing)).toMatchObject({
+      title: "Capture engine not found",
+      buttons: [{ id: "choose-engine", label: "Choose engine folder…", look: "primary", busy: false }],
+    });
+    expect(blocked(EBlock.AbiMismatch)).toMatchObject({ title: "The capture engine needs a rebuild", buttons: [] });
+  });
+
+  it("the broken decoder: the headline, the fix's line, the held line and the technical detail; healthCard's button", () => {
+    const broken = state({ status: ECaptureStatus.Capturing, engineBroken: [ATTACH] });
+    const ready = { ...initialUpdateStatus, phase: EUpdatePhase.Ready, version: "0.9.1" };
+    const view = noticeView(
+      { kind: ENotice.Decoder, line: EHealthLine.Ready, action: EHealthAction.StopAndUpdate },
+      ctx({ capture: broken, update: ready }),
+    );
+    expect(view).toEqual({
+      kind: ENotice.Decoder,
+      tone: "alert",
+      icon: "alert",
+      title: "A game update broke loot logging",
+      body: "Until this app is updated, some of the loot it records is wrong — your guild's loot numbers will be off. The fix is downloaded (v0.9.1). Update now — it takes a few seconds.",
+      notes: ["Nothing is sent to your guild until then — what is logged meanwhile stays in the file on this computer."],
+      details: ["EvOtherGrabbedLoot failed on 5 of 5 packets in the last 10 minutes."],
+      buttons: [{ id: "update-now", label: "Stop capture and update", look: "primary", busy: false }],
+    });
+    const decoder = (line: EHealthLine, action: EHealthAction, update = initialUpdateStatus) =>
+      noticeView({ kind: ENotice.Decoder, line, action }, ctx({ capture: broken, update }));
+    expect(decoder(EHealthLine.NotOutYet, EHealthAction.CheckForFix).buttons).toEqual([
+      { id: "check-for-fix", label: "Check for the fix", look: "outline", busy: false },
+    ]);
+    expect(decoder(EHealthLine.Downloading, EHealthAction.None, { ...initialUpdateStatus, version: "0.9.1", percent: 40 })).toMatchObject({
+      body: expect.stringContaining("The fix is downloading (v0.9.1)… 40%"),
+      buttons: [],
+    });
+    expect(decoder(EHealthLine.Manual, EHealthAction.GetUpdate).buttons).toEqual([
+      { id: "get-update", label: "Get the update", look: "link", busy: false },
+    ]);
+  });
+
+  it("the logger keeps stopping: quiet, no button; when the next restart comes, then that it is starting", () => {
+    const waiting = state({ status: ECaptureStatus.Restarting, restartAttempt: 4, restartDelayMs: 8_000 });
+    expect(noticeView({ kind: ENotice.LoggerStopping }, ctx({ capture: waiting }))).toEqual({
+      kind: ENotice.LoggerStopping,
+      tone: "quiet",
+      icon: "refresh",
+      title: "The logger keeps stopping",
+      body: "The capture engine stopped unexpectedly. It restarts by itself in 8s — your log file and counts are safe.",
+      notes: [],
+      details: [],
+      buttons: [],
+    });
+    expect(noticeView({ kind: ENotice.LoggerStopping }, ctx({ capture: state({ status: ECaptureStatus.Starting, restartAttempt: 4 }) })).body).toBe(
+      en.statusHint.starting,
+    );
+  });
+
+  it("an update is ready: quiet; while capturing it offers the decoder's own stop-and-update", () => {
+    const ready = { ...initialUpdateStatus, phase: EUpdatePhase.Ready, version: "0.9.1" };
+    expect(noticeView({ kind: ENotice.UpdateReady, running: false }, ctx({ update: ready }))).toEqual({
+      kind: ENotice.UpdateReady,
+      tone: "quiet",
+      icon: "download",
+      title: "An update is ready",
+      body: "Update v0.9.1 ready — it installs when you quit the app.",
+      notes: [],
+      details: [],
+      buttons: [{ id: "update-now", label: "Restart and update", look: "outline", busy: false }],
+    });
+    expect(noticeView({ kind: ENotice.UpdateReady, running: true }, ctx({ update: ready }))).toMatchObject({
+      body: "Capture is running — the update installs when you quit, or stop capture first.",
+      buttons: [{ id: "update-now", label: "Stop capture and update", look: "outline", busy: false }],
+    });
+  });
+
+  it("only a gold fix makes Start step back", () => {
+    expect(holdsTheGold(blocked(EBlock.MacPermission))).toBe(true);
+    expect(holdsTheGold(blocked(EBlock.NpcapAdminOnly))).toBe(false);
+    expect(holdsTheGold(noticeView({ kind: ENotice.UpdateReady, running: false }, ctx()))).toBe(false);
+    expect(holdsTheGold(null)).toBe(false);
+  });
+
+  it("every notice in every language has its words — no slot left empty", () => {
+    const kinds = [
+      ...Object.values(EBlock).map((block) => ({ kind: ENotice.Blocked, block }) as const),
+      { kind: ENotice.Decoder, line: EHealthLine.Ready, action: EHealthAction.StopAndUpdate } as const,
+      { kind: ENotice.LoggerStopping } as const,
+      { kind: ENotice.UpdateReady, running: true } as const,
+    ];
+    for (const lang of ["en", "uk", "ru", "de", "fr", "pt"] as const) {
+      const s = stringsFor(lang);
+      for (const notice of kinds) {
+        const view = noticeView(notice, ctx({ s, capture: state({ engineBroken: [ATTACH] }), setup: setup({ platform: "win32" }) }));
+        expect(view.title.length, `${lang} ${notice.kind}`).toBeGreaterThan(0);
+        for (const button of view.buttons) {
+          expect(button.label.length, `${lang} ${notice.kind} ${button.id}`).toBeGreaterThan(0);
+        }
+      }
+      expect(s.shell.notices.held.length).toBeGreaterThan(20);
+      expect(s.shell.notices.later.length).toBeGreaterThan(0);
+      expect(s.shell.foot.held.length).toBeGreaterThan(0);
+    }
   });
 });

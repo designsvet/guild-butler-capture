@@ -290,16 +290,19 @@ that theme, and that the faces are the package's files, byte for byte, with thei
 them.
 
 **What is in it.** The shell around one page, drawn from the canvas's boards (page v5): Fh1 for the
-title bar, Fh2 for the sidebar's foot, Fh3 and Fh7 for Session, F1 and Fr for the frame, Fa for the
-keyboard and the screen reader.
+title bar, Fh2 for the sidebar's foot, Fh3 and Fh7 for Session, Fh4 and Fh5 for the notices, F1 and
+Fr for the frame, Fa for the keyboard and the screen reader.
 
 - **The title bar** says the capture's state in the app's own words, with a dot beside them: while
   capturing, the character and how long (`Bors · capturing 1 h 20 min`), or `Capturing · detecting…`
   before Albion names them; `Waiting for Albion… · listening for 40 s`; `Starting the logger…`; the
   restart and when it comes; `Stopping…`; `Not capturing`; `Something needs fixing` in the danger
-  red. Then its one button — Stop (dimmed and refusing the press while the logger starts or stops,
-  with a sheen crossing it), Start capture in gold when idle, a neutral Start in the error state —
-  the version, and the gear. The button changes face the way the old window's pill does (below).
+  red — the dot is red then and only then: when capture is blocked, which the setup probe can know
+  while idle (no engine, no permission, no Npcap) as well as the error state. Then its one button —
+  Stop (dimmed and refusing the press while the logger starts or stops, with a sheen crossing it),
+  Start capture in gold when idle, a neutral Start whenever the band below holds the next step
+  (capture blocked, or a notice carrying the gold fix: one gold button per window) — the version,
+  and the gear. The button changes face the way the old window's pill does (below).
   Below 1024px it keeps the name and the time and drops the version. The guild and the zone are not
   drawn: the app does not know them yet.
 - **The sidebar** lists only the pages that exist — Session, under Live — 208px with labels from
@@ -307,8 +310,9 @@ keyboard and the screen reader.
   you are on wears the chosen wash and an icon that draws itself once on arrival (lit at once under
   reduced motion). Its foot shows the guild connection: `Connect a guild` and where sessions stay
   when unpaired, else the device's name and a short form of the upload state (`312 lines sent · 1 min
-  ago`, `Sending…`, `Couldn't send — retrying`, `Auto-send off`, …). It is not yet a door: the panel
-  it will open comes with the pairing step, so for now Tab passes it by.
+  ago`, `Sending…`, `Couldn't send — retrying`, `Auto-send off`, …, and `Held until the update` in
+  amber while a broken decoder holds the upload — below). It is not yet a door: the panel it will
+  open comes with the pairing step, so for now Tab passes it by.
 - **The page header** is the range tabs where a title would be — only Session so far, since Today
   and 7 days need History — with a light running along its underline while capturing, and the meta
   line (`Listening since 14:33`, `Started 14:33 · 1 h 20 min`) beside it, or under it below 1280px.
@@ -317,9 +321,50 @@ keyboard and the screen reader.
   (Pair with Discord does nothing yet), the data folder (Open folder is the old window's Reveal) and
   the auto-start switch (the stored setting, as in the old window). From 1280px the right column is
   400px, at 1024 it is 320, below that it moves under the page.
+- **The notices** (Fh5): one slot at the top of every page, above the header — the band — one notice
+  at a time, the most blocking first: capture is blocked › a game update broke the decoder › the
+  logger keeps stopping › an update is ready (`src/shared/notices.ts`). Each is an ordinary card —
+  its weight is the icon, its title's colour and its one action — in the old window's own words,
+  wired to what the old window's buttons do: Fix capture permissions… (and what happened, under it,
+  when the password prompt was closed), Install capture driver (dimmed while it fetches, with the
+  old window's notes) and Download it myself (the Npcap page, in the browser), Choose engine folder…,
+  no button for a rebuild; for the broken decoder `healthCard()`'s step — Stop capture and update,
+  Update now, Check for the fix, Get the update — with the held line and the engine's own verdict in
+  mono; for an update that is ready, Restart and update, or, while capturing, the same Stop capture
+  and update (stop, then install once the engine is down — main refuses to cut a live capture, and
+  the notice says so if it still does). "The logger keeps stopping" is a new rule: from the third
+  restart in a row, until a relaunched run proves healthy by the supervisor's own test (it sees
+  Albion or lives a minute — `HEALTHY_RUN_MS`, now shared), so the band does not come and go with
+  each short run. Only a break that reaches the loot log puts the decoder's notice up: a broken
+  festivity or energy reader makes no loot wrong. Below 1024 the words take the card's width and the
+  action goes under them. The band is not a live region: its title is spoken once, through the
+  page's one polite region, when a notice arrives (a notice that read itself out would read the
+  fix's download percent out on every tick).
+- **The broken decoder's dialog** (Fh4, option D): it interrupts once when the break is found and
+  again when the fix has downloaded (each its own event; the window keeps the ones it was given
+  "Later" for). "Later" closes the dialog, never the notice — which is in the band under it from the
+  first moment, so nothing on the page moves when it closes. It is the package's dialog and scrim
+  under the title bar; the rest of the window is inert, Tab stays inside, Escape is "Later" — even
+  after a click on the scrim has left the focus outside it (the keys are heard on the document) —
+  the focus starts on "Later" (the other button stops a capture) and goes back where it was.
+- **The held upload** (main process, `src/main/uploader.ts`; ADR 0159's amendment of 2026-10-01):
+  while the decoder is broken where loot is concerned (`lootBroken` in `src/shared/engineHealth.ts`:
+  any broken handler but the five that feed no loot — an unknown one counts as feeding it, the safe
+  mistake), the uploader sends nothing, and what the engine writes meanwhile is never sent. Every
+  pass records where the hold began in the file it would read — from where the uploader stood, so
+  the lines written between the break and the verdict go too — as a range (file, first line, the
+  run those before it went under) in `held-uploads.json` in the data folder, written temp-then-
+  rename, never over an unreadable one. Every pass, held or not, sends a file only up to its hold,
+  and resumes a held file's run at the hold, so the app that restarts into the fix sends none of it
+  and nothing twice; the fixed engine's own files go whole. It is recorded even unpaired or
+  switched off, a verdict landing mid-pass stops what that pass read, and a device that needs
+  pairing again still says so. Behind the v5 flag, as everything new is: the old window has no words
+  for a hold. Tested in `test/uploader.test.ts` and `test/heldUploads.test.ts`.
 - **Behind it**, `src/app/store.ts` mirrors the bridge for React (`useSyncExternalStore`): the five
   `get*` calls, then the three `on*` subscriptions — a push that lands while a get is in flight wins
-  — and the setup probed again on window focus. Auto-start runs once per window over an idle
+  — and the setup probed again on window focus. It also keeps the little the notices' buttons need
+  that main does not: a fix attempt's outcome, a running install or check, Stop capture and
+  update's wait for the engine, and the dialog's answered events. Auto-start runs once per window over an idle
   capture, as the old window's does. `src/app/router.ts` keeps the page in the hash (`#/session`);
   any hash not starting `#/`, like the skip link's `#main`, is left alone. The stored theme and
   language apply as they arrive. What each state says is pure (`src/app/model.ts`), held to the
@@ -380,20 +425,25 @@ stopped, then the same for the error state's neutral Start (pressed again; the l
 starts), in both themes, each at 0, 110, 220, 330 and 440ms — the page's own animations stopped at
 that millisecond, not a timer racing them (`tools/shell-morph.cjs`) — and laid out side by side in
 `morph-strip.png` (`ONLY=morph-st` for the gold pair alone). `ONLY=forced` shoots the bar under
-Windows' high contrast (DevTools' forced-colours emulation). It measures nothing; the layout check
-below does.
+Windows' high contrast (DevTools' forced-colours emulation). `ONLY=notice-` shoots every notice of
+Fh5 in the band, at 1440 and 768, in both themes — pressing first where the board draws a notice
+after a press (the password prompt closed, the driver still fetching, "Later" on the dialog) — and
+lays the bands out in a sheet per theme and width, `notices-<theme>-<width>.png`; `ONLY=dialog-`
+shoots the broken decoder's dialog. It measures nothing; the layout check below does.
 
 **Checking it.** `pnpm check:layout:v5` (`tools/shell-layout-check.cjs`, in CI under xvfb beside the
 old window's check) drives the built page behind the same stub bridge and measures every route at
 768, 1024, 1280 and 1440 — the narrowest width of each of the shell's layouts, and the boards' width
 — all at the window's smallest height, 620, in both themes, the six languages, both platforms and
-the twelve states that change the layout: every capture state the shell draws, each with a guild
-connection that gives the sidebar's foot one of its shapes, and the foot's remaining states over a
-running capture: 1,152 scenarios, from 288 windows each shrunk through the four widths. Then the
+the twenty-six states that change the layout: every capture state the shell draws, each with a guild
+connection that gives the sidebar's foot one of its shapes, the foot's remaining states over a
+running capture, and every notice of Fh5 at its tallest — the blocked cards with their notes, the
+decoder's four steps over a held upload, the logger stopping, an update ready — and the broken
+decoder's dialog itself: 2,496 scenarios, from 624 windows each shrunk through the four widths. Then the
 title bar's button changing face, the one part of the shell that moves its own layout: in a window
 with motion back on, both directions as the logger goes (Start pressed, the logger stopped), at
 every 55ms from the change to the drain's end, at the four widths, in both themes, the six languages
-and both platforms — 1,728 more, from 24 windows, measured on the bar. 2,880 in all. It fails on:
+and both platforms — 1,728 more, from 24 windows, measured on the bar. 4,224 in all. It fails on:
 
 - sideways scroll — the window, or anything in it that scrolls, wider than it is;
 - clipped text — words cut by a box that hides its overflow, or past the window's edge. Two cuts are
@@ -409,7 +459,13 @@ and both platforms — 1,728 more, from 24 windows, measured on the bar. 2,880 i
 - any `securitypolicyviolation`, heard from the page's first moment (`tools/shell-layout-preload.cjs`),
   and any error the page logs;
 - a page that did not draw: the landmarks, the route marked current in the sidebar, a page in the
-  panel;
+  panel, and the notice its state calls for in the band — or one it does not call for;
+- the broken decoder's dialog open when it should not be, or shut when it should be open; a dialog
+  that does not fit the window under the title bar, or scrolls; the focus outside it, or the rest of
+  the window not inert. A box under its scrim is not "over" one in the dialog. Then the dialog is
+  answered from the keyboard — a click on its scrim (which leaves the focus outside it), then Escape
+  — and must close with the band still holding its notice, the window alive again and the focus on
+  the page;
 - in the morph: a word outside the button at any frame, the version or the gear moving by half a
   pixel, a change that did not play its drain, its width or its words (a run whose morph never
   played proves nothing), and a button that keeps its eased width, or a leaving word, once the
@@ -421,7 +477,9 @@ must measure exactly the product of its lists, none of them empty — so an empt
 that stops early, fails, and a source that no longer compiles fails at once rather than leaving
 Electron waiting with no window. Each measurement waits until the page says it has settled (its language and
 theme applied, every slice of the bridge drawn, the faces loaded) rather than a fixed time.
-`OUT=<dir>` writes a PNG of each failing scenario. About two minutes on an Apple-silicon Mac (the morph is half of it).
+A state that is a press away (Later, the fix that reports back, the install still fetching) presses
+first, on the platforms whose card has that button, and waits for what the press brings.
+`OUT=<dir>` writes a PNG of each failing scenario. About four minutes on an Apple-silicon Mac.
 
 **The window.** Behind the flag the window is the shell's own (`src/main/windowOptions.ts`):
 resizable down to 768×620, maximizable and full-screenable, and opening at 1280×800 the first time —
@@ -455,9 +513,10 @@ With the flag off, the old window's options are 0.8.8's byte for byte (`test/win
 compares them with JSON produced from 0.8.8's own source), and none of the above applies to it.
 
 **Not yet.** The gear does nothing, Pair with Discord does nothing, and the sidebar's foot opens
-nothing. The error state names what is wrong but carries no fix: the notice that holds the fix
-comes in a later step, so until then the old window is where a broken setup gets mended. Times of
-day are in the OS's format, which may not be the app language's. In full screen on a Mac the bar
+nothing. The numbers a broken decoder feeds are not marked ("may be wrong since 14:41", Fh4): there
+are no numbers on Session yet. A notice shows no "Technical details" for an error (the old window's
+fold); the broken decoder's verdict is the only detail the band shows. Times of day are in the OS's
+format, which may not be the app language's. In full screen on a Mac the bar
 still pads 84px for the lights it no longer shows. The layout check cannot see the rail's tooltips
 (drawn by CSS on hover and focus, out of the DOM's reach), what the OS draws over the window, or a
 real Windows machine.
@@ -482,7 +541,8 @@ so walking away from the broken packet does not hide it; only the updated app
 clears it. When paired, the app also reports the newly broken handlers to the
 bot, which posts them to the ops channel once per handler per day. The rules
 are the pure `src/shared/engineHealth.ts`, tested in
-`test/engineHealth.test.ts`.
+`test/engineHealth.test.ts`. In the v5 shell (behind its flag) the card is the band's notice and a
+dialog, and the guild upload is held while the break reaches the loot log — see "The v5 shell".
 
 ## Builds (CI)
 
