@@ -20,6 +20,7 @@
  */
 
 import type { TLang } from "./i18n.js";
+import { plural } from "./plural.js";
 
 const EN = {
   appName: "Guild Butler Capture",
@@ -278,10 +279,76 @@ const EN = {
   /**
    * The v5 shell (Loot Butler, raid-bot ADR 0159), built beside the old window and opened only
    * behind GBC_SHELL=v5 / settings.shell until the first beta. Everything above stays the old
-   * window's. The name is a brand word: the same in every language.
+   * window's, and the shell reuses its words wherever the boards keep them (the states, their
+   * hints, the waiting reasons, the pairing pitch). The name is a brand word: the same in every
+   * language.
+   *
+   * The lines the boards drew new are here: the title bar's short status (board Fh1), the sidebar
+   * foot's two lines (Fh2 — short forms of the pairing block's sentences), the Session page before
+   * there is anything to show (Fh3).
    */
   shell: {
     appName: "Loot Butler",
+    skipToContent: "Skip to content",
+    /** The sidebar's landmark name, and the page header's tab strip's. */
+    views: "Views",
+    range: "Range",
+    groups: {
+      live: "Live",
+    },
+    pages: {
+      session: "Session",
+    },
+    /** A duration as the bar writes it: "40 s", "3 min", "1 h 20 min". */
+    units: { s: "s", min: "min", h: "h" },
+    bar: {
+      listeningFor: (duration: string): string => `listening for ${duration}`,
+      capturingFor: (duration: string): string => `capturing ${duration}`,
+      restartIn: (duration: string): string => `in ${duration}`,
+      stop: "Stop",
+    },
+    meta: {
+      listeningSince: (time: string): string => `Listening since ${time}`,
+      started: (time: string): string => `Started ${time}`,
+    },
+    session: {
+      waitingMore:
+        "Log in and play. Fame, silver, loot, mobs, gathering and fishing appear here about a minute after the game starts talking.",
+      capturingMore: "Numbers appear as soon as there is something to count.",
+      appearsTitle: "What appears here",
+      appears: [
+        { lead: "Fame, silver, respec, might and favor", body: "this session and per hour" },
+        { lead: "Loot", body: "every pickup near you, and what it is worth" },
+        { lead: "Mobs and chests", body: "what you killed and opened, by content" },
+        { lead: "History", body: "every session, kept on this computer" },
+      ],
+      pairOptional: "Optional. Loot Butler works without a guild.",
+      folderTitleMac: "On this Mac",
+      folderTitle: "On this computer",
+      folderBody:
+        "Loot and activity logs are written to your data folder as you play. Your loot stays on this computer unless you connect a guild.",
+      openFolder: "Open folder",
+      captureTitle: "Capture",
+    },
+    /** The sidebar's foot: the guild connection in one line and a quieter one (board Fh2). */
+    foot: {
+      connect: "Connect a guild",
+      localMac: "Sessions stay on this Mac",
+      local: "Sessions stay on this computer",
+      /** When the pairing carries no device name. */
+      unnamedDevice: "This computer",
+      linesSent: (n: number): string => plural("en", n, { one: "# line sent", other: "# lines sent" }),
+      ago: (duration: string): string => `${duration} ago`,
+      justNow: "just now",
+      nothingYet: "Nothing to send yet",
+      sending: "Sending…",
+      retrying: "Couldn't send — retrying",
+      off: "Auto-send off",
+      blocked: "Stuck — tell your officer",
+      unauthorized: "Disconnected in Discord",
+      pairAgain: "Pair again to resume",
+      outdated: "Bot needs an update",
+    },
   },
 };
 
@@ -517,6 +584,68 @@ const UK: TStrings = {
 
   shell: {
     appName: "Loot Butler",
+    skipToContent: "Перейти до вмісту",
+    views: "Розділи",
+    range: "Період",
+    groups: {
+      live: "Наживо",
+    },
+    pages: {
+      session: "Сесія",
+    },
+    units: { s: "с", min: "хв", h: "год" },
+    bar: {
+      listeningFor: (duration: string): string => `слухаємо ${duration}`,
+      capturingFor: (duration: string): string => `запис ${duration}`,
+      restartIn: (duration: string): string => `за ${duration}`,
+      stop: "Стоп",
+    },
+    meta: {
+      listeningSince: (time: string): string => `Слухаємо з ${time}`,
+      started: (time: string): string => `Почато о ${time}`,
+    },
+    session: {
+      waitingMore:
+        "Зайдіть у гру й грайте. Слава, срібло, лут, моби, збирання й риболовля з'являться тут приблизно за хвилину після того, як гра почне надсилати дані.",
+      capturingMore: "Цифри з'являться, щойно буде що рахувати.",
+      appearsTitle: "Що тут з'явиться",
+      appears: [
+        { lead: "Слава, срібло, респек, могутність і прихильність", body: "за цю сесію та за годину" },
+        { lead: "Лут", body: "кожна знахідка поруч із вами і скільки вона коштує" },
+        { lead: "Моби й скрині", body: "кого ви вбили й що відкрили, за типом контенту" },
+        { lead: "Історія", body: "кожна сесія, збережена на цьому комп'ютері" },
+      ],
+      pairOptional: "Необов'язково. Loot Butler працює і без гільдії.",
+      folderTitleMac: "На цьому Mac",
+      folderTitle: "На цьому комп'ютері",
+      folderBody:
+        "Логи луту й активності пишуться у вашу папку даних, поки ви граєте. Ваш лут лишається на цьому комп'ютері, доки ви не підключите гільдію.",
+      openFolder: "Відкрити папку",
+      captureTitle: "Запис",
+    },
+    foot: {
+      connect: "Підключити гільдію",
+      localMac: "Сесії лишаються на цьому Mac",
+      local: "Сесії лишаються на цьому комп'ютері",
+      unnamedDevice: "Цей комп'ютер",
+      linesSent: (n: number): string =>
+        plural("uk", n, {
+          one: "# рядок надіслано",
+          few: "# рядки надіслано",
+          many: "# рядків надіслано",
+          other: "# рядка надіслано",
+        }),
+      ago: (duration: string): string => `${duration} тому`,
+      justNow: "щойно",
+      nothingYet: "Поки нічого надсилати",
+      sending: "Надсилаємо…",
+      retrying: "Не вдалося надіслати — пробуємо ще",
+      off: "Автонадсилання вимкнено",
+      blocked: "Застрягло — скажіть офіцеру",
+      unauthorized: "Відключено в Discord",
+      pairAgain: "Підключіть знову, щоб продовжити",
+      outdated: "Бот потребує оновлення",
+    },
   },
 };
 
@@ -746,6 +875,68 @@ const RU: TStrings = {
 
   shell: {
     appName: "Loot Butler",
+    skipToContent: "Перейти к содержимому",
+    views: "Разделы",
+    range: "Период",
+    groups: {
+      live: "Вживую",
+    },
+    pages: {
+      session: "Сессия",
+    },
+    units: { s: "с", min: "мин", h: "ч" },
+    bar: {
+      listeningFor: (duration: string): string => `слушаем ${duration}`,
+      capturingFor: (duration: string): string => `запись ${duration}`,
+      restartIn: (duration: string): string => `через ${duration}`,
+      stop: "Стоп",
+    },
+    meta: {
+      listeningSince: (time: string): string => `Слушаем с ${time}`,
+      started: (time: string): string => `Начато в ${time}`,
+    },
+    session: {
+      waitingMore:
+        "Зайдите в игру и играйте. Слава, серебро, лут, мобы, сбор и рыбалка появятся здесь примерно через минуту после того, как игра начнёт передавать данные.",
+      capturingMore: "Цифры появятся, как только будет что считать.",
+      appearsTitle: "Что здесь появится",
+      appears: [
+        { lead: "Слава, серебро, респек, могущество и благосклонность", body: "за эту сессию и в час" },
+        { lead: "Лут", body: "каждая находка рядом с вами и её цена" },
+        { lead: "Мобы и сундуки", body: "кого вы убили и что открыли, по типу контента" },
+        { lead: "История", body: "каждая сессия, сохранённая на этом компьютере" },
+      ],
+      pairOptional: "Необязательно. Loot Butler работает и без гильдии.",
+      folderTitleMac: "На этом Mac",
+      folderTitle: "На этом компьютере",
+      folderBody:
+        "Логи лута и активности пишутся в вашу папку данных, пока вы играете. Ваш лут остаётся на этом компьютере, пока вы не подключите гильдию.",
+      openFolder: "Открыть папку",
+      captureTitle: "Запись",
+    },
+    foot: {
+      connect: "Подключить гильдию",
+      localMac: "Сессии остаются на этом Mac",
+      local: "Сессии остаются на этом компьютере",
+      unnamedDevice: "Этот компьютер",
+      linesSent: (n: number): string =>
+        plural("ru", n, {
+          one: "# строка отправлена",
+          few: "# строки отправлены",
+          many: "# строк отправлено",
+          other: "# строки отправлено",
+        }),
+      ago: (duration: string): string => `${duration} назад`,
+      justNow: "только что",
+      nothingYet: "Пока нечего отправлять",
+      sending: "Отправка…",
+      retrying: "Не удалось отправить — повторяем",
+      off: "Автоотправка выключена",
+      blocked: "Застряло — скажите офицеру",
+      unauthorized: "Отключено в Discord",
+      pairAgain: "Подключите снова, чтобы продолжить",
+      outdated: "Боту нужно обновление",
+    },
   },
 };
 
@@ -979,6 +1170,62 @@ const DE: TStrings = {
 
   shell: {
     appName: "Loot Butler",
+    skipToContent: "Zum Inhalt springen",
+    views: "Ansichten",
+    range: "Zeitraum",
+    groups: {
+      live: "Live",
+    },
+    pages: {
+      session: "Sitzung",
+    },
+    units: { s: "Sek.", min: "Min.", h: "Std." },
+    bar: {
+      listeningFor: (duration: string): string => `lauscht seit ${duration}`,
+      capturingFor: (duration: string): string => `zeichnet seit ${duration} auf`,
+      restartIn: (duration: string): string => `in ${duration}`,
+      stop: "Stopp",
+    },
+    meta: {
+      listeningSince: (time: string): string => `Lauscht seit ${time}`,
+      started: (time: string): string => `Gestartet ${time}`,
+    },
+    session: {
+      waitingMore:
+        "Log dich ein und spiel. Ruhm, Silber, Loot, Mobs, Sammeln und Angeln erscheinen hier etwa eine Minute, nachdem das Spiel Daten sendet.",
+      capturingMore: "Zahlen erscheinen, sobald es etwas zu zählen gibt.",
+      appearsTitle: "Was hier erscheint",
+      appears: [
+        { lead: "Ruhm, Silber, Respec, Macht und Gunst", body: "diese Sitzung und pro Stunde" },
+        { lead: "Loot", body: "alles, was in deiner Nähe aufgehoben wird, und was es wert ist" },
+        { lead: "Mobs und Truhen", body: "was du getötet und geöffnet hast, nach Content" },
+        { lead: "Verlauf", body: "jede Sitzung, auf diesem Computer gespeichert" },
+      ],
+      pairOptional: "Optional. Loot Butler funktioniert auch ohne Gilde.",
+      folderTitleMac: "Auf diesem Mac",
+      folderTitle: "Auf diesem Computer",
+      folderBody:
+        "Loot- und Aktivitätslogs werden beim Spielen in deinen Datenordner geschrieben. Dein Loot bleibt auf diesem Computer, solange du keine Gilde verbindest.",
+      openFolder: "Ordner öffnen",
+      captureTitle: "Aufzeichnung",
+    },
+    foot: {
+      connect: "Gilde verbinden",
+      localMac: "Sitzungen bleiben auf diesem Mac",
+      local: "Sitzungen bleiben auf diesem Computer",
+      unnamedDevice: "Dieser Computer",
+      linesSent: (n: number): string => plural("de", n, { one: "# Zeile gesendet", other: "# Zeilen gesendet" }),
+      ago: (duration: string): string => `vor ${duration}`,
+      justNow: "gerade eben",
+      nothingYet: "Noch nichts zu senden",
+      sending: "Wird gesendet…",
+      retrying: "Senden fehlgeschlagen — neuer Versuch",
+      off: "Auto-Senden aus",
+      blocked: "Hängt — sag deinem Offizier Bescheid",
+      unauthorized: "In Discord getrennt",
+      pairAgain: "Neu koppeln zum Fortsetzen",
+      outdated: "Bot braucht ein Update",
+    },
   },
 };
 
@@ -1213,6 +1460,62 @@ const FR: TStrings = {
 
   shell: {
     appName: "Loot Butler",
+    skipToContent: "Aller au contenu",
+    views: "Vues",
+    range: "Période",
+    groups: {
+      live: "En direct",
+    },
+    pages: {
+      session: "Session",
+    },
+    units: { s: "s", min: "min", h: "h" },
+    bar: {
+      listeningFor: (duration: string): string => `à l'écoute depuis ${duration}`,
+      capturingFor: (duration: string): string => `capture depuis ${duration}`,
+      restartIn: (duration: string): string => `dans ${duration}`,
+      stop: "Arrêter",
+    },
+    meta: {
+      listeningSince: (time: string): string => `À l'écoute depuis ${time}`,
+      started: (time: string): string => `Commencée à ${time}`,
+    },
+    session: {
+      waitingMore:
+        "Connectez-vous et jouez. Gloire, argent, loot, monstres, récolte et pêche apparaissent ici environ une minute après que le jeu a commencé à émettre.",
+      capturingMore: "Les chiffres apparaissent dès qu'il y a quelque chose à compter.",
+      appearsTitle: "Ce qui apparaît ici",
+      appears: [
+        { lead: "Gloire, argent, respec, puissance et faveur", body: "cette session et par heure" },
+        { lead: "Loot", body: "chaque ramassage près de vous, et ce qu'il vaut" },
+        { lead: "Monstres et coffres", body: "ce que vous avez tué et ouvert, par contenu" },
+        { lead: "Historique", body: "chaque session, conservée sur cet ordinateur" },
+      ],
+      pairOptional: "Facultatif. Loot Butler fonctionne sans guilde.",
+      folderTitleMac: "Sur ce Mac",
+      folderTitle: "Sur cet ordinateur",
+      folderBody:
+        "Les journaux de loot et d'activité sont écrits dans votre dossier de données pendant que vous jouez. Votre loot reste sur cet ordinateur tant que vous ne connectez pas de guilde.",
+      openFolder: "Ouvrir le dossier",
+      captureTitle: "Capture",
+    },
+    foot: {
+      connect: "Connecter une guilde",
+      localMac: "Les sessions restent sur ce Mac",
+      local: "Les sessions restent sur cet ordinateur",
+      unnamedDevice: "Cet ordinateur",
+      linesSent: (n: number): string => plural("fr", n, { one: "# ligne envoyée", other: "# lignes envoyées" }),
+      ago: (duration: string): string => `il y a ${duration}`,
+      justNow: "à l'instant",
+      nothingYet: "Rien à envoyer pour l'instant",
+      sending: "Envoi…",
+      retrying: "Échec de l'envoi — nouvel essai",
+      off: "Envoi auto désactivé",
+      blocked: "Bloqué — prévenez votre officier",
+      unauthorized: "Déconnecté dans Discord",
+      pairAgain: "Associez à nouveau pour reprendre",
+      outdated: "Le bot doit être mis à jour",
+    },
   },
 };
 
@@ -1442,6 +1745,62 @@ const PT: TStrings = {
 
   shell: {
     appName: "Loot Butler",
+    skipToContent: "Pular para o conteúdo",
+    views: "Seções",
+    range: "Período",
+    groups: {
+      live: "Ao vivo",
+    },
+    pages: {
+      session: "Sessão",
+    },
+    units: { s: "s", min: "min", h: "h" },
+    bar: {
+      listeningFor: (duration: string): string => `ouvindo há ${duration}`,
+      capturingFor: (duration: string): string => `capturando há ${duration}`,
+      restartIn: (duration: string): string => `em ${duration}`,
+      stop: "Parar",
+    },
+    meta: {
+      listeningSince: (time: string): string => `Ouvindo desde ${time}`,
+      started: (time: string): string => `Iniciada às ${time}`,
+    },
+    session: {
+      waitingMore:
+        "Entre no jogo e jogue. Fama, prata, loot, mobs, coleta e pesca aparecem aqui cerca de um minuto depois que o jogo começa a transmitir.",
+      capturingMore: "Os números aparecem assim que houver algo para contar.",
+      appearsTitle: "O que aparece aqui",
+      appears: [
+        { lead: "Fama, prata, respec, poder e favor", body: "nesta sessão e por hora" },
+        { lead: "Loot", body: "cada item pego perto de você, e quanto vale" },
+        { lead: "Mobs e baús", body: "o que você matou e abriu, por conteúdo" },
+        { lead: "Histórico", body: "cada sessão, guardada neste computador" },
+      ],
+      pairOptional: "Opcional. O Loot Butler funciona sem guilda.",
+      folderTitleMac: "Neste Mac",
+      folderTitle: "Neste computador",
+      folderBody:
+        "Os logs de loot e de atividade são gravados na sua pasta de dados enquanto você joga. Seu loot fica neste computador, a menos que você conecte uma guilda.",
+      openFolder: "Abrir pasta",
+      captureTitle: "Captura",
+    },
+    foot: {
+      connect: "Conectar uma guilda",
+      localMac: "As sessões ficam neste Mac",
+      local: "As sessões ficam neste computador",
+      unnamedDevice: "Este computador",
+      linesSent: (n: number): string => plural("pt", n, { one: "# linha enviada", other: "# linhas enviadas" }),
+      ago: (duration: string): string => `há ${duration}`,
+      justNow: "agora mesmo",
+      nothingYet: "Nada para enviar ainda",
+      sending: "Enviando…",
+      retrying: "Falha no envio — tentando de novo",
+      off: "Envio automático desligado",
+      blocked: "Travado — avise seu oficial",
+      unauthorized: "Desconectado no Discord",
+      pairAgain: "Pareie de novo para retomar",
+      outdated: "O bot precisa de atualização",
+    },
   },
 };
 

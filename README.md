@@ -53,7 +53,7 @@ src/renderer/   the single screen (plain TS/HTML/CSS, no framework)
 src/app/        the v5 shell preview (React + Tailwind, behind a flag — see "The v5 shell (preview)")
 src/shared/     types, channel names, all user-facing copy (strings.ts)
 resources/mac/  the ChmodBPF-style permission helper (plist + scripts)
-tools/          mock engine, stdout recorder, static-copy build step (+ design-system CSS), v5 shell build
+tools/          mock engine, stdout recorder, static-copy build step (+ design-system CSS), v5 shell build + shots
 test/           vitest suites — run with no Electron and no game
 ```
 
@@ -280,11 +280,58 @@ The page keeps the old window's content-security policy word for word. `pnpm typ
 that theme, and that the faces are the package's files, byte for byte, with their licences beside
 them.
 
-**What is in it.** The frame: the 48px title bar with the crest, the wordmark and the gear, over an
-empty main region. The gear is the design system's `Button`, which shows the package's React entry
-rendering under the policy. A value a board draws that no token holds is a `--lb-*` variable in
-`src/app/shell.css`, defined for both themes; where the board takes a different token in each theme
+**What is in it.** The shell around one page, drawn from the canvas's boards (page v5): Fh1 for the
+title bar, Fh2 for the sidebar's foot, Fh3 and Fh7 for Session, F1 and Fr for the frame, Fa for the
+keyboard and the screen reader.
+
+- **The title bar** says the capture's state in the app's own words, with a dot beside them: while
+  capturing, the character and how long (`Bors · capturing 1 h 20 min`), or `Capturing · detecting…`
+  before Albion names them; `Waiting for Albion… · listening for 40 s`; `Starting the logger…`; the
+  restart and when it comes; `Stopping…`; `Not capturing`; `Something needs fixing` in the danger
+  red. Then its one button — Stop (dimmed and refusing the press while the logger starts or stops),
+  Start capture in gold when idle, a neutral Start in the error state — the version, and the gear.
+  Below 1024px it keeps the name and the time and drops the version. The guild and the zone are not
+  drawn: the app does not know them yet.
+- **The sidebar** lists only the pages that exist — Session, under Live — 208px with labels from
+  1280px up, the 60px rail of icons below, each label then a tooltip on hover and on focus. The page
+  you are on wears the chosen wash and an icon that draws itself once on arrival (lit at once under
+  reduced motion). Its foot shows the guild connection: `Connect a guild` and where sessions stay
+  when unpaired, else the device's name and a short form of the upload state (`312 lines sent · 1 min
+  ago`, `Sending…`, `Couldn't send — retrying`, `Auto-send off`, …). It is not yet a door: the panel
+  it will open comes with the pairing step, so for now Tab passes it by.
+- **The page header** is the range tabs where a title would be — only Session so far, since Today
+  and 7 days need History — with a light running along its underline while capturing, and the meta
+  line (`Listening since 14:33`, `Started 14:33 · 1 h 20 min`) beside it, or under it below 1280px.
+- **Session before data**: a card for the capture's state (the waiting reasons join it after 90 s
+  of waiting, as in the old window), what will appear here, and at the right a guild to connect
+  (Pair with Discord does nothing yet), the data folder (Open folder is the old window's Reveal) and
+  the auto-start switch (the stored setting, as in the old window). From 1280px the right column is
+  400px, at 1024 it is 320, below that it moves under the page.
+- **Behind it**, `src/app/store.ts` mirrors the bridge for React (`useSyncExternalStore`): the five
+  `get*` calls, then the three `on*` subscriptions — a push that lands while a get is in flight wins
+  — and the setup probed again on window focus. Auto-start runs once per window over an idle
+  capture, as the old window's does. `src/app/router.ts` keeps the page in the hash (`#/session`);
+  any hash not starting `#/`, like the skip link's `#main`, is left alone. The stored theme and
+  language apply as they arrive. What each state says is pure (`src/app/model.ts`), held to the
+  boards by `test/shellModel.test.ts`; the store and the router by `test/shellStore.test.ts`. The
+  bridge's type is shared with the old window (`src/shared/bridge.ts`, types only, so the old
+  window's built JavaScript is unchanged).
+- **Accessibility**: a skip link first, then the title bar (banner), the sidebar (navigation
+  "Views") and the page (main) with one h1; one polite live region speaks a state change once; the
+  package's steel focus ring throughout; every dot beside words.
+
+Every new string is in `src/shared/strings.ts` in the six languages; the count of lines sent picks
+its plural form with `Intl.PluralRules` (`src/shared/plural.ts`).
+
+A value a board draws that no token holds is a `--lb-*` variable in `src/app/shell.css`, defined
+for both themes with the board it came from; where the board takes a different token in each theme
 (the bar's hairline), the variable names the two tokens instead of copying their values.
+
+**Seeing it.** `pnpm build && OUT=<dir> electron tools/shell-shots.cjs` draws the built page behind
+the layout check's stub bridge in every capture state, both themes, both platforms and three widths,
+and writes a PNG of each (`ONLY=<part of a name>` for some, `SCALE=2` for 2x). The OS's own buttons
+are not in a page, so the tool draws dashed stand-ins where a Mac's lights and Windows' caption
+buttons go. It measures nothing; the v5 layout check is the next step.
 
 **The window.** Behind the flag the window is the shell's own (`src/main/windowOptions.ts`):
 resizable down to 768×620, maximizable and full-screenable, and opening at 1280×800 the first time —
@@ -317,10 +364,11 @@ clamped to the screen's work area and centred on it — then wherever it was lef
 With the flag off, the old window's options are 0.8.8's byte for byte (`test/windowOptions.test.ts`
 compares them with JSON produced from 0.8.8's own source), and none of the above applies to it.
 
-**Not yet.** The gear does nothing. There is no status, action, version, sidebar, page or skip
-link. The stored theme and language are not read: the page follows the OS language and draws dark
-until the store arrives. In full screen on a Mac the bar still pads 84px for the lights it no longer
-shows. `pnpm check:layout` measures the old window only.
+**Not yet.** The gear does nothing, Pair with Discord does nothing, and the sidebar's foot opens
+nothing. The error state names what is wrong but carries no fix: the notice that holds the fix
+comes in a later step, so until then the old window is where a broken setup gets mended. Times of
+day are in the OS's format, which may not be the app language's. In full screen on a Mac the bar
+still pads 84px for the lights it no longer shows. `pnpm check:layout` measures the old window only.
 
 ## When a game update breaks the decoder
 
