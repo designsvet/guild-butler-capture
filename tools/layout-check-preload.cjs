@@ -95,24 +95,37 @@ ipcRenderer.on("gbc-stub:state", (_event, name) => {
   }
 });
 
-const pairing = sc.paired
-  ? {
-      paired: true,
-      deviceName: "Member's MacBook Pro",
-      guildId: "1",
-      pairedAt: now,
-      uploadEnabled: sc.uploadEnabled ?? true,
-      // sc.upload, sc.sent and sc.uploadEnabled shape the v5 shell's sidebar foot; the old check sets none
-      upload: { state: sc.upload ?? "idle", sentTotal: sc.sent ?? 1284, lastSentAt: now - (sc.sentAgoMs ?? 0), failures: 0, lastError: null },
-    }
-  : {
-      paired: false,
-      deviceName: null,
-      guildId: null,
-      pairedAt: null,
-      uploadEnabled: true,
-      upload: { state: "unpaired", sentTotal: 0, lastSentAt: null, failures: 0, lastError: null },
-    };
+const PAIRED = {
+  paired: true,
+  deviceName: "Member's MacBook Pro",
+  guildId: "1",
+  lootUrl: "https://app.guild-butler.com/?guild=1&tab=loot",
+  pairedAt: now,
+  uploadEnabled: sc.uploadEnabled ?? true,
+  // sc.upload, sc.sent and sc.uploadEnabled shape the v5 shell's sidebar foot; the old check sets none
+  upload: { state: sc.upload ?? "idle", sentTotal: sc.sent ?? 1284, lastSentAt: now - (sc.sentAgoMs ?? 0), failures: 0, lastError: null },
+};
+const UNPAIRED = {
+  paired: false,
+  deviceName: null,
+  guildId: null,
+  lootUrl: null,
+  pairedAt: null,
+  uploadEnabled: true,
+  upload: { state: "unpaired", sentTotal: 0, lastSentAt: null, failures: 0, lastError: null },
+};
+// What main would hold: the v5 shell's connection panel pairs, disconnects and switches the upload,
+// and each answers with the status after it, and pushes it, as main does. The old check presses
+// Pair alone.
+let pairing = sc.paired ? PAIRED : UNPAIRED;
+const onPairingListeners = new Set();
+const setPairing = (next) => {
+  pairing = next;
+  for (const listener of onPairingListeners) {
+    listener(pairing);
+  }
+  return pairing;
+};
 
 // The folders a real install reports, at their longest: the v5 shell's settings show both whole
 // (sc.longPaths, set by its tools); the old check keeps its short stand-ins.
@@ -172,13 +185,25 @@ const bridge = {
     };
   },
   getPairing: () => ok(pairing),
-  // Every code is refused: the failure sentence is the tallest thing the steps can hold.
-  pair: () => ok({ ok: false, status: pairing, failure: "refused" }),
-  unpair: () => ok(pairing),
-  setUpload: () => ok(pairing),
+  // Every code is refused: the failure sentence is the tallest thing the steps can hold — the
+  // refusal of sc.pairFailure, if a scenario names another (an EPairFailure). sc.pairPending: the
+  // answer never comes, so a scenario sees the panel while a code is checked; sc.pairOk: accepted.
+  pair: () =>
+    sc.pairPending
+      ? never
+      : sc.pairOk
+        ? ok({ ok: true, status: setPairing(PAIRED), failure: null, detail: null })
+        : ok({ ok: false, status: pairing, failure: sc.pairFailure ?? "refused", detail: null }),
+  unpair: () => ok(setPairing(UNPAIRED)),
+  setUpload: (enabled) => ok(setPairing({ ...pairing, uploadEnabled: enabled !== false })),
   openLoot: () => ok(),
   openPrivacy: () => ok(),
-  onPairing: () => () => {},
+  onPairing: (listener) => {
+    onPairingListeners.add(listener);
+    return () => {
+      onPairingListeners.delete(listener);
+    };
+  },
   getUpdate: () => ok(update),
   updateRestart: () => ok({ ok: true }),
   onUpdate: () => () => {},

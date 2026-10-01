@@ -40,6 +40,13 @@
  *   kept, every other control pressed from the keyboard making its own bridge call (WIRES, read
  *   back from the stub), Escape closing the menu alone and then the drawer, and the focus back on
  *   the gear;
+ * - the guild connection's panel (board Fh2) open when a door was pressed and not otherwise, showing
+ *   the face the pairing calls for, whole in the window under the title bar, over its foot and not on
+ *   it, not scrolling, the focus in it, the foot's door saying it is open and drawn pressed. Then the
+ *   keys (`connectionKeys`): every control pressed from the keyboard making its own bridge call and
+ *   no other (`pair`, `copyText`, `setUpload`, `openLoot`, `unpair`), Pair waiting for a code, a
+ *   refusal said under the field, Escape, a press outside and the focus leaving closing it — none of
+ *   them while a code is being checked — and the focus back on the door it came from;
  * - while the title bar's Start/Stop changes face (MORPHS, measured every 55ms of it with motion
  *   on): any of the above in the bar, the version or the gear moving, a change that did not play,
  *   and a button still holding its eased width, or a leaving word, once it is over.
@@ -130,7 +137,9 @@ const PLATFORMS = ["darwin", "win32"];
  * drawer, `menu` its language menu. `press` clicks a button first — or several, in order — as a
  * member would: "Later", the fix that reports back, the install still fetching, the gear and then
  * the language; required on the platforms named (`on`), not tried on the others, where the card
- * has no such button; `waitFor` is what the press must bring before measuring.
+ * has no such button; `waitFor` is what the press must bring before measuring. A press may type into
+ * a field instead (`{ fill, value }`): the connection panel's code. `panel` is the face of the guild
+ * connection's panel (board Fh2) the state must show — "connect" or "connected" — or none.
  */
 const LATER = { selector: "[data-dialog-later]", on: ["darwin", "win32"] };
 const GEAR = "[data-settings-gear]";
@@ -149,6 +158,15 @@ const WIRES = [
   { control: ".lb-set-links a[href]", key: "Enter", call: "openPrivacy" },
   { control: "[role='switch']", key: " ", call: "setAutoCapture" },
 ];
+/**
+ * The guild connection's panel (Fh2): its door in the sidebar's foot, the other on Session, the code
+ * typed (the board's) and Pair pressed — which the stub bridge refuses, with the failure a state
+ * names (`pairFailure`), or never answers (`pairPending`).
+ */
+const DOOR = "[data-connection-door]";
+const CONNECT = { selector: DOOR, on: ["darwin", "win32"] };
+const FROM_SESSION = { selector: "[data-connection-opener='session']", on: ["darwin", "win32"] };
+const REFUSED = { selector: [DOOR, { fill: "[data-pair-code]", value: "ABCD-EFGH" }, "[data-pair-submit]"], on: ["darwin", "win32"] };
 const STATES = [
   // The first run: Start in gold, the pair card in the right column, "Connect a guild" in the foot.
   { name: "idle", state: "idle", paired: false, notice: null },
@@ -216,15 +234,27 @@ const STATES = [
   { name: "settings", state: "capturing", paired: true, press: SETTINGS, waitFor: ".lb-drawer", notice: null, drawer: true },
   { name: "settings-language", state: "capturing", paired: true, press: LANGUAGE_MENU, waitFor: "[role='listbox']", notice: null, drawer: true, menu: true },
   { name: "settings-no-engine", state: "idle", engineMissing: true, paired: false, press: SETTINGS, waitFor: ".lb-drawer", notice: "blocked", drawer: true },
+  // The guild connection's panel (Fh2): not connected, from the foot and from Session's button; a
+  // code refused, the board's refusal and the longest in every language (this computer cannot
+  // store the token securely); a code being checked ("Connecting…"); connected, as the board draws
+  // it and with the longest sentence the details can carry (the bot needs an update).
+  { name: "connect", state: "idle", paired: false, press: CONNECT, waitFor: "[data-connection-panel='connect']", notice: null, panel: "connect" },
+  // (the stub accepts its code: the keys pair this one)
+  { name: "connect-from-session", state: "waiting", paired: false, pairOk: true, press: FROM_SESSION, waitFor: "[data-connection-panel='connect']", notice: null, panel: "connect" },
+  { name: "connect-refused", state: "idle", paired: false, press: REFUSED, waitFor: "[data-pair-failure]", notice: null, panel: "connect" },
+  { name: "connect-no-encryption", state: "idle", paired: false, pairFailure: "no-encryption", press: REFUSED, waitFor: "[data-pair-failure]", notice: null, panel: "connect" },
+  { name: "connect-checking", state: "idle", paired: false, pairPending: true, press: REFUSED, waitFor: "[data-pair-submit][aria-disabled='true']", notice: null, panel: "connect" },
+  { name: "connected", state: "capturing", paired: true, sentAgoMs: 60_000, press: CONNECT, waitFor: "[data-connection-panel='connected']", notice: null, panel: "connected" },
+  { name: "connected-outdated", state: "capturing", paired: true, upload: "bot-outdated", press: CONNECT, waitFor: "[data-connection-panel='connected']", notice: null, panel: "connected" },
 ];
 
 /**
  * The scrims are veils over the page, not boxes on it. The layers over the page — the decoder's
- * dialog, the settings drawer, the drawer's language menu — each lie over what is under them on
- * purpose: a box in one and a box in another are not on one another.
+ * dialog, the settings drawer, the drawer's language menu, the connection's panel — each lie over
+ * what is under them on purpose: a box in one and a box in another are not on one another.
  */
 const VEILS = [".lb-scrim"];
-const OVERLAY = ".lb-overlay, .lb-settings, .lb-menu";
+const OVERLAY = ".lb-overlay, .lb-settings, .lb-menu, .lb-pair";
 
 /**
  * The cuts the shell makes on purpose: a device's name in the sidebar's foot, which is whatever a
@@ -273,7 +303,7 @@ const loads = ({ ROUTES, SUPPORTED_LANGS }) => {
     for (const platform of PLATFORMS) {
       for (const theme of THEMES) {
         for (const lang of SUPPORTED_LANGS) {
-          for (const { name, notice, dialog, drawer, menu, press, waitFor, ...stub } of STATES) {
+          for (const { name, notice, dialog, drawer, menu, panel, press, waitFor, ...stub } of STATES) {
             const pressed = press != null && press.on.includes(platform);
             list.push({
               route,
@@ -281,7 +311,7 @@ const loads = ({ ROUTES, SUPPORTED_LANGS }) => {
               theme,
               lang,
               stateName: name,
-              expect: { notice, dialog: dialog === true, drawer: drawer === true, menu: menu === true },
+              expect: { notice, dialog: dialog === true, drawer: drawer === true, menu: menu === true, panel: panel ?? null },
               press: pressed ? [press.selector].flat() : [],
               waitFor: pressed ? (waitFor ?? null) : null,
               // a real install's folders, at their longest (the settings drawer shows them whole)
@@ -518,6 +548,38 @@ const measure = ({ route, zones, mayCut, surfaces, scope, veils = [], overlay = 
         }
         if (document.activeElement?.getAttribute("role") !== "option" || !menu.contains(document.activeElement)) {
           problems.add("the language menu is open and the focus is not on one of its rows");
+        }
+      }
+      // The guild connection's panel (Fh2): open with the face the pairing calls for when a door was
+      // pressed, and only then; whole in the window, under the title bar, over the foot it opens from
+      // and not on it; not scrolling (it would only in a window shorter than the smallest); the focus
+      // in it; the foot's door saying it is open, and drawn pressed.
+      const pair = document.querySelector("[data-connection-panel]");
+      const face = pair?.dataset.connectionPanel ?? null;
+      if (face !== expect.panel) {
+        problems.add(expect.panel == null ? `the connection panel is open (${face})` : face == null ? "the connection panel is not open" : `the connection panel shows ${face}, not ${expect.panel}`);
+      }
+      if (pair != null) {
+        const r = pair.getBoundingClientRect();
+        if (r.top < 48 + 8 - T || r.left < -T || r.right > W + T || r.bottom > H + T) {
+          problems.add(`the connection panel does not fit the window under the title bar (${Math.round(r.left)},${Math.round(r.top)} to ${Math.round(r.right)},${Math.round(r.bottom)})`);
+        }
+        if (pair.scrollHeight > pair.clientHeight + T) {
+          problems.add(`the connection panel scrolls (${pair.scrollHeight}px of it in ${pair.clientHeight}px)`);
+        }
+        const foot = document.querySelector(".lb-foot");
+        if (foot != null && r.bottom > foot.getBoundingClientRect().top + T) {
+          problems.add("the connection panel covers the foot it opens from");
+        }
+        if (!pair.contains(document.activeElement)) {
+          problems.add("the connection panel is open and the focus is not in it");
+        }
+        const door = document.querySelector("[data-connection-door]");
+        if (door?.getAttribute("aria-expanded") !== "true") {
+          problems.add("the foot's door does not say its panel is open");
+        }
+        if (door == null || !painted(css(door).backgroundColor)) {
+          problems.add("the foot's door is not drawn pressed while its panel is open");
         }
       }
     }
@@ -822,6 +884,13 @@ const settingsKeys = async (win, load) => {
     js(`(() => { const list = [...document.querySelectorAll('.lb-drawer :is(button, a[href], [tabindex]:not([tabindex="-1"]))')].filter((el) => !el.hasAttribute('disabled')); const el = list.at(-1); return el == null ? null : (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 40); })()`);
   const closedWell = async (how) => {
     await settle();
+    // The drawer goes once its exit has played (SettingsDrawer.tsx: the animation's promise, then a
+    // render): under a loaded machine that render can land after the animations have stopped, so
+    // its going is waited for — up to 3s — rather than read once (a run of 5,184 once caught it
+    // still leaving).
+    await js(
+      `new Promise((r) => { const t0 = performance.now(); const tick = () => document.querySelector('.lb-settings') == null || performance.now() - t0 > 3000 ? r() : setTimeout(tick, 10); tick(); })`,
+    );
     const problems = [];
     if ((await js("document.querySelector('.lb-settings') != null")) === true) {
       problems.push(`${how} did not close the drawer`);
@@ -1011,6 +1080,281 @@ const settingsKeys = async (win, load) => {
   }
 };
 
+/**
+ * The guild connection's panel from the keyboard and the pointer (board Fa: a popover — Escape and a
+ * press outside close it, and so does the focus leaving it; the focus goes back to the door it came
+ * from), once its window has been measured. Real keys, text and presses through DevTools, as a
+ * member's would arrive; what the page asked of the bridge is read back from the stub's record.
+ * Returns the problems; empty = it behaved.
+ *
+ * - Not connected, from the foot: the focus starts in the code field and Pair waits for a code;
+ *   Escape closes it onto the door, and Enter on the door opens it again onto the field; the copy
+ *   button copies `/capture pair` and says so; a code typed and Enter asks the bridge to pair it —
+ *   once — and the refusal is said under the field, which keeps the focus; the focus leaving the
+ *   panel (Tab past Pair) closes it, and a refusal does not outlive the panel; a press outside — on a
+ *   spot that takes no focus, so the press alone — closes it.
+ * - From Session's Pair with Discord: the same panel, that button saying it is open, and Escape gives
+ *   the focus back to it. Enter on it opens it again, and a code the stub accepts turns the panel to
+ *   the details with the focus on the panel, the pair card gone from Session and the foot naming the
+ *   computer; Escape then gives the focus to the foot's door, the other door having gone.
+ * - While a code is being checked: Escape, a press outside, the door and the focus leaving all leave
+ *   it open, and Enter in the field asks for nothing more.
+ * - Connected: the focus starts on the panel itself; Space on the switch, Enter on View my loot (the
+ *   window not navigating) and Enter on Disconnect each make their own call and no other; Disconnect
+ *   turns the panel to its steps with the focus in it, and the foot to "Connect a guild"; Escape
+ *   closes it onto the door.
+ */
+const connectionKeys = async (win, load) => {
+  const cdp = win.webContents.debugger;
+  cdp.attach("1.3");
+  const js = (code) => win.webContents.executeJavaScript(code);
+  const KEYS = { Tab: ["Tab", 9], Escape: ["Escape", 27], Enter: ["Enter", 13], " ": ["Space", 32] };
+  const press = async (name, shift = false) => {
+    const [code, vk] = KEYS[name];
+    for (const type of ["keyDown", "keyUp"]) {
+      await cdp.sendCommand("Input.dispatchKeyEvent", {
+        type,
+        key: name,
+        code,
+        windowsVirtualKeyCode: vk,
+        modifiers: shift ? 8 : 0,
+        ...((name === "Enter" || name === " ") && type === "keyDown" ? { text: name === "Enter" ? "\r" : " " } : {}),
+      });
+    }
+    await settle();
+  };
+  const click = async ([x, y]) => {
+    for (const type of ["mousePressed", "mouseReleased"]) {
+      await cdp.sendCommand("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+    }
+    await settle();
+  };
+  const centre = (selector) =>
+    js(`(() => { const r = document.querySelector(${JSON.stringify(selector)})?.getBoundingClientRect(); return r == null ? null : [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  // A spot on the page with nothing on it: the header's row, at the window's right. A press there
+  // also takes the focus to the main region (it can hold the focus), so it closes the panel by the
+  // focus leaving it too.
+  const outside = () => js("[innerWidth - 30, 70]");
+  // A spot that takes no focus — the sidebar's empty middle, above the panel — so a press there
+  // closes the panel, if it does, by the press alone.
+  const bare = () =>
+    js("(() => { const f = document.querySelector('.lb-side-fill').getBoundingClientRect(); const p = document.querySelector('[data-connection-panel]').getBoundingClientRect(); return [f.left + f.width / 2, (f.top + Math.min(f.bottom, p.top)) / 2]; })()");
+  const settle = () =>
+    js(`new Promise((r) => { const t0 = performance.now(); const tick = () => { const busy = document.getAnimations().some((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity); if (!busy || performance.now() - t0 > 3000) { setTimeout(r, 30); } else { setTimeout(tick, 10); } }; tick(); })`);
+  const asked = () => js("window.gbcStub.calls().filter((c) => !c.name.startsWith('get')).map((c) => c.name + '(' + c.args.map((a) => JSON.stringify(a)).join(', ') + ')')");
+  const on = (selector) => js(`document.activeElement?.matches(${JSON.stringify(selector)}) === true`);
+  const focused = () =>
+    js(`(() => { const el = document.activeElement; if (el == null || el === document.body) return 'the page'; if (el.matches('[data-connection-panel]')) return 'the panel'; if (el.matches('[data-connection-door]')) return 'the foot'; if (el.matches('[data-pair-code]')) return 'the code field'; return (el.getAttribute('aria-label') ?? el.textContent ?? el.tagName).trim().slice(0, 40); })()`);
+  const open = () => js("document.querySelector('[data-connection-panel]')?.dataset.connectionPanel ?? null");
+  const tabTo = async (selector) => {
+    for (let i = 0; i < 12; i += 1) {
+      if ((await on(selector)) === true) {
+        return true;
+      }
+      await press("Tab");
+    }
+    return (await on(selector)) === true;
+  };
+  // Pressing a control must make exactly its own call.
+  const makes = async (what, key, wanted, out) => {
+    const before = (await asked()).length;
+    await press(key);
+    const made = (await asked()).slice(before);
+    if (made.length !== 1 || made[0] !== wanted) {
+      out.push(`${key === " " ? "Space" : key} on ${what} asked the bridge for ${made.length === 0 ? "nothing" : made.join(", ")}, not ${wanted}`);
+    }
+  };
+  const closedOnto = async (how, door, out) => {
+    if ((await open()) != null) {
+      out.push(`${how} did not close the connection panel`);
+      return;
+    }
+    if ((await js("document.querySelector('[data-connection-door]')?.getAttribute('aria-expanded')")) !== "false") {
+      out.push(`after ${how} the foot's door still says its panel is open`);
+    }
+    if (door != null && (await on(door)) !== true) {
+      out.push(`after ${how} closed the panel the focus is on ${await focused()}, not the door it came from`);
+    }
+  };
+  const out = [];
+  try {
+    await cdp.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+    switch (load.stateName) {
+      case "connect": {
+        if ((await on("[data-pair-code]")) !== true) {
+          out.push(`the panel opened with the focus on ${await focused()}, not the code field`);
+        }
+        if ((await js("document.querySelector('[data-pair-submit]')?.disabled")) !== true) {
+          out.push("Pair does not wait for a code");
+        }
+        await press("Escape");
+        await closedOnto("Escape", DOOR, out);
+        await press("Enter");
+        if ((await open()) !== "connect") {
+          out.push("Enter on the foot's door did not open the panel again");
+          return out;
+        }
+        if ((await on("[data-pair-code]")) !== true) {
+          out.push(`the panel opened again with the focus on ${await focused()}, not the code field`);
+        }
+        await press("Tab", true);
+        if ((await on("[data-pair-copy]")) !== true) {
+          out.push(`Shift+Tab from the code field went to ${await focused()}, not the copy button`);
+        } else {
+          await makes("the copy button", "Enter", 'copyText("/capture pair")', out);
+          if ((await js("document.querySelector('.lb-pair-copied') != null")) !== true) {
+            out.push("the copy button did not say it had copied");
+          }
+        }
+        await press("Tab");
+        if ((await on("[data-pair-code]")) !== true) {
+          out.push(`Tab from the copy button went to ${await focused()}, not the code field`);
+          return out;
+        }
+        await cdp.sendCommand("Input.insertText", { text: "abcd efgh" });
+        await settle();
+        if ((await js("document.querySelector('[data-pair-submit]')?.disabled")) !== false) {
+          out.push("Pair stayed refusing with a code typed");
+        }
+        await makes("the code field", "Enter", 'pair("abcd efgh")', out);
+        if ((await js("document.querySelector('[data-pair-failure]')?.dataset.pairFailure ?? null")) !== "refused") {
+          out.push("a refused code is not said under the field");
+        }
+        if ((await js("document.querySelector('[data-pair-code]')?.getAttribute('aria-invalid')")) !== "true") {
+          out.push("the field does not say its code was refused");
+        }
+        if ((await on("[data-pair-code]")) !== true) {
+          out.push(`after the refusal the focus is on ${await focused()}, not the code field`);
+        }
+        // Tab past Pair: the focus leaves the panel, which closes
+        await press("Tab");
+        await press("Tab");
+        await closedOnto("the focus leaving it", null, out);
+        await click(await centre(DOOR));
+        if ((await open()) !== "connect") {
+          out.push("a press on the foot's door did not open the panel");
+          return out;
+        }
+        if ((await js("document.querySelector('[data-pair-failure]') != null || document.querySelector('[data-pair-code]')?.value !== ''")) === true) {
+          out.push("a refusal, or its code, outlived the panel it was said in");
+        }
+        await click(await bare());
+        await closedOnto("a press outside it", null, out);
+        return out;
+      }
+      case "connect-from-session": {
+        if ((await on("[data-pair-code]")) !== true) {
+          out.push(`the panel opened from Session with the focus on ${await focused()}, not the code field`);
+        }
+        if ((await js("document.querySelector(\"[data-connection-opener='session']\")?.getAttribute('aria-expanded')")) !== "true") {
+          out.push("Session's Pair with Discord does not say its panel is open");
+        }
+        await press("Escape");
+        await closedOnto("Escape", "[data-connection-opener='session']", out);
+        await press("Enter");
+        if ((await on("[data-pair-code]")) !== true) {
+          out.push(`Enter on Session's Pair with Discord left the focus on ${await focused()}, not the code field`);
+          return out;
+        }
+        await cdp.sendCommand("Input.insertText", { text: "abcd efgh" });
+        await settle();
+        await makes("the code field", "Enter", 'pair("abcd efgh")', out);
+        if ((await open()) !== "connected") {
+          out.push(`an accepted code left the panel showing ${(await open()) ?? "nothing"}, not the details`);
+          return out;
+        }
+        if ((await on("[data-connection-panel]")) !== true) {
+          out.push(`after an accepted code the focus is on ${await focused()}, not the panel`);
+        }
+        if ((await js("document.querySelector(\"[data-connection-opener='session']\") != null")) === true) {
+          out.push("after an accepted code Session still offers to pair");
+        }
+        if ((await js("document.querySelector('.lb-foot')?.dataset.dot")) === "hollow") {
+          out.push("after an accepted code the foot still says Connect a guild");
+        }
+        await press("Escape");
+        await closedOnto("Escape, once Session's button had gone", DOOR, out);
+        return out;
+      }
+      case "connect-checking": {
+        const pairs = async () => (await asked()).filter((c) => c.startsWith("pair(")).length;
+        await press("Escape");
+        if ((await open()) == null) {
+          out.push("Escape closed the panel while a code was being checked");
+          return out;
+        }
+        await click(await outside());
+        if ((await open()) == null) {
+          out.push("a press outside closed the panel while a code was being checked");
+          return out;
+        }
+        await click(await centre(DOOR));
+        if ((await open()) == null) {
+          out.push("the foot's door closed the panel while a code was being checked");
+          return out;
+        }
+        await js("document.querySelector('[data-pair-code]')?.focus()");
+        await press("Enter");
+        if ((await pairs()) !== 1) {
+          out.push(`a code was sent ${await pairs()} times while the first was being checked`);
+        }
+        for (let i = 0; i < 4; i += 1) {
+          await press("Tab");
+        }
+        if ((await open()) == null) {
+          out.push("the focus leaving the panel closed it while a code was being checked");
+        }
+        return out;
+      }
+      case "connected": {
+        if ((await on("[data-connection-panel]")) !== true) {
+          out.push(`the details opened with the focus on ${await focused()}, not the panel`);
+        }
+        const href = await js("location.href");
+        if (!(await tabTo("[data-connection-panel] [role='switch']"))) {
+          out.push("Tab never reached Send loot automatically");
+        } else {
+          await makes("Send loot automatically", " ", "setUpload(false)", out);
+          if ((await js("document.querySelector(\"[data-connection-panel] [role='switch']\")?.getAttribute('aria-checked')")) !== "false") {
+            out.push("the switch does not show the upload off");
+          }
+        }
+        if (!(await tabTo("[data-pair-loot]"))) {
+          out.push("Tab never reached View my loot");
+        } else {
+          await makes("View my loot", "Enter", "openLoot()", out);
+          if ((await js("location.href")) !== href) {
+            out.push("View my loot navigated the window away");
+            return out;
+          }
+        }
+        if (!(await tabTo("[data-pair-disconnect]"))) {
+          out.push("Tab never reached Disconnect this computer");
+          return out;
+        }
+        await makes("Disconnect this computer", "Enter", "unpair()", out);
+        if ((await open()) !== "connect") {
+          out.push("after Disconnect the panel does not show the steps");
+        }
+        if ((await on("[data-connection-panel]")) !== true) {
+          out.push(`after Disconnect the focus is on ${await focused()}, not the panel`);
+        }
+        if ((await js("document.querySelector('.lb-foot')?.dataset.dot")) !== "hollow") {
+          out.push("after Disconnect the foot does not say Connect a guild");
+        }
+        await press("Escape");
+        await closedOnto("Escape", DOOR, out);
+        return out;
+      }
+      default: {
+        return out;
+      }
+    }
+  } finally {
+    cdp.detach();
+  }
+};
+
 const run = async () => {
   const { ROUTES, SUPPORTED_LANGS } = readLists();
   const lists = [
@@ -1074,12 +1418,19 @@ const run = async () => {
     await win.loadFile(PAGE, { hash: `/${load.route}` });
     const pressFailed = [];
     for (const press of load.press) {
-      // as a member would, once the page has drawn what the press is on (and settled from the last)
+      // as a member would, once the page has drawn what the press is on (and settled from the last):
+      // a button pressed, or a field typed into — its value set as the browser sets it, then the
+      // input event a keystroke raises, which is what React listens for
+      const at = typeof press === "string" ? press : press.fill;
+      const act =
+        typeof press === "string"
+          ? "el.click();"
+          : `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(press.value)}); el.dispatchEvent(new Event('input', { bubbles: true }));`;
       const ready = await win.webContents.executeJavaScript(
-        `new Promise((r) => { const t0 = performance.now(); const tick = () => { const el = document.querySelector(${JSON.stringify(press)}); const busy = document.getAnimations().some((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity); if (el != null && !busy) { el.click(); r(true); } else if (performance.now() - t0 > 5000) { r(false); } else { setTimeout(tick, 10); } }; tick(); })`,
+        `new Promise((r) => { const t0 = performance.now(); const tick = () => { const el = document.querySelector(${JSON.stringify(at)}); const busy = document.getAnimations().some((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity); if (el != null && !busy) { ${act} r(true); } else if (performance.now() - t0 > 5000) { r(false); } else { setTimeout(tick, 10); } }; tick(); })`,
       );
       if (!ready) {
-        pressFailed.push(`there was nothing to press at ${press}`);
+        pressFailed.push(`there was nothing to press at ${at}`);
         break;
       }
     }
@@ -1127,10 +1478,15 @@ const run = async () => {
       }
       results.push({ width, all });
     }
-    if (load.expect.dialog || load.expect.drawer) {
-      // Measured at every width, the dialog or the drawer is answered at the last one: no scenario of
-      // its own (the count stays the product of the lists), its faults are the last width's.
-      const keys = load.expect.dialog ? await dialogKeys(win) : await settingsKeys(win, load);
+    if (load.expect.dialog || load.expect.drawer || load.expect.panel != null) {
+      // Measured at every width, the dialog, the drawer or the connection's panel is answered at the
+      // last one: no scenario of its own (the count stays the product of the lists), its faults are
+      // the last width's.
+      const keys = load.expect.dialog
+        ? await dialogKeys(win)
+        : load.expect.drawer
+          ? await settingsKeys(win, load)
+          : await connectionKeys(win, load);
       const last = results.at(-1);
       if (keys.length > 0 && last != null) {
         if (last.all.length === 0) {
