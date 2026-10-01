@@ -64,6 +64,13 @@ const STATES = {
   waitingLong: { status: "waiting", startedAt: now - 900_000, runStartedAt: now - 900_000 },
   capturing,
   health: { ...capturing, engineBroken: [{ handler: "EvOtherGrabbedLoot", failures: 5, calls: 5 }] },
+  // The states only the v5 shell's shots use (tools/shell-shots.cjs); the old check never asks.
+  starting: { status: "starting", startedAt: now - 3_000, runStartedAt: now - 3_000 },
+  // Capturing before Albion has named the character: the bar says "detecting…".
+  capturingNew: { ...capturing, character: null, linesThisRun: 0, heartbeatSeen: false, startedAt: now - 20_000 },
+  restarting: { ...capturing, status: "restarting", albionSeen: false, restartAttempt: 1, restartDelayMs: 4_000 },
+  stopping: { ...capturing, status: "stopping", stopRequested: true },
+  error: { status: "error", errorKind: "permission", errorDetail: "bpf: Permission denied" },
 };
 
 const state = { ...idle, ...STATES[sc.state] };
@@ -74,8 +81,9 @@ const pairing = sc.paired
       deviceName: "Member's MacBook Pro",
       guildId: "1",
       pairedAt: now,
-      uploadEnabled: true,
-      upload: { state: "idle", sentTotal: 1284, lastSentAt: now, failures: 0, lastError: null },
+      uploadEnabled: sc.uploadEnabled ?? true,
+      // sc.upload picks the uploader's state for the v5 shell's sidebar foot; the old check never sets it
+      upload: { state: sc.upload ?? "idle", sentTotal: sc.sent ?? 1284, lastSentAt: now - (sc.sentAgoMs ?? 0), failures: 0, lastError: null },
     }
   : {
       paired: false,
