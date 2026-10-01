@@ -6,8 +6,10 @@
    What a board draws that no token in @guild-butler/design-system holds, each defined once, for
    both themes, with the board it came from. Named --lb-*, never --gb-*: the package owns that
    prefix, and the old window's own names (--gb-titlebar, --gb-wash, …) live there too. A
-   component reads one of these or a package token, never a raw colour. The selectors are the
-   package's tokens.css ones, so on data-theme="light" the light block wins the same way. */
+   component reads one of these or a package token, never a raw colour; a size that is a step of
+   the package's type scale (11 label, 12 caption, 13 dense, 14 body) names the step, and only the
+   boards' in-between sizes (12.5, 13.5, 15.5, 18) are written out. The selectors are the package's
+   tokens.css ones, so on data-theme="light" the light block wins the same way. */
 :root,
 [data-theme="dark"] {
   /* Fh1, F1: the title bar's ground, a shade lighter than the page's --gb-bg (#0A0A0C). No
@@ -137,7 +139,7 @@ body {
   align-items: center;
   gap: 9px;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--gb-text-dense);
   color: var(--gb-muted);
   white-space: nowrap;
 }
@@ -221,7 +223,7 @@ body {
 .lb-bar-version {
   flex: none;
   font-family: var(--gb-font-mono);
-  font-size: 11px;
+  font-size: var(--gb-text-label);
   color: var(--gb-dim);
   white-space: nowrap;
 }
@@ -270,9 +272,9 @@ body {
 .lb-side-eyebrow {
   padding: 0 10px 6px;
   font-family: var(--gb-font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  font-size: var(--gb-text-label);
+  font-weight: var(--gb-text-label-w);
+  letter-spacing: var(--gb-text-label-ls);
   text-transform: uppercase;
   color: var(--gb-dim);
   white-space: nowrap;
@@ -380,7 +382,7 @@ body {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--gb-text-dense);
   font-weight: 600;
   color: var(--gb-ink-2);
   white-space: nowrap;
@@ -417,7 +419,7 @@ body {
    it has, and a sentence cut to "Sessions stay on this co…" says nothing. */
 .lb-foot-sub {
   padding-left: 15px;
-  font-size: 12px;
+  font-size: var(--gb-text-caption);
   color: var(--gb-muted);
 }
 
@@ -624,8 +626,8 @@ body {
 .lb-hero-line {
   max-width: 640px;
   margin: 0;
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: var(--gb-text-body);
+  line-height: var(--gb-text-body-lh);
   color: var(--gb-muted);
   text-wrap: pretty;
 }
@@ -645,9 +647,9 @@ body {
 .lb-eyebrow {
   margin: 0;
   font-family: var(--gb-font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  font-size: var(--gb-text-label);
+  font-weight: var(--gb-text-label-w);
+  letter-spacing: var(--gb-text-label-ls);
   text-transform: uppercase;
   color: var(--gb-dim);
 }
