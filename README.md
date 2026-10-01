@@ -254,6 +254,14 @@ logging" card (below).
 
 ## The v5 shell (preview)
 
+**Try it:** `pnpm dev:v5`. It builds, then opens the new shell with the mock engine in a throwaway
+data folder of its own (`.dev-v5-data/`, git-ignored) — never the installed app's, so your settings,
+pairing and captures are not touched and nothing reaches your guild's bot. `pnpm dev:v5 -- --real`
+runs the real engine instead (it needs the capture permission, as the app does); `-- --fresh` forgets
+the throwaway folder first, for a first open. The mock engine never talks to the bot in any mode
+(`src/main/botFacing.ts`): before this, `pnpm dev:mock` on a paired computer uploaded its invented
+loot as the member's.
+
 **Loot Butler**, the dashboard this app is being rebuilt into (raid-bot ADR 0159), is built
 beside the old window in `src/app/`, and nothing reaches it by accident: the old window stays the
 default, and 0.8.x ships it unchanged.

@@ -58,6 +58,7 @@ import {
 } from "./platform/macBpf.js";
 import { installNpcap, parseSignatureOutput, type TSignatureCheck } from "./platform/npcapInstall.js";
 import { classifyNpcap, npcapChildPathEnv, probeNpcap } from "./platform/winNpcap.js";
+import { talksToBot } from "./botFacing.js";
 import { loadSettings, saveSettings, settingsFilePath, wantsV5Shell, withLanguage, withTheme } from "./settings.js";
 import { asLang, detectLang } from "../shared/i18n.js";
 import { asTheme } from "../shared/captureTypes.js";
@@ -140,16 +141,18 @@ const dispatch = (ev: TSessionEvent): void => {
   const brokenBefore = state.engineBroken;
   state = reduceCaptureSession(state, ev);
   const fresh = newlyBroken(brokenBefore, state.engineBroken);
-  if (fresh.length > 0) {
+  // The mock engine's lines are invented: they never leave the machine (see botFacing.ts).
+  const toBot = talksToBot(currentEngine?.source);
+  if (toBot && fresh.length > 0) {
     forwardEngineHealth(fresh);
   }
-  if (ev.type === "engine-line" && ev.event.kind === "festivities") {
+  if (toBot && ev.type === "engine-line" && ev.event.kind === "festivities") {
     forwardFestivities(ev.event);
   }
-  if (ev.type === "engine-line" && ev.event.kind === "energy") {
+  if (toBot && ev.type === "engine-line" && ev.event.kind === "energy") {
     forwardEnergy(ev.event);
   }
-  if (ev.type === "engine-line" && ev.event.kind === "energy-log") {
+  if (toBot && ev.type === "engine-line" && ev.event.kind === "energy-log") {
     forwardEnergyLog(ev.event);
   }
   if (ev.type === "engine-exit") {
@@ -403,7 +406,11 @@ const stopUploadLoop = (): void => {
     clearInterval(uploadTimer);
     uploadTimer = null;
   }
-  // One last pass so the tail of a session is not left on disk until next time.
+  // One last pass so the tail of a session is not left on disk until next time — never for the mock
+  // engine, whose file is invented (botFacing.ts).
+  if (!talksToBot(currentEngine?.source)) {
+    return;
+  }
   void ensureUploader()
     .tick()
     .then(pushPairing)
@@ -526,7 +533,11 @@ const startCapture = (): void => {
     resolveLogPath: (name) => (isAbsolute(name) ? name : join(engine.workDir, name)),
   });
   supervisor.startSession();
-  startUploadLoop();
+  if (talksToBot(engine.source)) {
+    startUploadLoop();
+  } else {
+    appLog("upload: off — the mock engine's lines never leave this computer");
+  }
 
   stopTracker();
   if (!supervisor.isActive()) {
