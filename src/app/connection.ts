@@ -88,6 +88,16 @@ export const connectionView = (pairing: TPairingStatus, now: number, platform: s
   };
 };
 
+/**
+ * One gold button per window (model.ts `barAction`). While the panel shows its steps, Pair is the
+ * step the member opened it to take, and Fh2 draws it gold: it holds the gold, and the bar's Start
+ * steps back to its neutral face, as it does for the band's fix. The band's fix outranks it — a
+ * capture that cannot run, a broken decoder, is what the window asks first — so under such a band
+ * Pair is outlined. Connected, the panel has no gold button (View my loot is a link).
+ */
+export const pairHoldsTheGold = (open: boolean, pairing: TPairingStatus | null, bandHoldsTheGold: boolean): boolean =>
+  open && pairing != null && !pairing.paired && !bandHoldsTheGold;
+
 /** Fh2: the panel stands 8px above the foot's rule, 8px in from the foot's edge, and 8px under the title bar at most. */
 export const PANEL_GAP = 8;
 

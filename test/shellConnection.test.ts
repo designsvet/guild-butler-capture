@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { connectionView, PANEL_GAP, pairFailureSentence, placePanel } from "../src/app/connection.js";
-import { sidebarFoot } from "../src/app/model.js";
-import { EPairFailure, initialPairingStatus, type TPairingStatus } from "../src/shared/captureTypes.js";
+import { connectionView, PANEL_GAP, pairFailureSentence, pairHoldsTheGold, placePanel } from "../src/app/connection.js";
+import { barAction, sidebarFoot } from "../src/app/model.js";
+import { ECaptureStatus, EPairFailure, initialCaptureState, initialPairingStatus, type TPairingStatus } from "../src/shared/captureTypes.js";
 import { SUPPORTED_LANGS } from "../src/shared/i18n.js";
 import { lootPageUrl } from "../src/shared/pairing.js";
 import { stringsFor } from "../src/shared/strings.js";
@@ -110,6 +110,24 @@ describe("the connected details (Fh2's third scene)", () => {
   it("speaks the window's language, and names a computer that has no name", () => {
     const view = connectionView(paired({}, { deviceName: null }), NOW, "win32", uk);
     expect(view?.title).toBe(uk.pairing.pairedAs(uk.shell.foot.unnamedDevice));
+  });
+});
+
+describe("one gold button per window: Pair holds it while the steps show", () => {
+  it("holds it over an idle capture, and the bar's Start steps back to its neutral face", () => {
+    const gold = pairHoldsTheGold(true, initialPairingStatus, false);
+    expect(gold).toBe(true);
+    expect(barAction({ ...initialCaptureState, status: ECaptureStatus.Idle }, gold)).toMatchObject({ kind: "start", look: "neutral" });
+  });
+
+  it("not while the panel is shut, nor connected (no gold button there), nor before the pairing is known", () => {
+    expect(pairHoldsTheGold(false, initialPairingStatus, false)).toBe(false);
+    expect(pairHoldsTheGold(true, paired({}), false)).toBe(false);
+    expect(pairHoldsTheGold(true, null, false)).toBe(false);
+  });
+
+  it("gives way to the band's fix: Pair is outlined under it", () => {
+    expect(pairHoldsTheGold(true, initialPairingStatus, true)).toBe(false);
   });
 });
 

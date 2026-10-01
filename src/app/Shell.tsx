@@ -7,6 +7,7 @@ import { asLang, detectLang } from "../shared/i18n.js";
 import { captureBlock, decoderDialogEvent, ENotice, noticesNow } from "../shared/notices.js";
 import { stringsFor, type TStrings } from "../shared/strings.js";
 import { ConnectionPanel } from "./ConnectionPanel.js";
+import { pairHoldsTheGold } from "./connection.js";
 import { formatClock } from "./format.js";
 import { barAction, barStatus, headerMeta, sessionHero, sidebarFoot } from "./model.js";
 import { DecoderDialog, NoticeBand } from "./Notice.js";
@@ -206,6 +207,10 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
     }
   };
   const connectionOpen = connection != null && snap.pairing != null;
+  // One gold button per window: the band's fix, else the panel's Pair while it shows its steps, else
+  // the bar's Start (connection.ts `pairHoldsTheGold`, model.ts `barAction`).
+  const bandGold = holdsTheGold(view);
+  const pairGold = pairHoldsTheGold(connectionOpen, snap.pairing, bandGold);
 
   return (
     <>
@@ -215,8 +220,9 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
       <TitleBar
         s={s}
         status={barStatus(capture, now, s, block != null)}
-        // The band holds the next step: Start steps back to the neutral face (one gold button per window).
-        action={barAction(capture, block != null || holdsTheGold(view))}
+        // The band, or the connection panel's Pair, holds the next step: Start steps back to the
+        // neutral face (one gold button per window).
+        action={barAction(capture, block != null || bandGold || pairGold)}
         version={snap.setup != null ? `v${snap.setup.appVersion}` : null}
         inert={modal}
         settingsOpen={settingsOpen}
@@ -244,6 +250,7 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
                   pairing={snap.pairing}
                   now={now}
                   busy={snap.ui.pairBusy}
+                  gold={pairGold}
                   failure={snap.ui.pairFailure}
                   suspended={modal}
                   on={{

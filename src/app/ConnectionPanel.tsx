@@ -54,12 +54,14 @@ export type TConnectionActions = {
 const Steps = ({
   s,
   busy,
+  gold,
   failure,
   on,
   codeRef,
 }: {
   s: TStrings;
   busy: boolean;
+  gold: boolean;
   failure: EPairFailure | null;
   on: TConnectionActions;
   codeRef: RefObject<HTMLInputElement | null>;
@@ -154,9 +156,10 @@ const Steps = ({
               onKeyDown={onKeyDown}
             />
             {/* Waits for a code (Fh2 draws it dimmed and refusing while the field is empty). While
-                main checks one it refuses a second press but keeps the focus: aria-disabled. */}
+                main checks one it refuses a second press but keeps the focus: aria-disabled. Gold,
+                as Fh2 draws it, unless the band's fix holds the window's one gold button. */}
             <Button
-              variant="primary"
+              variant={gold ? "primary" : "outline"}
               disabled={empty}
               aria-disabled={busy ? true : undefined}
               data-pair-submit=""
@@ -182,6 +185,7 @@ export const ConnectionPanel = ({
   pairing,
   now,
   busy,
+  gold,
   failure,
   suspended,
   on,
@@ -192,6 +196,8 @@ export const ConnectionPanel = ({
   now: number;
   /** A code is with main. */
   busy: boolean;
+  /** Pair is the window's one gold button (connection.ts `pairHoldsTheGold`); outlined under a band's fix. */
+  gold: boolean;
   /** Why the last code was refused. */
   failure: EPairFailure | null;
   /** A dialog or the settings drawer is over the window: the keys and presses are theirs. */
@@ -316,7 +322,7 @@ export const ConnectionPanel = ({
             </h2>
             <p className="lb-pair-text">{s.pairing.intro}</p>
           </div>
-          <Steps s={s} busy={busy} failure={failure} on={on} codeRef={codeRef} />
+          <Steps s={s} busy={busy} gold={gold} failure={failure} on={on} codeRef={codeRef} />
           <div className="lb-pair-rule" aria-hidden="true" />
           <p className="lb-pair-note">{s.shell.connection.noGuild}</p>
         </>
