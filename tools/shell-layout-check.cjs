@@ -25,17 +25,21 @@
  * - any `securitypolicyviolation` (heard from the page's first moment, shell-layout-preload.cjs),
  *   and any error the page logs;
  * - a page that did not draw: the landmarks, the route marked current in the sidebar, a page in
- *   the panel.
+ *   the panel;
+ * - while the title bar's Start/Stop changes face (MORPHS, measured every 55ms of it with motion
+ *   on): any of the above in the bar, the version or the gear moving, a change that did not play,
+ *   and a button still holding its eased width, or a leaving word, once it is over.
  *
  * Every route × 768/1024/1280/1440 × both themes × six languages × the states that change the
- * layout × both platforms. The routes and the languages are read from the source (src/app/router.ts
+ * layout × both platforms; then every route × width × theme × language × platform × both directions
+ * of the morph × its frames. The routes and the languages are read from the source (src/app/router.ts
  * ROUTES, src/shared/i18n.ts SUPPORTED_LANGS), the sidebar must offer exactly those routes, and the
  * run must measure exactly the product of the lists, each of them non-empty — so an empty route
  * list, or a loop that stops early, cannot pass.
  *
- * Final frames: reduced motion is forced, and each measurement waits for the page to say it has
- * settled — the scenario's language and theme applied, every slice of the bridge drawn, the faces
- * loaded — rather than for a fixed time. One window per route, platform, theme, language and state,
+ * Final frames, the morph's apart: reduced motion is forced, and each measurement waits for the page
+ * to say it has settled — the scenario's language and theme applied, every slice of the bridge
+ * drawn, the faces loaded — rather than for a fixed time. One window per route, platform, theme, language and state,
  * shrunk through the four widths: the shell's shape is CSS alone (nothing in src/app reads the
  * window's width), so a window resized to 1024 draws what one opened at 1024 draws.
  *
@@ -51,6 +55,8 @@ const { mkdirSync, writeFileSync } = require("node:fs");
 const { join, resolve } = require("node:path");
 
 const { buildSync } = require("esbuild");
+
+const morph = require("./shell-morph.cjs");
 
 const ROOT = resolve(__dirname, "..");
 const PAGE = join(ROOT, "dist", "web", "app", "index.html");
@@ -137,6 +143,26 @@ const STATES = [
 const MAY_CUT = [".lb-foot-text:not(.lb-foot-text--words)", ".lb-status-label"];
 
 /**
+ * The title bar's Start/Stop changing face (StartStop.tsx; board Fh1), measured while it plays —
+ * the one part of the shell that moves its own layout. Its box eases between two widths, its words
+ * roll out and in, a surface drains off another: a word standing outside the drawn box for a frame,
+ * or the version and the gear jumping, would pass every final frame above. So each window here
+ * turns motion back on (tools/shell-morph.cjs) and plays both directions as the logger goes —
+ * Start pressed (idle → starting) and the logger stopped (stopping → idle) — measuring the bar at
+ * every MORPH_FRAMES ms of the 440ms drain, from the change to its end.
+ */
+const MORPHS = [
+  { name: "start", to: "starting" },
+  { name: "stop", via: "stopping", to: "idle" },
+];
+/** Every 55ms: the words' 170ms exit and 260ms entrance, and the width's two eases, fall between. */
+const MORPH_FRAMES = [0, 55, 110, 165, 220, 275, 330, 385, 440];
+/** What a change must set playing, or the morph did not run and its frames prove nothing. */
+const MORPH_PLAYS = ["clip-path", "width", "lb-roll-out", "lb-roll-in"];
+/** The button: its layers are its paint, not boxes of their own (the check's `surfaces`). */
+const SURFACES = [{ box: ".lb-act", layers: ".lb-act-layer" }];
+
+/**
  * Where the OS draws over the bar (board Fh1; tools/shell-shots.cjs draws the same stand-ins): a
  * Mac's three 12px lights, 8px apart from 18px in, centred on the 48px bar; Windows' three 46px
  * caption buttons, the bar's full height, at the right. No part of the bar may sit under them.
@@ -163,15 +189,46 @@ const loads = ({ ROUTES, SUPPORTED_LANGS }) => {
   return list;
 };
 
+/** One window per entry, from idle; both directions of the morph are played in it at every width. */
+const morphLoads = ({ ROUTES, SUPPORTED_LANGS }) => {
+  const list = [];
+  for (const route of ROUTES) {
+    for (const platform of PLATFORMS) {
+      for (const theme of THEMES) {
+        for (const lang of SUPPORTED_LANGS) {
+          list.push({ route, platform, theme, lang, sc: { lang, theme, platform, state: "idle", paired: false } });
+        }
+      }
+    }
+  }
+  return list;
+};
+
+/** In the page: where the bar's parts right of the button are. A change of the button's width must not move them. */
+const rightOfButton = () => {
+  const parts = [];
+  for (let el = document.querySelector(".lb-titlebar > .lb-act")?.nextElementSibling; el != null; el = el.nextElementSibling) {
+    if (getComputedStyle(el).display !== "none") {
+      const r = el.getBoundingClientRect();
+      parts.push({ what: [...el.classList].find((c) => c.startsWith("lb-")) ?? el.tagName.toLowerCase(), left: r.left, right: r.right });
+    }
+  }
+  return parts;
+};
+
 /**
  * Runs in the page, so it is written to stand alone: everything it uses is a parameter or a
  * browser global. Returns the problems (empty = fits), the ellipses it allowed, and the routes the
  * sidebar offers.
  */
-const measure = ({ route, zones, mayCut }) => {
+const measure = ({ route, zones, mayCut, surfaces, scope }) => {
   const problems = new Set();
   const marked = new Set();
   const root = document.documentElement;
+  // The whole page, or one part of it (a morph changes only the title bar): the page-wide checks —
+  // that it drew, that nothing scrolls sideways — belong to the whole.
+  const wholePage = scope == null;
+  const within = wholePage ? document.body : document.querySelector(scope);
   const W = root.clientWidth;
   const H = root.clientHeight;
   // Layout rounds to fractions of a pixel; a whole pixel is a real overflow.
@@ -217,8 +274,13 @@ const measure = ({ route, zones, mayCut }) => {
     const alpha = colour.match(/\/\s*([\d.]+)%?\s*\)$/) ?? colour.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)$/);
     return alpha == null || Number(alpha[1]) > 0;
   };
-  // A box the eye sees as one: a ground, an edge or a shadow. Words must stay inside it.
-  const drawsABox = (s) =>
+  // A box the eye sees as one: a ground, an edge or a shadow. Words must stay inside it. A button
+  // drawn by layers inside it (the bar's Start/Stop: an ember face, a surface that drains off it)
+  // is one box, its own, whatever its layers are doing — the layers are its paint, not boxes.
+  const surface = (el) => surfaces.some(({ box }) => el.matches(box));
+  const layer = (el) => surfaces.some(({ layers }) => el.matches(layers));
+  const drawsABox = (s, el) =>
+    (el != null && surface(el)) ||
     painted(s.backgroundColor) ||
     s.backgroundImage !== "none" ||
     s.boxShadow !== "none" ||
@@ -254,7 +316,7 @@ const measure = ({ route, zones, mayCut }) => {
   };
 
   // The page drew.
-  for (const [selector, what] of [
+  for (const [selector, what] of !wholePage ? [] : [
     ["header.lb-titlebar", "the title bar"],
     ["nav.lb-side", "the sidebar"],
     ["main#main", "the main region"],
@@ -264,30 +326,35 @@ const measure = ({ route, zones, mayCut }) => {
       problems.add(`${what} (${selector}) is not drawn`);
     }
   }
-  const link = document.querySelector(`nav a[href="#/${route}"]`);
-  if (link?.getAttribute("aria-current") !== "page") {
-    problems.add(`the sidebar does not mark #/${route} as the page you are on`);
-  }
-  const panel = document.querySelector("main [role='tabpanel']");
-  if (panel == null || panel.textContent.trim() === "") {
-    problems.add(`#/${route} drew no page`);
-  }
-
-  // Sideways scroll: the window, then anything in it that scrolls.
-  if (root.scrollWidth > W + T) {
-    problems.add(`the window scrolls sideways (${root.scrollWidth}px of content in ${W}px)`);
-  }
-  for (const el of document.body.querySelectorAll("*")) {
-    if (scrolls(css(el).overflowX) && el.scrollWidth > el.clientWidth + T) {
-      problems.add(`${say(el)} scrolls sideways (${el.scrollWidth}px of content in ${el.clientWidth}px)`);
+  if (wholePage) {
+    const link = document.querySelector(`nav a[href="#/${route}"]`);
+    if (link?.getAttribute("aria-current") !== "page") {
+      problems.add(`the sidebar does not mark #/${route} as the page you are on`);
     }
+    const panel = document.querySelector("main [role='tabpanel']");
+    if (panel == null || panel.textContent.trim() === "") {
+      problems.add(`#/${route} drew no page`);
+    }
+
+    // Sideways scroll: the window, then anything in it that scrolls.
+    if (root.scrollWidth > W + T) {
+      problems.add(`the window scrolls sideways (${root.scrollWidth}px of content in ${W}px)`);
+    }
+    for (const el of document.body.querySelectorAll("*")) {
+      if (scrolls(css(el).overflowX) && el.scrollWidth > el.clientWidth + T) {
+        problems.add(`${say(el)} scrolls sideways (${el.scrollWidth}px of content in ${el.clientWidth}px)`);
+      }
+    }
+  } else if (within == null) {
+    problems.add(`${scope} is not drawn`);
+    return { problems: [...problems], marked: [], offered: [] };
   }
 
   // Every piece of words on the page: walk out from it through the boxes that hold it, to the
   // first that scrolls (a page is meant to be longer than its window; sideways is reported above).
   // A box that hides its overflow must not cut it; a box that is drawn must not have it spill out.
   // With no scroller on the way, the window's own edges are the last box.
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(within, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node != null; node = walker.nextNode()) {
     const host = node.parentElement;
     if (!/\S/.test(node.data) || host == null || host.closest("script, style") != null || unseen(host) || parked(host)) {
@@ -325,7 +392,7 @@ const measure = ({ route, zones, mayCut }) => {
           break;
         }
       }
-      if (drawsABox(s) && visible.some((r) => outside(r, box(el.getBoundingClientRect())))) {
+      if (drawsABox(s, el) && visible.some((r) => outside(r, box(el.getBoundingClientRect())))) {
         problems.add(`${words(node.data)} spills out of ${say(el)}`);
       }
     }
@@ -338,8 +405,8 @@ const measure = ({ route, zones, mayCut }) => {
   // any two boxes the eye sees, neither of which holds the other. A box too wide for its column
   // that does not make the page scroll lands on its neighbour instead, and its words can still all
   // be inside it.
-  const drawn = [...document.body.querySelectorAll("*")].filter(
-    (el) => drawsABox(css(el)) && !unseen(el) && !parked(el) && el.getClientRects().length > 0,
+  const drawn = [...within.querySelectorAll("*")].filter(
+    (el) => !layer(el) && drawsABox(css(el), el) && !unseen(el) && !parked(el) && el.getClientRects().length > 0,
   );
   for (const [i, a] of drawn.entries()) {
     for (const b of drawn.slice(i + 1)) {
@@ -458,13 +525,28 @@ const run = async () => {
     ["state", STATES],
     ["platform", PLATFORMS],
   ];
-  const none = lists.filter(([, list]) => !Array.isArray(list) || list.length === 0).map(([what]) => what);
+  const none = [...lists, ["direction", MORPHS], ["frame", MORPH_FRAMES]]
+    .filter(([, list]) => !Array.isArray(list) || list.length === 0)
+    .map(([what]) => what);
   if (none.length > 0) {
     console.log(`Nothing to check: no ${none.join(", no ")}. A run that measures nothing does not pass.`);
     return 1;
   }
-  const expected = lists.reduce((n, [, list]) => n * list.length, 1);
-  const factors = lists.map(([what, list]) => `${list.length} ${what}${list.length === 1 ? "" : "s"}`).join(" × ");
+  const morphLists = [
+    ["route", ROUTES],
+    ["width", WIDTHS],
+    ["theme", THEMES],
+    ["language", SUPPORTED_LANGS],
+    ["direction", MORPHS],
+    ["frame", MORPH_FRAMES],
+    ["platform", PLATFORMS],
+  ];
+  const product = (ls) => ls.reduce((n, [, list]) => n * list.length, 1);
+  const describe = (ls) => ls.map(([what, list]) => `${list.length} ${what}${list.length === 1 ? "" : "s"}`).join(" × ");
+  const expectedStill = product(lists);
+  const expectedMorph = product(morphLists);
+  const expected = expectedStill + expectedMorph;
+  const factors = `${expectedStill} still (${describe(lists)}) + ${expectedMorph} in the Start/Stop morph (${describe(morphLists)})`;
   if (OUT != null) {
     mkdirSync(OUT, { recursive: true });
   }
@@ -503,7 +585,7 @@ const run = async () => {
         settled({ lang: load.lang, theme: load.theme, platform: load.platform, width, height: HEIGHT, timeoutMs: 5000 }),
       );
       const { problems, marked, offered } = await win.webContents.executeJavaScript(
-        `(${measure.toString()})(${JSON.stringify({ route: load.route, zones: OS_ZONES[load.platform], mayCut: MAY_CUT })})`,
+        `(${measure.toString()})(${JSON.stringify({ route: load.route, zones: OS_ZONES[load.platform], mayCut: MAY_CUT, surfaces: SURFACES })})`,
       );
       const refused = await win.webContents.executeJavaScript("window.gbcCheck.refused()");
       const all = [
@@ -534,6 +616,109 @@ const run = async () => {
     }
     for (const r of bad) {
       console.log(`FAIL ${label.padEnd(44)} ${r.width}  ${r.all.join("; ")}`);
+    }
+  }
+  for (const load of morphLoads({ ROUTES, SUPPORTED_LANGS })) {
+    const label = `morph #/${load.route} ${load.platform} ${load.theme} ${load.lang}`;
+    const win = new BrowserWindow({
+      show: false,
+      width: WIDTHS[0],
+      height: HEIGHT,
+      useContentSize: true,
+      frame: false,
+      webPreferences: {
+        offscreen: true,
+        preload: join(__dirname, "shell-layout-preload.cjs"),
+        contextIsolation: true,
+        sandbox: false,
+        additionalArguments: [`--gbc-scenario=${Buffer.from(JSON.stringify(load.sc)).toString("base64")}`],
+      },
+    });
+    const logged = [];
+    win.webContents.on("console-message", (event) => {
+      if (event.level === "error") {
+        logged.push(event.message);
+      }
+    });
+    await win.loadFile(PAGE, { hash: `/${load.route}` });
+    await morph.allowMotion(win);
+    const bad = [];
+    for (const width of WIDTHS) {
+      if (width !== WIDTHS[0]) {
+        win.setContentSize(width, HEIGHT);
+      }
+      const waitingFor = await win.webContents.executeJavaScript(
+        settled({ lang: load.lang, theme: load.theme, platform: load.platform, width, height: HEIGHT, timeoutMs: 5000 }),
+      );
+      for (const m of MORPHS) {
+        const before = [...(waitingFor.length > 0 ? [`the page never settled: no ${waitingFor.join(", no ")}`] : [])];
+        if (m.via != null) {
+          const label0 = await win.webContents.executeJavaScript("document.querySelector('.lb-status-label')?.textContent");
+          morph.push(win, m.via);
+          const landed = await win.webContents.executeJavaScript(
+            `new Promise((r) => { const t0 = performance.now(); const tick = () => document.querySelector('.lb-status-label')?.textContent !== ${JSON.stringify(label0)} ? r(true) : performance.now() - t0 > 3000 ? r(false) : setTimeout(tick, 10); tick(); })`,
+          );
+          if (!landed) {
+            before.push(`the bar never showed ${m.via}`);
+          }
+        }
+        const rest = await win.webContents.executeJavaScript(`(${rightOfButton.toString()})()`);
+        const playing = await morph.play(win, m.to);
+        if (playing == null) {
+          before.push(`the button did not change when ${m.to} was pushed`);
+        } else {
+          for (const needed of MORPH_PLAYS.filter((p) => !playing.includes(p))) {
+            before.push(`the change to ${m.to} did not play ${needed}`);
+          }
+        }
+        for (const t of MORPH_FRAMES) {
+          await morph.seekTo(win, t);
+          const { problems, marked } = await win.webContents.executeJavaScript(
+            `(${measure.toString()})(${JSON.stringify({ route: load.route, zones: OS_ZONES[load.platform], mayCut: MAY_CUT, surfaces: SURFACES, scope: "header.lb-titlebar" })})`,
+          );
+          const now = await win.webContents.executeJavaScript(`(${rightOfButton.toString()})()`);
+          const moved = rest
+            .map((r, i) => ({ r, n: now[i] }))
+            .filter(({ r, n }) => n == null || n.what !== r.what || Math.abs(n.left - r.left) > 0.5 || Math.abs(n.right - r.right) > 0.5)
+            .map(({ r, n }) => `${r.what}, right of the button, moved ${n == null ? "away" : `${(n.left - r.left).toFixed(1)}px`}`);
+          const refused = await win.webContents.executeJavaScript("window.gbcCheck.refused()");
+          const all = [
+            ...(t === MORPH_FRAMES[0] ? before : []),
+            ...problems,
+            ...moved,
+            ...refused.map((r) => `the content-security policy refused ${r}`),
+            ...logged.splice(0).map((msg) => `the page logged an error: ${msg}`),
+          ];
+          if (t === MORPH_FRAMES.at(-1)) {
+            const after = await morph.playOut(win);
+            if (after.held) {
+              all.push("the button kept the width its ease held it at once the morph was over");
+            }
+            if (after.leaving > 0) {
+              all.push(`${after.leaving} leaving word(s) still drawn once the morph was over`);
+            }
+          }
+          for (const mk of marked) {
+            allowed.set(mk, (allowed.get(mk) ?? 0) + 1);
+          }
+          measured += 1;
+          if (all.length > 0) {
+            failed += 1;
+            bad.push(`${width} ${m.name} ${t}ms  ${all.join("; ")}`);
+            if (OUT != null) {
+              const name = `morph-${load.route}-${load.platform}-${load.theme}-${load.lang}-${width}-${m.name}-${t}ms`;
+              writeFileSync(join(OUT, `${name}.png`), (await win.webContents.capturePage()).toPNG());
+            }
+          }
+        }
+      }
+    }
+    win.destroy();
+    if (bad.length === 0) {
+      console.log(`ok   ${label.padEnd(44)} ${WIDTHS.join(" ")} × ${MORPHS.map((m) => m.name).join(", ")} × ${MORPH_FRAMES.length} frames`);
+    }
+    for (const b of bad) {
+      console.log(`FAIL ${label.padEnd(44)} ${b}`);
     }
   }
   if (allowed.size > 0) {
