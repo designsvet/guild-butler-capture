@@ -297,8 +297,9 @@ keyboard and the screen reader.
   capturing, the character and how long (`Bors · capturing 1 h 20 min`), or `Capturing · detecting…`
   before Albion names them; `Waiting for Albion… · listening for 40 s`; `Starting the logger…`; the
   restart and when it comes; `Stopping…`; `Not capturing`; `Something needs fixing` in the danger
-  red. Then its one button — Stop (dimmed and refusing the press while the logger starts or stops),
-  Start capture in gold when idle, a neutral Start in the error state — the version, and the gear.
+  red. Then its one button — Stop (dimmed and refusing the press while the logger starts or stops,
+  with a sheen crossing it), Start capture in gold when idle, a neutral Start in the error state —
+  the version, and the gear. The button changes face the way the old window's pill does (below).
   Below 1024px it keeps the name and the time and drops the version. The guild and the zone are not
   drawn: the app does not know them yet.
 - **The sidebar** lists only the pages that exist — Session, under Live — 208px with labels from
@@ -329,6 +330,40 @@ keyboard and the screen reader.
   "Views") and the page (main) with one h1; one polite live region speaks a state change once; the
   package's steel focus ring throughout; every dot beside words.
 
+**How the button changes** (`src/app/StartStop.tsx`, the rules in `src/app/morph.ts`). The owner
+asked for the old window's Start/Stop transition, and it is that pill's, at the bar's 34px — one
+button in layers, never two that swap:
+
+- Stop's ember face (the danger outline) is underneath all the time, and the surface over it — gold,
+  or lifted for the error state's neutral Start — **drains off it**, left to right, over 440ms
+  (`cubic-bezier(.65, 0, .35, 1)`); the wipe retraces on the way back, so stopping visibly undoes
+  starting. A cross-fade was the obvious move and the transition study showed why it was wrong: a
+  bright gradient dissolving into a dark outline passes through a muddy middle.
+- The words **roll**: the old ones out upward in 170ms, then the new ones in from below over 260ms,
+  7px of travel. They are drawn twice in one place — on the ember in Stop's red, and inside the
+  surface in its ink, cut by the same edge — so mid-drain each word is in the colour of whatever it
+  stands on. (The old pill faded one set of words from one colour to the other, which read as
+  half-lost words at the midpoint; this is the one departure from it.)
+- The two labels differ in width, so the box **eases** between them and nothing in the bar jumps:
+  the version and the gear stay put, the status glides. A wider face makes its room while the old
+  words leave and its words arrive into it; a narrower one waits for the old words to go, then
+  closes in with the new — so the words never stand outside the drawn box. The width is written
+  through the CSSOM (the policy refuses style attributes, not that) and let go when the ease ends.
+- While the logger starts or stops, Stop is dimmed to 40% and refuses the press (board Fh1) and the
+  old **sheen** crosses it at full strength. The refusal is `aria-disabled`, not `disabled`, so a
+  Start pressed from the keyboard keeps the focus.
+- The old pill's small touches came too: one squash as the face changes, and hover held off for
+  350ms after the logger lands under a resting pointer, so the new face's hover does not flash on.
+
+Every timing is a `--lb-t-*` in `src/app/shell.css` — the old window owns the `--gb-t-*` names —
+and `test/startStop.test.ts` holds them to the old window's. The sequence is CSS alone, so the
+component keeps no time; it answers the browser's animation events. Under reduced motion every
+duration is zero, the sheen goes, and the end states are the same. Hover and press paint the layers
+with the package's own gradients; a press rule must carry every condition its hover rule does, or
+the hover outranks it (the test holds each press to its hover twin). Under Windows' high contrast
+the layers give way to a border in the system's colours, and Stop's square is drawn in its button
+text.
+
 Every new string is in `src/shared/strings.ts` in the six languages; the count of lines sent picks
 its plural form with `Intl.PluralRules` (`src/shared/plural.ts`).
 
@@ -340,7 +375,13 @@ for both themes with the board it came from; where the board takes a different t
 the layout check's stub bridge in every capture state, both themes, both platforms and three widths,
 and writes a PNG of each (`ONLY=<part of a name>` for some, `SCALE=2` for 2x). The OS's own buttons
 are not in a page, so the tool draws dashed stand-ins where a Mac's lights and Windows' caption
-buttons go. It measures nothing; the layout check below does.
+buttons go. The button's change is shot in motion (`ONLY=morph`): Start pressed and the logger
+stopped, then the same for the error state's neutral Start (pressed again; the logger failing as it
+starts), in both themes, each at 0, 110, 220, 330 and 440ms — the page's own animations stopped at
+that millisecond, not a timer racing them (`tools/shell-morph.cjs`) — and laid out side by side in
+`morph-strip.png` (`ONLY=morph-st` for the gold pair alone). `ONLY=forced` shoots the bar under
+Windows' high contrast (DevTools' forced-colours emulation). It measures nothing; the layout check
+below does.
 
 **Checking it.** `pnpm check:layout:v5` (`tools/shell-layout-check.cjs`, in CI under xvfb beside the
 old window's check) drives the built page behind the same stub bridge and measures every route at
@@ -348,7 +389,11 @@ old window's check) drives the built page behind the same stub bridge and measur
 — all at the window's smallest height, 620, in both themes, the six languages, both platforms and
 the twelve states that change the layout: every capture state the shell draws, each with a guild
 connection that gives the sidebar's foot one of its shapes, and the foot's remaining states over a
-running capture. 1,152 scenarios, from 288 windows each shrunk through the four widths. It fails on:
+running capture: 1,152 scenarios, from 288 windows each shrunk through the four widths. Then the
+title bar's button changing face, the one part of the shell that moves its own layout: in a window
+with motion back on, both directions as the logger goes (Start pressed, the logger stopped), at
+every 55ms from the change to the drain's end, at the four widths, in both themes, the six languages
+and both platforms — 1,728 more, from 24 windows, measured on the bar. 2,880 in all. It fails on:
 
 - sideways scroll — the window, or anything in it that scrolls, wider than it is;
 - clipped text — words cut by a box that hides its overflow, or past the window's edge. Two cuts are
@@ -364,7 +409,11 @@ running capture. 1,152 scenarios, from 288 windows each shrunk through the four 
 - any `securitypolicyviolation`, heard from the page's first moment (`tools/shell-layout-preload.cjs`),
   and any error the page logs;
 - a page that did not draw: the landmarks, the route marked current in the sidebar, a page in the
-  panel.
+  panel;
+- in the morph: a word outside the button at any frame, the version or the gear moving by half a
+  pixel, a change that did not play its drain, its width or its words (a run whose morph never
+  played proves nothing), and a button that keeps its eased width, or a leaving word, once the
+  morph is over.
 
 The routes and the languages are read from the source (`ROUTES` in `src/app/router.ts`,
 `SUPPORTED_LANGS` in `src/shared/i18n.ts`); the sidebar must offer exactly those routes, and the run
@@ -372,7 +421,7 @@ must measure exactly the product of its lists, none of them empty — so an empt
 that stops early, fails, and a source that no longer compiles fails at once rather than leaving
 Electron waiting with no window. Each measurement waits until the page says it has settled (its language and
 theme applied, every slice of the bridge drawn, the faces loaded) rather than a fixed time.
-`OUT=<dir>` writes a PNG of each failing scenario. About a minute on an Apple-silicon Mac.
+`OUT=<dir>` writes a PNG of each failing scenario. About two minutes on an Apple-silicon Mac (the morph is half of it).
 
 **The window.** Behind the flag the window is the shell's own (`src/main/windowOptions.ts`):
 resizable down to 768×620, maximizable and full-screenable, and opening at 1280×800 the first time —

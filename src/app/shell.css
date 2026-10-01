@@ -31,6 +31,30 @@
   /* Fh3: the icon tiles' corner, a step inside --gb-r-sm (8px); the package's small tile uses
      the same 7px */
   --lb-r-tile: 7px;
+
+  /* The title bar's Start/Stop changing face (StartStop.tsx) — the old window's motion, kept: its
+     `--gb-t-*` timings (src/renderer/styles.css, from the 2026-08-29 transition study,
+     docs/design-transition-study.html), named --lb-* here because the old window owns those names.
+     Words LEAVE quicker than they arrive — a departure that lingers reads as hesitation — and travel
+     7px as they go; the gold drains over 440ms, long enough to read as a material change. No
+     package token holds these: the package's --gb-motion-* are its own steps (140/220/260), and
+     the old pill's rhythm is what the owner asked to keep. Under reduced motion base.css takes every
+     duration to nothing and the end states are the same. */
+  --lb-t-out: 170ms;
+  --lb-t-in: 260ms;
+  --lb-t-morph: 440ms;
+  /* the old .settle: a new face's hover held off this long after the logger lands under a resting
+     pointer, so it does not flash on */
+  --lb-t-settle: 350ms;
+  /* one pass of the sheen while the logger starts or stops */
+  --lb-t-shimmer: 1400ms;
+  /* the drain: slow off the mark, slow to land, so the edge is seen to travel */
+  --lb-ease-morph: cubic-bezier(0.65, 0, 0.35, 1);
+  /* the words: quick off the mark, a long settle (the old window's .swap) */
+  --lb-ease-roll: cubic-bezier(0.2, 0.75, 0.3, 1);
+  /* the sheen crossing a refusing Stop: Stop's own red at 18% — the old pill's
+     rgba(232, 161, 132, 0.18), which is --lb-danger-text's colour on dark */
+  --lb-shimmer: color-mix(in srgb, var(--lb-danger-text) 18%, transparent);
 }
 [data-theme="light"] {
   /* Fh1, "On parchment" */
@@ -38,6 +62,9 @@
   --lb-bar-line: var(--gb-card-rule);
   --lb-danger-text: var(--gb-red-text);
   --lb-halo: 16%;
+  /* On parchment Stop's red is dark (--gb-red-text), and 18% of it reads as a smudge passing, not
+     light: the sheen is the card's white (--gb-card-top) instead */
+  --lb-shimmer: color-mix(in srgb, var(--gb-card-top) 85%, transparent);
 }
 
 /* — The frame — the page never scrolls; the main region does. Text with no line-height of its
@@ -199,12 +226,239 @@ body {
   --lb-tone-halo: var(--lb-halo);
 }
 
-/* Stop: the package's outlined danger, in the board's lighter red, with a small square for an
-   icon. Its line is --gb-red at 55% in both themes (Fh1). */
-.lb-stop {
-  color: var(--lb-danger-text);
+/* — The bar's one button (StartStop.tsx; Fh1) — Start capture and Stop are ONE button in layers,
+   as the old window's pill is (src/renderer/styles.css `.primary`): Stop's ember face underneath
+   all the time; the surface over it (gold, or lifted for the error state's neutral Start) DRAINS off
+   it, left to right, and the wipe retraces on the way back, so stopping visibly undoes starting; a
+   sheen while the logger starts or stops; the words on top. It is the package's 34px button
+   (`.gbtn`), with its paint moved off the button and onto the layers. */
+.lb-act {
+  position: relative;
+  /* the layers are the button's paint, cut to its corners; and the sheen travels past its ends */
+  overflow: hidden;
+  /* the layers draw the edge: the package's 1px transparent border becomes a pixel more of
+     padding, the same 34 × (13 + 1) box */
+  border-width: 0;
+  padding: 0 14px;
+  /* the drop under a lifted surface lives on the button, not on a layer — the button's overflow
+     would cut a layer's — so it fades across the morph instead of being wiped */
+  transition: box-shadow var(--lb-t-morph) ease;
+}
+.lb-act[data-kind="start"][data-surface="gold"] {
+  box-shadow: var(--gb-gold-edge);
+}
+.lb-act[data-kind="start"][data-surface="lift"] {
+  box-shadow: var(--gb-lift-edge);
+}
+
+/* The width eases to the new words', so nothing in the bar jumps (src/app/morph.ts `widthEase`):
+   a wider face makes its room while the old words leave, and its words arrive into it; a narrower
+   one waits until the old words have gone, then closes in with the new ones. Either way the words
+   never stand outside the drawn box, which clipping would turn into a wipe. StartStop.tsx sets the
+   width through the CSSOM (the policy refuses style attributes, not that). */
+.lb-act[data-ease="grow"] {
+  transition:
+    box-shadow var(--lb-t-morph) ease,
+    width var(--lb-t-out) var(--lb-ease-morph);
+}
+.lb-act[data-ease="shrink"] {
+  transition:
+    box-shadow var(--lb-t-morph) ease,
+    width var(--lb-t-in) var(--lb-ease-morph) var(--lb-t-out);
+}
+
+/* One squash as the surface changes — a material change you can feel. The old pill's 1.3% was
+   ~4px across 320px; on a button a third as wide the same few pixels are 3%. Two names for one
+   keyframe, alternated by StartStop.tsx, so each change restarts it. */
+.lb-act[data-squash="a"] {
+  animation: lb-squash-a var(--lb-t-morph) ease;
+}
+.lb-act[data-squash="b"] {
+  animation: lb-squash-b var(--lb-t-morph) ease;
+}
+@keyframes lb-squash-a {
+  45% {
+    transform: scale(0.97);
+  }
+}
+@keyframes lb-squash-b {
+  45% {
+    transform: scale(0.97);
+  }
+}
+
+.lb-act-layer {
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  pointer-events: none;
+}
+/* Stop: the package's outlined danger, its line --gb-red at 55% in both themes (Fh1). */
+.lb-act-ember {
   border-color: color-mix(in srgb, var(--gb-red) 55%, transparent);
 }
+.lb-act-top {
+  clip-path: inset(0 0 0 0 round var(--gb-r-sm));
+  transition: clip-path var(--lb-t-morph) var(--lb-ease-morph);
+}
+.lb-act[data-surface="gold"] .lb-act-top {
+  background: var(--gb-grad-gold);
+  border-color: var(--gb-gold-line);
+  box-shadow: var(--gb-gold-edge);
+}
+.lb-act[data-surface="lift"] .lb-act-top {
+  background: var(--gb-lift);
+  border-color: var(--gb-lift-line);
+  box-shadow: var(--gb-lift-edge);
+}
+/* drained: the surface's left edge has travelled to the right end */
+.lb-act[data-kind="stop"] .lb-act-top {
+  clip-path: inset(0 0 0 100% round var(--gb-r-sm));
+}
+
+/* The logger starting or stopping: the dimmed Stop of Fh1 that refuses the press, and the sheen —
+   waiting that looks like working. The package dims a refused button whole, to 40%; here the face
+   dims (the ember and the words) and the sheen crosses it at full strength, which dimmed with
+   them would not show. */
+.lb-act[aria-disabled="true"] {
+  opacity: 1;
+}
+.lb-act-ember,
+.lb-act > .lb-act-words {
+  transition: opacity var(--lb-t-morph) ease;
+}
+.lb-act[aria-disabled="true"] :is(.lb-act-ember, .lb-act > .lb-act-words) {
+  opacity: 0.4;
+}
+.lb-act-shimmer {
+  border: 0;
+  background: linear-gradient(100deg, transparent 32%, var(--lb-shimmer) 50%, transparent 68%);
+  opacity: 0;
+}
+.lb-act[aria-disabled="true"] .lb-act-shimmer {
+  opacity: 1;
+  animation: lb-shimmer var(--lb-t-shimmer) linear infinite;
+}
+@keyframes lb-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+/* A sheen that does not move is a stripe: under reduced motion, as base.css decides it, it goes. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .lb-act-shimmer {
+    display: none;
+  }
+}
+:root[data-motion="reduced"] .lb-act-shimmer {
+  display: none;
+}
+
+/* The words, twice in one place: on the ember, in Stop's red — positioned, so they paint over the
+   ember and under the surface (positioned boxes paint in order) — and inside the surface, in its
+   ink, cut by its edge. Wherever the surface is, its words show; wherever it has drained, the
+   ember's. The old words leave upward and the new arrive from below once they have gone
+   (src/app/morph.ts). */
+.lb-act-words {
+  position: relative;
+  display: inline-flex;
+}
+.lb-act > .lb-act-words {
+  color: var(--lb-danger-text);
+}
+.lb-act-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lb-act[data-surface="gold"] .lb-act-top {
+  color: var(--gb-gold-ink);
+}
+.lb-act[data-surface="lift"] .lb-act-top {
+  color: var(--gb-ink-2);
+}
+.lb-act-face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+/* The leaving words are out of the flow — the arriving ones give the box its width — and laid
+   out at their own width, centred where they stood: StartStop.tsx reads the old width off them.
+   Centred by `translate`, which adds to the roll's `transform` rather than replacing it. */
+.lb-act-face.is-leaving {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  translate: -50% 0;
+  animation: lb-roll-out var(--lb-t-out) var(--lb-ease-roll) forwards;
+}
+.lb-act-face.is-arriving {
+  animation: lb-roll-in var(--lb-t-in) var(--lb-ease-roll) var(--lb-t-out) backwards;
+}
+@keyframes lb-roll-out {
+  to {
+    opacity: 0;
+    transform: translateY(-7px);
+  }
+}
+@keyframes lb-roll-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+}
+
+/* Hover and press, the package's paints on the layers — not while refusing, and not in the beat
+   after the logger lands under a resting pointer (.is-settling). A press is also a hover, so each
+   press rule carries every condition its hover rule does and comes after it: one condition fewer
+   and the hover's gradient outranks the press's, and a pressed Start never darkens. */
+.lb-act[data-kind="start"][data-surface="gold"]:not([aria-disabled="true"]):not(.is-settling):hover .lb-act-top {
+  background: var(--gb-grad-gold-hover);
+}
+.lb-act[data-kind="start"][data-surface="gold"]:not([aria-disabled="true"]):not(.is-settling):active .lb-act-top {
+  background: var(--gb-grad-gold-press);
+  box-shadow: var(--gb-gold-press-shadow);
+}
+.lb-act[data-kind="start"][data-surface="lift"]:not([aria-disabled="true"]):not(.is-settling):hover .lb-act-top {
+  background: var(--gb-lift-hover);
+}
+.lb-act[data-kind="start"][data-surface="lift"]:not([aria-disabled="true"]):not(.is-settling):active .lb-act-top {
+  background: var(--gb-lift-press);
+  box-shadow: var(--gb-sunk);
+}
+.lb-act[data-kind="start"][data-surface="lift"]:not([aria-disabled="true"]):not(.is-settling):is(:hover, :active) .lb-act-top {
+  color: var(--gb-ink);
+}
+.lb-act[data-kind="stop"]:not([aria-disabled="true"]):not(.is-settling):hover .lb-act-ember {
+  background: color-mix(in srgb, var(--gb-red) 10%, transparent);
+  border-color: color-mix(in srgb, var(--gb-red-text) 80%, transparent);
+}
+
+/* Windows high contrast takes the paint away: the layers go, and the button keeps a border of the
+   system's own. Stop's small square is a background, which the system paints over with its own
+   ground, leaving a gap before the word: it keeps its paint, in the system's button text (scoped
+   to the button, so it outranks the plain .lb-stop-mark rule further down). */
+@media (forced-colors: active) {
+  .lb-act {
+    border: 1px solid ButtonText;
+    padding: 0 13px;
+  }
+  .lb-act-layer {
+    display: none;
+  }
+  .lb-act .lb-stop-mark {
+    forced-color-adjust: none;
+    background: ButtonText;
+  }
+}
+
 .lb-stop-mark {
   display: inline-block;
   flex: none;
