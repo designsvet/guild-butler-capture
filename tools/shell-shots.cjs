@@ -48,12 +48,16 @@ const STRIP = process.env.STRIP ?? "morph-strip.png";
 /**
  * The morph in both directions, as the logger really goes: Start pressed (idle → starting: the gold
  * drains to a dimmed, refusing Stop with the sheen over it) and the logger stopped (stopping → idle:
- * the gold refills). Frames every 110ms across the 440ms drain (FRAMES=… for others), the first
- * one the instant of the change, the last its end.
+ * the gold refills). Then the same for the error state's neutral Start, whose lifted surface is the
+ * one that drains and refills: Start pressed again (error → starting) and the logger failing as it
+ * starts (starting → error). Frames every 110ms across the 440ms drain (FRAMES=… for others), the
+ * first one the instant of the change, the last its end. ONLY=morph-st shoots the gold pair alone.
  */
 const MORPHS = [
   { morph: "start", from: "idle", to: "starting", title: "Start capture → Stop", note: "Start pressed: idle → starting" },
   { morph: "stop", from: "stopping", to: "idle", title: "Stop → Start capture", note: "the logger stopped: stopping → idle" },
+  { morph: "retry", from: "error", to: "starting", title: "Start capture (neutral) → Stop", note: "Start pressed in the error state: error → starting" },
+  { morph: "fail", from: "starting", to: "error", title: "Stop → Start capture (neutral)", note: "the logger failed as it started: starting → error" },
 ];
 const FRAMES = (process.env.FRAMES ?? "0,110,220,330,440").split(",").map(Number);
 /** The bar's right end, where the change happens: the status's end, the button, the version, the gear. */
@@ -100,6 +104,11 @@ const scenarios = () => {
     add({ state: "restarting", theme: "obsidian", platform: "win32", width: 768, height: 620, lang, name: `restarting-${lang}-obsidian-win32-768x620` });
     add({ state: "waitingLong", theme: "obsidian", platform: "darwin", width: 1024, height: 768, lang, name: `waitingLong-${lang}-obsidian-darwin-1024x768` });
   }
+  // Windows high contrast (DevTools' forced-colours emulation): the button's layers give way to the
+  // system's own border, and Stop keeps its square. `forced` turns the emulation on.
+  for (const state of ["idle", "capturing", "starting", "error"]) {
+    add({ state, theme: "obsidian", platform: "win32", width: 1440, height: 900, forced: true, name: `forced-colors-${state}-win32-1440x900` });
+  }
   // The Start/Stop morph, frame by frame (board Fh1's button), in both themes.
   for (const theme of ["obsidian", "parchment"]) {
     for (const m of MORPHS) {
@@ -130,7 +139,7 @@ const stripPage = (rows) => {
     img { display: block; border-radius: 6px; outline: 1px solid rgba(128, 128, 128, .35); }
     figcaption { margin-top: 5px; font: 11px/1.3 ui-monospace, monospace; color: #a7a39b; }
   </style></head><body><h1>The title bar's Start / Stop — the morph, frame by frame</h1>
-  <p>The built page, the gold draining off the ember face beneath it over 440 ms and refilling on the way back, the words rolling (out upward 170 ms, in from below 260 ms), the box easing to the new words' width while the version and the gear stay put. Each frame is the page's own animations stopped at that millisecond (tools/shell-shots.cjs).</p>
+  <p>The built page, the gold — in the error state the neutral, lifted surface — draining off the ember face beneath it over 440 ms and refilling on the way back, the words rolling (out upward 170 ms, in from below 260 ms), the box easing to the new words' width while the version and the gear stay put. Each frame is the page's own animations stopped at that millisecond (tools/shell-shots.cjs).</p>
   ${body}</body></html>`;
 };
 
@@ -208,6 +217,13 @@ const run = async () => {
       win.webContents.debugger.attach("1.3");
       await win.webContents.debugger.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
       await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(sc.focus)}).focus({ focusVisible: true })`);
+    }
+    if (sc.forced) {
+      // Windows' high contrast, as Chromium draws it there: the system's colours over the page's own
+      if (!win.webContents.debugger.isAttached()) {
+        win.webContents.debugger.attach("1.3");
+      }
+      await win.webContents.debugger.sendCommand("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }] });
     }
     win.webContents.off("console-message", onConsole);
     refused.push(...refusedAtLoad);

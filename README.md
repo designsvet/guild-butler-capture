@@ -376,9 +376,12 @@ the layout check's stub bridge in every capture state, both themes, both platfor
 and writes a PNG of each (`ONLY=<part of a name>` for some, `SCALE=2` for 2x). The OS's own buttons
 are not in a page, so the tool draws dashed stand-ins where a Mac's lights and Windows' caption
 buttons go. The button's change is shot in motion (`ONLY=morph`): Start pressed and the logger
-stopped, in both themes, each at 0, 110, 220, 330 and 440ms — the page's own animations stopped at
+stopped, then the same for the error state's neutral Start (pressed again; the logger failing as it
+starts), in both themes, each at 0, 110, 220, 330 and 440ms — the page's own animations stopped at
 that millisecond, not a timer racing them (`tools/shell-morph.cjs`) — and laid out side by side in
-`morph-strip.png`. It measures nothing; the layout check below does.
+`morph-strip.png` (`ONLY=morph-st` for the gold pair alone). `ONLY=forced` shoots the bar under
+Windows' high contrast (DevTools' forced-colours emulation). It measures nothing; the layout check
+below does.
 
 **Checking it.** `pnpm check:layout:v5` (`tools/shell-layout-check.cjs`, in CI under xvfb beside the
 old window's check) drives the built page behind the same stub bridge and measures every route at
