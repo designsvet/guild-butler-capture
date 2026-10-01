@@ -14,7 +14,7 @@
  * retry loop anyone needs to watch).
  */
 
-import { EEngineErrorKind, isFatalErrorKind } from "../shared/captureTypes.js";
+import { EEngineErrorKind, HEALTHY_RUN_MS, isFatalErrorKind } from "../shared/captureTypes.js";
 import { classifyFatalLine, createLineSplitter, parseEngineLine } from "./engineAdapter.js";
 import type { TSessionEvent } from "./captureSession.js";
 
@@ -47,8 +47,8 @@ export const defaultRestartDelayMs = (attempt: number): number => {
   return Math.min(30_000, 1000 * 2 ** Math.min(Math.max(attempt - 1, 0), 5));
 };
 
-/** A run that reached Capturing, or simply lived this long, resets the backoff. */
-export const HEALTHY_RUN_MS = 60_000;
+/** A run that reached Capturing, or simply lived this long, resets the backoff (the number is shared). */
+export { HEALTHY_RUN_MS };
 
 const DETAIL_RING_SIZE = 25;
 const DEFAULT_KILL_GRACE_MS = 3000;
