@@ -379,17 +379,27 @@ describe("the shell's store: the guild connection's panel", () => {
     expect(store.getSnapshot().ui).toMatchObject({ pairBusy: false, pairFailure: EPairFailure.Unreachable });
   });
 
-  it("the panel closing forgets a refusal; Disconnect forgets it too, and keeps main's pairing", async () => {
+  it("the panel closing forgets a refusal", async () => {
     const { fake, store } = await booted();
     store.pair("x");
     fake.pairAnswer.resolve({ ok: false, failure: EPairFailure.Refused, detail: null, status: initialPairingStatus });
     await flush();
     store.forgetPairFailure();
     expect(store.getSnapshot().ui.pairFailure).toBeNull();
+  });
+
+  it("Disconnect forgets a refusal too — the steps it brings back start clean — and keeps main's pairing", async () => {
+    const { fake, store } = await booted();
+    store.pair("x");
+    fake.pairAnswer.resolve({ ok: false, failure: EPairFailure.Refused, detail: null, status: initialPairingStatus });
+    await flush();
+    // paired since, from elsewhere, with the refusal still held
     fake.push.pairing?.(PAIRED);
+    expect(store.getSnapshot().ui.pairFailure).toBe(EPairFailure.Refused);
     store.unpair();
     await flush();
     expect(fake.bridge.unpair).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().ui.pairFailure).toBeNull();
     expect(store.getSnapshot().pairing).toEqual(initialPairingStatus);
   });
 
