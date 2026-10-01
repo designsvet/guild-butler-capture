@@ -1,0 +1,19 @@
+/* The v5 shell's one stylesheet (Loot Butler, raid-bot ADR 0159), built by tools/build-app.mjs:
+   postcss-import inlines every @import below, in this order, and Tailwind (the design system's
+   preset, tailwind.config.mjs) then fills its layers. No @import survives the build — it refuses
+   one rather than ship a page that names a node_modules path the app does not carry.
+
+   The order is the design system's (its README; the dashboard's web/src/index.css is the same
+   chain): the tokens, the page basics, Tailwind's preflight, then the package's controls —
+   after preflight, whose `[type='button'] { background-image: none }` would otherwise erase
+   every button's fill — and its surfaces, then Tailwind's components and utilities, so a
+   utility can still adjust a control's spacing. The shell's own layer comes last.
+   test/appDesignSystem.test.ts holds the built file to this order. */
+@import "@guild-butler/design-system/tokens.css";
+@import "@guild-butler/design-system/base.css";
+@import "tailwindcss/base.css";
+@import "@guild-butler/design-system/controls.css";
+@import "@guild-butler/design-system/surfaces.css";
+@import "tailwindcss/components.css";
+@import "tailwindcss/utilities.css";
+@import "./shell.css";

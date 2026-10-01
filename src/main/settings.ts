@@ -47,6 +47,42 @@ export type TSettings = {
   language?: string;
   /** Window look (gear popover). Absent = obsidian. */
   theme?: string;
+  /** Which window opens: absent = the old one; "v5" = the shell preview. See `wantsV5Shell`. */
+  shell?: typeof SHELL_V5;
+};
+
+/**
+ * The v5 shell (Loot Butler, raid-bot ADR 0159) is built beside the old window and is reached
+ * only on purpose: `GBC_SHELL=v5` in the environment, or `"shell": "v5"` in settings.json. Any
+ * other value — absent, misspelt, a name a later build will use — opens the old window, so a
+ * stray value can never strand a member on a half-built screen. The old window stays the default
+ * until the first beta.
+ */
+export const SHELL_V5 = "v5";
+
+export const wantsV5Shell = (env: Readonly<Record<string, string | undefined>>, settings: TSettings): boolean => {
+  return env.GBC_SHELL === SHELL_V5 || settings.shell === SHELL_V5;
+};
+
+/**
+ * The gear's two picks, as written back to disk. Pure, so the test can hold what the IPC
+ * handlers rely on: every field the pick does not touch rides along — the pairing, the engine
+ * path, and the shell flag, which a whole-file rewrite would otherwise be one forgotten field
+ * away from dropping.
+ */
+export const withTheme = (settings: TSettings, theme: string): TSettings => {
+  return { ...settings, theme };
+};
+
+/** A language overrides the OS; null ("System", or anything unrecognised) drops the override. */
+export const withLanguage = (settings: TSettings, language: string | null): TSettings => {
+  const next: TSettings = { ...settings };
+  if (language == null) {
+    delete next.language;
+  } else {
+    next.language = language;
+  }
+  return next;
 };
 
 /**
@@ -111,6 +147,11 @@ export const loadSettings = (file: string): TSettings => {
     }
     if (typeof raw.theme === "string" && raw.theme.length > 0) {
       out.theme = raw.theme;
+    }
+    // Whitelisted, not merely a string: this file is read whole and written back whole, so only
+    // a value this build knows survives the round trip.
+    if (raw.shell === SHELL_V5) {
+      out.shell = SHELL_V5;
     }
     const pairing = readPairing(raw.pairing);
     if (pairing != null) {

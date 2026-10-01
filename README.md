@@ -50,9 +50,10 @@ the fixtures — never guess at line shapes.
 src/main/       Electron main: supervisor, adapter, trackers, platform probes
 src/preload/    the sandboxed IPC bridge (self-contained on purpose)
 src/renderer/   the single screen (plain TS/HTML/CSS, no framework)
+src/app/        the v5 shell preview (React + Tailwind, behind a flag — see "The v5 shell (preview)")
 src/shared/     types, channel names, all user-facing copy (strings.ts)
 resources/mac/  the ChmodBPF-style permission helper (plist + scripts)
-tools/          mock engine, stdout recorder, static-copy build step (+ design-system CSS)
+tools/          mock engine, stdout recorder, static-copy build step (+ design-system CSS), v5 shell build
 test/           vitest suites — run with no Electron and no game
 ```
 
@@ -249,6 +250,46 @@ error and auto-restart paths (see `test/engineSupervisor.test.ts`).
 `GBC_MOCK_BROKEN_AFTER=5000 pnpm dev:mock` makes the mock report a broken
 decoder after five seconds, which puts up the "A game update broke loot
 logging" card (below).
+
+## The v5 shell (preview)
+
+**Loot Butler**, the dashboard this app is being rebuilt into (raid-bot ADR 0159), is built
+beside the old window in `src/app/`, and nothing reaches it by accident: the old window stays the
+default, and 0.8.x ships it unchanged.
+
+**Opening it.** `GBC_SHELL=v5 pnpm dev` (or `pnpm dev:mock`), or `"shell": "v5"` in
+`settings.json` in the app's data folder. Any other value opens the old window. Picking a theme or
+a language keeps the stored flag (`test/settings.test.ts`).
+
+**How it is built.** `pnpm build` runs `tools/build-app.mjs` after the old window's build, into
+`dist/web/app/`:
+
+- esbuild bundles `src/app/main.tsx`, React included, into `main.js`;
+- PostCSS builds `app.css`: postcss-import inlines the design system's `tokens.css`, `base.css`,
+  `controls.css` and `surfaces.css` with Tailwind's layers between them, in the order `app.css`
+  lists, and Tailwind 3 writes the utilities from the package's preset (`tailwind.config.mjs`).
+  The build fails if an `@import` survives or is skipped;
+- the package's `fonts/` directory is copied whole, its four OFL licence texts with it, and the
+  crest is `resources/icons/crest-mark.png`.
+
+The page keeps the old window's content-security policy word for word. `pnpm typecheck` covers it
+(`tsconfig.app.json`). `test/appDesignSystem.test.ts` builds it into a temp dir and checks that no
+`@import` is left, that the package's sheets arrive whole and in order (Tailwind's preflight before
+`controls.css`), that no package token is declared again, that the app's own variables are all
+`--lb-*`, that a colour is written out only as an `--lb-*` value no package token already holds in
+that theme, and that the faces are the package's files, byte for byte, with their licences beside
+them.
+
+**What is in it.** The frame: the 48px title bar with the crest, the wordmark and the gear, over an
+empty main region. The gear is the design system's `Button`, which shows the package's React entry
+rendering under the policy. A value a board draws that no token holds is a `--lb-*` variable in
+`src/app/shell.css`, defined for both themes; where the board takes a different token in each theme
+(the bar's hairline), the variable names the two tokens instead of copying their values.
+
+**Not yet.** The window is still the old 660×620 frame (the v5 window is the next step). The gear
+does nothing. There is no status, action, version, sidebar, page or skip link. The stored theme and
+language are not read: the page follows the OS language and draws dark until the store arrives.
+`pnpm check:layout` measures the old window only.
 
 ## When a game update breaks the decoder
 

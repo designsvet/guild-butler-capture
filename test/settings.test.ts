@@ -4,7 +4,14 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { loadSettings, saveSettings, settingsFilePath } from "../src/main/settings.js";
+import {
+  loadSettings,
+  saveSettings,
+  settingsFilePath,
+  wantsV5Shell,
+  withLanguage,
+  withTheme,
+} from "../src/main/settings.js";
 
 describe("settings: autoCapture", () => {
   const dir = (): string => mkdtempSync(join(tmpdir(), "gbc-settings-"));
@@ -54,5 +61,46 @@ describe("settings: language + theme", () => {
     const loaded = loadSettings(file);
     expect(loaded.language).toBeUndefined();
     expect(loaded.theme).toBeUndefined();
+  });
+});
+
+describe("settings: the v5 shell flag", () => {
+  const dir = (): string => mkdtempSync(join(tmpdir(), "gbc-settings-"));
+
+  it("opens the old window unless the env or the stored setting asks for v5", () => {
+    expect(wantsV5Shell({}, {})).toBe(false);
+    expect(wantsV5Shell({ GBC_SHELL: "v5" }, {})).toBe(true);
+    expect(wantsV5Shell({}, { shell: "v5" })).toBe(true);
+    // anything else is the old window: a typo must not strand a member on a half-built screen
+    expect(wantsV5Shell({ GBC_SHELL: "V5" }, {})).toBe(false);
+    expect(wantsV5Shell({ GBC_SHELL: "1" }, {})).toBe(false);
+  });
+
+  it("keeps only a value this build knows", () => {
+    const file = settingsFilePath(dir());
+    writeFileSync(file, JSON.stringify({ shell: "v6" }), "utf8");
+    expect(loadSettings(file).shell).toBeUndefined();
+    writeFileSync(file, JSON.stringify({ shell: true }), "utf8");
+    expect(loadSettings(file).shell).toBeUndefined();
+    writeFileSync(file, JSON.stringify({ shell: "v5" }), "utf8");
+    expect(loadSettings(file).shell).toBe("v5");
+  });
+
+  // The IPC handlers read the file whole and write it back whole (src/main/index.ts), through
+  // these two updaters — so a flag the reader dropped, or an updater that rebuilt the object,
+  // would switch the shell off the first time a member picked a theme or a language.
+  it("survives a theme change and both kinds of language change", () => {
+    const file = settingsFilePath(dir());
+    saveSettings(file, { shell: "v5", autoCapture: false, language: "de" });
+
+    saveSettings(file, withTheme(loadSettings(file), "parchment"));
+    expect(loadSettings(file)).toEqual({ shell: "v5", autoCapture: false, language: "de", theme: "parchment" });
+
+    saveSettings(file, withLanguage(loadSettings(file), "uk"));
+    expect(loadSettings(file)).toEqual({ shell: "v5", autoCapture: false, language: "uk", theme: "parchment" });
+
+    saveSettings(file, withLanguage(loadSettings(file), null));
+    expect(loadSettings(file)).toEqual({ shell: "v5", autoCapture: false, theme: "parchment" });
+    expect(wantsV5Shell({}, loadSettings(file))).toBe(true);
   });
 });

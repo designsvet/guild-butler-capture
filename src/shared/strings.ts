@@ -274,6 +274,15 @@ const EN = {
     engineCredit: "Capture engine: ao-loot-logger (GPL-3.0, open source)",
     privacy: "Privacy policy",
   },
+
+  /**
+   * The v5 shell (Loot Butler, raid-bot ADR 0159), built beside the old window and opened only
+   * behind GBC_SHELL=v5 / settings.shell until the first beta. Everything above stays the old
+   * window's. The name is a brand word: the same in every language.
+   */
+  shell: {
+    appName: "Loot Butler",
+  },
 };
 
 /**
@@ -505,6 +514,10 @@ const UK: TStrings = {
     engineCredit: "Рушій захоплення: ao-loot-logger (GPL-3.0, відкритий код)",
     privacy: "Політика конфіденційності",
   },
+
+  shell: {
+    appName: "Loot Butler",
+  },
 };
 
 /** Русский — machine-quality, wants a native proofread (same caveat as the bot). */
@@ -729,6 +742,10 @@ const RU: TStrings = {
   footer: {
     engineCredit: "Движок захвата: ao-loot-logger (GPL-3.0, открытый код)",
     privacy: "Политика конфиденциальности",
+  },
+
+  shell: {
+    appName: "Loot Butler",
   },
 };
 
@@ -958,6 +975,10 @@ const DE: TStrings = {
   footer: {
     engineCredit: "Capture-Engine: ao-loot-logger (GPL-3.0, Open Source)",
     privacy: "Datenschutzerklärung",
+  },
+
+  shell: {
+    appName: "Loot Butler",
   },
 };
 
@@ -1189,6 +1210,10 @@ const FR: TStrings = {
     engineCredit: "Moteur de capture : ao-loot-logger (GPL-3.0, open source)",
     privacy: "Politique de confidentialité",
   },
+
+  shell: {
+    appName: "Loot Butler",
+  },
 };
 
 /** Português — machine-quality, wants a native proofread (same caveat as the bot). */
@@ -1413,6 +1438,10 @@ const PT: TStrings = {
   footer: {
     engineCredit: "Motor de captura: ao-loot-logger (GPL-3.0, código aberto)",
     privacy: "Política de privacidade",
+  },
+
+  shell: {
+    appName: "Loot Butler",
   },
 };
 
