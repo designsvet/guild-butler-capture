@@ -406,7 +406,11 @@ const stopUploadLoop = (): void => {
     clearInterval(uploadTimer);
     uploadTimer = null;
   }
-  // One last pass so the tail of a session is not left on disk until next time.
+  // One last pass so the tail of a session is not left on disk until next time — never for the mock
+  // engine, whose file is invented (botFacing.ts).
+  if (!talksToBot(currentEngine?.source)) {
+    return;
+  }
   void ensureUploader()
     .tick()
     .then(pushPairing)

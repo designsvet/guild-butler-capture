@@ -22,6 +22,14 @@ describe("the mock engine never talks to the bot", () => {
     expect(MAIN).toMatch(/if \(talksToBot\(engine\.source\)\) \{\s*startUploadLoop\(\);/);
   });
 
+  // Stopping a capture runs one last upload pass for the session's tail: the mock's tail is invented too.
+  it("runs the closing upload pass only for an engine that talks to the bot", () => {
+    const stop = MAIN.slice(MAIN.indexOf("const stopUploadLoop"), MAIN.indexOf("};", MAIN.indexOf("const stopUploadLoop")));
+    const guard = stop.indexOf("if (!talksToBot(currentEngine?.source))");
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(stop.indexOf(".tick()"));
+  });
+
   it("forwards nothing to the bot unless the engine talks to it", () => {
     for (const fn of ["forwardEngineHealth(fresh)", "forwardFestivities(ev.event)", "forwardEnergy(ev.event)", "forwardEnergyLog(ev.event)"]) {
       const at = MAIN.indexOf(fn);
