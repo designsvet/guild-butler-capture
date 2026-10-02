@@ -15,3 +15,8 @@ engine-output-*.log
 
 # `pnpm dev:v5` keeps its own throwaway data folder here
 .dev-v5-data/
+
+.dev-replay-data/
+activity-events-*.jsonl
+!test/fixtures/session/activity-events-*.jsonl
+!test/fixtures/session/loot-events-*.txt

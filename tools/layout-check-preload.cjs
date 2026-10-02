@@ -82,7 +82,7 @@ const STATES = {
 };
 
 const stateFor = (name) => ({ ...idle, ...STATES[name] });
-const state = stateFor(sc.state);
+let state = stateFor(sc.state);
 
 // A state pushed later, as main pushes one: the v5 shell's tools (tools/shell-shots.cjs,
 // tools/shell-layout-check.cjs) send a state's name on this channel to play a change — the
@@ -148,7 +148,7 @@ const setup = {
   platform: sc.platform,
   engineEntry: sc.engineMissing ? null : "/engine/src/index.js",
   engineRoot: sc.engineMissing ? null : paths.engineRoot,
-  engineSource: sc.engineMissing ? null : "bundled",
+  engineSource: sc.engineMissing ? null : sc.session != null ? "replay" : "bundled",
   captureDir: sc.engineMissing ? null : paths.captureDir,
   access: sc.access ?? "ok",
   appVersion: "0.0.0",
@@ -169,10 +169,38 @@ const store = (patch) => {
 
 const ok = (value) => Promise.resolve(value);
 
+let session = sc.session ?? null;
+if (session != null) {
+  state = { ...state, character: session.character, startedAt: session.startedAt, runStartedAt: session.startedAt };
+}
+const onSessionListeners = new Set();
 const bridge = {
   platform: sc.platform,
   start: () => ok(),
   stop: () => ok(),
+  getSession: () => ok(session),
+  onSession: (listener) => {
+    onSessionListeners.add(listener);
+    return () => onSessionListeners.delete(listener);
+  },
+  newSession: () => {
+    session = {
+      ...session,
+      id: "next-session",
+      events: 0,
+      totals: {},
+      feed: [],
+      recentLoot: [],
+      zones: {},
+      files: [],
+      audits: {},
+      refused: 0,
+    };
+    for (const listener of onSessionListeners) {
+      listener(session);
+    }
+    return ok(session);
+  },
   getState: () => ok(state),
   reveal: () => ok(true),
   getSetup: () => ok(setup),

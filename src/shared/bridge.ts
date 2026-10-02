@@ -20,7 +20,12 @@ import type {
   TUpdateStatus,
 } from "./captureTypes.js";
 
+import type { TSession } from "./session/model.js";
+
 export type TGbc = {
+  getSession: () => Promise<TSession | null>;
+  newSession: () => Promise<TSession>;
+  onSession: (listener: (session: TSession) => void) => () => void;
   platform: string;
   start: () => Promise<void>;
   stop: () => Promise<void>;

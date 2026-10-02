@@ -51,7 +51,7 @@ src/main/       Electron main: supervisor, adapter, trackers, platform probes
 src/preload/    the sandboxed IPC bridge (self-contained on purpose)
 src/renderer/   the single screen (plain TS/HTML/CSS, no framework)
 src/app/        the v5 shell preview (React + Tailwind, behind a flag — see "The v5 shell (preview)")
-src/shared/     types, channel names, all user-facing copy (strings.ts)
+src/shared/     types, channel names, user-facing copy, pure session reducers + generated names
 resources/mac/  the ChmodBPF-style permission helper (plist + scripts)
 tools/          mock engine, stdout recorder, static-copy build step (+ design-system CSS), v5 shell build, shots + layout check
 test/           vitest suites — run with no Electron and no game
@@ -141,6 +141,9 @@ Batches are also packed by **encoded bytes** rather than character count, so a
 Russian or Ukrainian capture is bounded the same way an English one is.
 
 ## How it moves
+
+The v5 data page keeps the same shell motion and streams one main-process snapshot;
+its counters and card contents update without entry animations. See [Session slice 1](docs/session.md).
 
 The four states — idle, starting, waiting, capturing — are one continuous
 run, and the interface treats them that way. One rule holds it up: **nothing
@@ -253,6 +256,16 @@ decoder after five seconds, which puts up the "A game update broke loot
 logging" card (below).
 
 ## The v5 shell (preview)
+
+**Session now has real data (slice 1).** `pnpm dev:replay test/fixtures/session` opens
+September 21's recorded evening through the real model; `pnpm check:replay` verifies
+IPC, totals, New session, summaries and Stop. Live v5 capture enables
+`ACTIVITY_EVENTS=1`. The page shows observed currencies and quantities, sources,
+places, chests and the feed; missing values wait for R5. New session resets counters
+without stopping capture, and Stop/quit save summaries beside the raw files.
+Architecture, name/art provenance, byte ranges and rebuild rules are in
+[docs/session.md](docs/session.md); [built F1 proofs](docs/design/session-proof.md) show both themes and the narrow window.
+The old renderer remains the default at 0.8.8.
 
 **Try it:** `pnpm dev:v5`. It builds, then opens the new shell with the mock engine in a throwaway
 data folder of its own (`.dev-v5-data/`, git-ignored) — never the installed app's, so your settings,
@@ -540,7 +553,7 @@ layout check below does.
 old window's check) drives the built page behind the same stub bridge and measures every route at
 768, 1024, 1280 and 1440 — the narrowest width of each of the shell's layouts, and the boards' width
 — all at the window's smallest height, 620, in both themes, the six languages, both platforms and
-the thirty-seven states that change the layout: every capture state the shell draws, each with a guild
+the forty states that change the layout: every capture state the shell draws, each with a guild
 connection that gives the sidebar's foot one of its shapes, the foot's remaining states over a
 running capture, and every notice of Fh5 at its tallest — the blocked cards with their notes, the
 decoder's four steps over a held upload, the logger stopping, an update ready — the broken
@@ -548,12 +561,13 @@ decoder's dialog itself, the settings drawer — open over a running capture, wi
 menu open, and over an idle capture with no engine found — and the guild connection's panel: not
 connected (from the foot and from Session's button), a code refused (the board's refusal and the
 longest in every language), a code being checked, opened under the band's gold fix, connected (as
-the board draws it, and with the longest sentence the details carry): 3,552 scenarios, from 888
+the board draws it, and with the longest sentence the details carry): 3,840 scenarios, from 960
 windows each shrunk through the four widths. Then the title bar's button changing face, the one part of the shell
 that moves its own layout: in a window with motion back on, both directions as the logger goes
 (Start pressed, the logger stopped), at every 55ms from the change to the drain's end, at the four
 widths, in both themes, the six languages and both platforms — 1,728 more, from 24 windows, measured
-on the bar. 5,280 in all. It fails on:
+on the bar. 5,568 in all. The three new states replay the scrubbed evening while capturing,
+after Stop, and after New session, with rendered raw-total/count assertions in every locale. It fails on:
 
 - sideways scroll — the window, or anything in it that scrolls, wider than it is;
 - clipped text — words cut by a box that hides its overflow, or past the window's edge. Two cuts are
@@ -876,6 +890,15 @@ bot-side download page `app.guild-butler.com/download`, pinned by the bot's
 electron-updater will consume.
 
 ## Hardware verification checklist
+
+For the v5 Session slice, additionally verify on real Mac and Windows: start the
+real engine with activity capture enabled, earn fame/silver, change zone, gather
+and fish; compare the page with the raw logs; press New session while staying in
+the same zone, then earn more; Stop and quit immediately after a gain and check
+the final summary. Load official item art once, go offline and verify the cached
+image. Check card folding, full-precision labels and New session with
+VoiceOver/NVDA. These hardware checks are pending; replay/layout checks do not
+substitute for packet capture or assistive technology.
 
 In order, on a real Mac (then the same on Windows). Nothing here is optional —
 each step proves an assumption the container build could not.

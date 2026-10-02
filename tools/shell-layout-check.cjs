@@ -81,6 +81,7 @@ const { join, resolve } = require("node:path");
 const { buildSync } = require("esbuild");
 
 const morph = require("./shell-morph.cjs");
+const stubItemArt = require("./item-art-stub.cjs");
 
 const ROOT = resolve(__dirname, "..");
 const PAGE = join(ROOT, "dist", "web", "app", "index.html");
@@ -109,10 +110,20 @@ const fromSource = (file) => {
  * longer compiles, or touches `window` on import — leaves Electron up with no window (it reports
  * the error and waits), and CI would sit through to its timeout. Inside the run a throw exits 1.
  */
-const readLists = () => ({
-  ROUTES: fromSource("src/app/router.ts").ROUTES,
-  SUPPORTED_LANGS: fromSource("src/shared/i18n.ts").SUPPORTED_LANGS,
-});
+const readLists = () => {
+  const { replayedSession, fromSource: sessionSource } = require("./session-fixture.cjs");
+  const session = replayedSession();
+  const { closeSession } = sessionSource("src/shared/session/model.ts");
+  STATES.push(
+    { name: "session-replay", state: "capturing", session, paired: true, notice: null },
+    { name: "session-stopped", state: "idle", session: closeSession(session, session.lastAt), paired: false, notice: null },
+    { name: "session-next", state: "capturing", session, paired: true, notice: null, press: { selector: "[data-new-session]", on: ["darwin", "win32"] } },
+  );
+  return {
+    ROUTES: fromSource("src/app/router.ts").ROUTES,
+    SUPPORTED_LANGS: fromSource("src/shared/i18n.ts").SUPPORTED_LANGS,
+  };
+};
 
 /** The words the connection panel's keys check against: the app's catalog and its failures, read in the run (above). */
 let stringsFor = null;
@@ -1462,6 +1473,7 @@ const connectionKeys = async (win, load) => {
 };
 
 const run = async () => {
+  stubItemArt();
   const { ROUTES, SUPPORTED_LANGS } = readLists();
   readWords();
   const lists = [
@@ -1563,7 +1575,28 @@ const run = async () => {
         `(${measure.toString()})(${JSON.stringify({ route: load.route, zones: OS_ZONES[load.platform], mayCut: MAY_CUT, surfaces: SURFACES, veils: VEILS, overlay: OVERLAY, expect: load.expect })})`,
       );
       const refused = await win.webContents.executeJavaScript("window.gbcCheck.refused()");
+      const replayProof =
+        load.sc.session != null
+          ? await win.webContents.executeJavaScript(`(() => {
+        const data = document.querySelector('[data-session-data]');
+        if (${JSON.stringify(load.stateName)} === 'session-next') { return data == null ? [] : ['New session kept the old counters']; }
+        if (data == null) { return ['Replay did not draw the Session page']; }
+        const counts = { kills: '40', resources: '19', fish: '2', chests: '1' };
+        const errors = [];
+        for (const [key, n] of Object.entries(counts)) {
+          const actual = document.querySelector('[data-session-count="' + key + '"]')?.textContent;
+          if (actual !== n) { errors.push(key + ': expected ' + n + ', got ' + actual); }
+        }
+        const totals = { fame: 13307603664, respec: 2351349126, silver: 142162640, might: 159966314, favor: 70156519, faction: 113949404 };
+        for (const [metric, raw] of Object.entries(totals)) {
+          const actual = document.querySelector('[data-session-metric="' + metric + '"]')?.dataset.raw;
+          if (actual !== String(raw)) { errors.push(metric + ': expected raw ' + raw + ', got ' + actual); }
+        }
+        return errors;
+      })()`)
+          : [];
       const all = [
+        ...replayProof,
         ...pressFailed,
         ...(waitingFor.length > 0 ? [`the page never settled: no ${waitingFor.join(", no ")}`] : []),
         ...problems,

@@ -1,4 +1,4 @@
-import { Tabs } from "@guild-butler/design-system/react";
+import { Button, Tabs } from "@guild-butler/design-system/react";
 
 import type { TStrings } from "../shared/strings.js";
 
@@ -16,7 +16,17 @@ import type { TStrings } from "../shared/strings.js";
 /** The id of the region the tab controls (Shell.tsx). */
 export const PAGE_PANEL_ID = "lb-page";
 
-export const PageHeader = ({ s, meta, live }: { s: TStrings; meta: string; live: boolean }) => (
+export const PageHeader = ({
+  s,
+  meta,
+  live,
+  newSession,
+}: {
+  s: TStrings;
+  meta: string;
+  live: boolean;
+  newSession?: { label: string; disabled: boolean; onClick: () => void };
+}) => (
   <div className="lb-head">
     <div className="lb-head-titles">
       <Tabs
@@ -30,5 +40,12 @@ export const PageHeader = ({ s, meta, live }: { s: TStrings; meta: string; live:
       />
       {meta !== "" ? <div className="lb-head-meta">{meta}</div> : null}
     </div>
+    {newSession != null ? (
+      <div className="lb-head-actions">
+        <Button variant="secondary" disabled={newSession.disabled} onClick={newSession.onClick} data-new-session="">
+          {newSession.label}
+        </Button>
+      </div>
+    ) : null}
   </div>
 );

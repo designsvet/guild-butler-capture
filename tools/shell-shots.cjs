@@ -64,6 +64,7 @@ const { tmpdir } = require("node:os");
 const { join, resolve } = require("node:path");
 
 const morph = require("./shell-morph.cjs");
+const stubItemArt = require("./item-art-stub.cjs");
 
 const ROOT = resolve(__dirname, "..");
 const PAGE = join(ROOT, "dist", "web", "app", "index.html");
@@ -167,6 +168,48 @@ const scenarios = () => {
       add({ state: "waiting", theme: "obsidian", platform, width, height });
       add({ state: "capturing", theme: "obsidian", platform, width, height, paired: true, sentAgoMs: 60_000 });
     }
+  }
+  const { replayedSession } = require("./session-fixture.cjs");
+  const { closeSession } = require("./session-fixture.cjs").fromSource("src/shared/session/model.ts");
+  const recorded = replayedSession();
+  for (const theme of ["obsidian", "parchment"]) {
+    for (const [width, height] of [
+      [1440, 900],
+      [1024, 768],
+      [768, 620],
+    ]) {
+      add({
+        state: "capturing",
+        theme,
+        platform: "darwin",
+        width,
+        height,
+        session: recorded,
+        name: `session-replay-${theme}-${width}`,
+      });
+    }
+    add({
+      state: "idle",
+      theme,
+      platform: "darwin",
+      width: 1440,
+      height: 900,
+      session: closeSession(recorded, recorded.lastAt),
+      name: `session-stopped-${theme}`,
+    });
+    add({
+      state: "capturing",
+      theme,
+      platform: "darwin",
+      width: 1440,
+      height: 900,
+      session: recorded,
+      press: ["[data-new-session]"],
+      name: `session-next-${theme}`,
+    });
+  }
+  for (const [name, scroll] of [["loot", ".lb-loot-meta"], ["end", ".lb-session-info"]]) {
+    add({ state: "capturing", theme: "obsidian", platform: "darwin", width: 1440, height: 900, session: recorded, scroll, name: `session-${name}-obsidian-1440` });
   }
   // The foot's states (board Fh2), on the Mac at full width.
   for (const upload of ["up-to-date", "sending", "retrying", "unauthorized", "blocked", "bot-outdated"]) {
@@ -431,6 +474,7 @@ const typeKeys = async (win, sc) => {
 };
 
 const run = async () => {
+  stubItemArt();
   mkdirSync(OUT, { recursive: true });
   const strip = [];
   /** The bands, cropped, by theme and width — laid out as one sheet each (sheetPage). */
@@ -500,6 +544,10 @@ const run = async () => {
       );
     }
     const asked = sc.keys == null ? null : await typeKeys(win, sc);
+    if (sc.scroll != null) {
+      await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(sc.scroll)})?.scrollIntoView({ block: "start" })`);
+      await wait(100);
+    }
     if (OS_CHROME) {
       await win.webContents.executeJavaScript(osChrome(sc.platform));
     }

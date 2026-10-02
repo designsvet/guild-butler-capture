@@ -46,6 +46,7 @@ import {
   type TTheme,
   type TUpdateStatus,
 } from "../shared/captureTypes.js";
+import type { TSession } from "../shared/session/model.js";
 import type { TGbc } from "../shared/bridge.js";
 import { engineRunning } from "../shared/engineHealth.js";
 import type { TLang } from "../shared/i18n.js";
@@ -71,10 +72,13 @@ export type TShellUi = {
   pairBusy: boolean;
   /** Why the last code was refused (the old window's sentence for it), until the next try. */
   pairFailure: EPairFailure | null;
+  newSessionBusy: boolean;
+  newSessionFailed: boolean;
 };
 
 export type TShellSnapshot = {
   capture: TCaptureState | null;
+  session: TSession | null;
   setup: TSetupStatus | null;
   pairing: TPairingStatus | null;
   update: TUpdateStatus | null;
@@ -127,6 +131,7 @@ export type TShellStore = {
   openLoot: () => void;
   /** The copy button beside `/capture pair`. Resolves true once main has put it on the clipboard. */
   copyPairCommand: () => Promise<boolean>;
+  newSession: () => void;
 };
 
 export const INITIAL_UI: TShellUi = {
@@ -139,9 +144,19 @@ export const INITIAL_UI: TShellUi = {
   dismissed: [],
   pairBusy: false,
   pairFailure: null,
+  newSessionBusy: false,
+  newSessionFailed: false,
 };
 
-const EMPTY: TShellSnapshot = { capture: null, setup: null, pairing: null, update: null, settings: null, ui: INITIAL_UI };
+const EMPTY: TShellSnapshot = {
+  session: null,
+  capture: null,
+  setup: null,
+  pairing: null,
+  update: null,
+  settings: null,
+  ui: INITIAL_UI,
+};
 
 /** A bridge call that failed leaves its slice as it was; the app log on main's side has the why. */
 const quietly = (promise: Promise<unknown>): void => {
@@ -183,7 +198,7 @@ export const createShellStore = (bridge: TGbc, focus: TFocusSource): TShellStore
       }),
     );
   };
-  const pushed = { capture: false, pairing: false, update: false };
+  const pushed = { session: false, capture: false, pairing: false, update: false };
   let booted = false;
 
   const refreshSetup = (): void => {
@@ -196,11 +211,23 @@ export const createShellStore = (bridge: TGbc, focus: TFocusSource): TShellStore
     }
     booted = true;
     const state = bridge.getState();
+    const session = bridge.getSession();
     const setup = bridge.getSetup();
     const pairing = bridge.getPairing();
     const update = bridge.getUpdate();
     const settings = bridge.getSettings();
 
+    bridge.onSession((session) => {
+      pushed.session = true;
+      set({ session });
+    });
+    quietly(
+      session.then((session) => {
+        if (!pushed.session) {
+          set({ session });
+        }
+      }),
+    );
     bridge.onState((capture) => {
       pushed.capture = true;
       set({ capture });
@@ -259,6 +286,24 @@ export const createShellStore = (bridge: TGbc, focus: TFocusSource): TShellStore
       };
     },
     boot,
+    newSession: () => {
+      if (snapshot.ui.newSessionBusy) {
+        return;
+      }
+      setUi({ newSessionBusy: true, newSessionFailed: false });
+      bridge
+        .newSession()
+        .then(
+          () => {},
+          (error: unknown) => {
+            console.error("[shell] new session failed", error);
+            setUi({ newSessionFailed: true });
+          },
+        )
+        .finally(() => {
+          setUi({ newSessionBusy: false });
+        });
+    },
     start: () => {
       quietly(bridge.start());
     },

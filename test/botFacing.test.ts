@@ -12,6 +12,7 @@ describe("the mock engine never talks to the bot", () => {
     expect(talksToBot("sibling")).toBe(true);
     expect(talksToBot(null)).toBe(true);
     expect(talksToBot("mock")).toBe(false);
+    expect(talksToBot("replay")).toBe(false);
   });
 
   // The guard is two call sites in main, which no unit reaches: hold them in the source, so a

@@ -13,6 +13,8 @@ import { DecoderDialog, NoticeBand } from "./Notice.js";
 import { holdsTheGold, noticeView, type TNoticeActionId } from "./notices.js";
 import { PAGE_PANEL_ID, PageHeader } from "./PageHeader.js";
 import type { TRouter } from "./router.js";
+import { SessionData } from "./SessionData.js";
+import { sessionStrings } from "../shared/sessionStrings.js";
 import { SessionPage } from "./SessionPage.js";
 import { langChoiceOf, storedLang } from "./settings.js";
 import { SettingsDrawer } from "./SettingsDrawer.js";
@@ -115,6 +117,10 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
   useAnnounceStatus(snap.capture?.status, s);
 
   const capture = snap.capture;
+  const session = snap.session;
+  const sessionWords = sessionStrings(lang);
+  const sessionNow = snap.setup?.engineSource === "replay" ? (session?.lastAt ?? now) : now;
+  const data = session != null && (session.events > 0 || session.refused > 0);
   const block = captureBlock(capture, snap.setup);
   const all = noticesNow({ capture, setup: snap.setup, update: snap.update, now });
   const notice = all[0] ?? null;
@@ -214,7 +220,7 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
       </a>
       <TitleBar
         s={s}
-        status={barStatus(capture, now, s, block != null)}
+        status={barStatus(capture, sessionNow, s, block != null)}
         // The band holds the next step: Start steps back to the neutral face (one gold button per
         // window). The connection panel never does — its Pair is steel (ConnectionPanel.tsx) — so
         // Start keeps the gold while it is open.
@@ -266,23 +272,45 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
           {view != null ? <NoticeBand view={view} onAction={onAction} /> : null}
           <PageHeader
             s={s}
-            meta={headerMeta(capture, now, s, (at) => formatClock(at))}
+            meta={
+              data && session != null
+                ? `${session.character ?? ""} · ${sessionWords.zoneCount(Object.keys(session.zones).length)}`
+                : headerMeta(capture, now, s, (at) => formatClock(at))
+            }
             live={capture?.status === ECaptureStatus.Capturing}
+            newSession={
+              data
+                ? {
+                    label: sessionWords.newSession,
+                    disabled: snap.ui.newSessionBusy || session?.endedAt != null,
+                    onClick: store.newSession,
+                  }
+                : undefined
+            }
           />
           <div id={PAGE_PANEL_ID} role="tabpanel" aria-label={s.shell.pages.session}>
-            <SessionPage
-              s={s}
-              hero={sessionHero(capture, now, platform, s, block)}
-              platform={platform}
-              paired={snap.pairing?.paired ?? null}
-              autoCapture={snap.settings?.autoCapture ?? null}
-              connectionOpen={connectionOpen}
-              onPair={() => {
-                toggleConnection("session");
-              }}
-              onReveal={store.reveal}
-              onAutoCapture={store.setAutoCapture}
-            />
+            {snap.ui.newSessionFailed ? (
+              <p role="alert" className="lb-data-warning">
+                {sessionWords.newSessionFailure}
+              </p>
+            ) : null}
+            {data && session != null ? (
+              <SessionData session={session} lang={lang} now={sessionNow} onReveal={store.reveal} />
+            ) : (
+              <SessionPage
+                s={s}
+                hero={sessionHero(capture, now, platform, s, block)}
+                platform={platform}
+                paired={snap.pairing?.paired ?? null}
+                autoCapture={snap.settings?.autoCapture ?? null}
+                connectionOpen={connectionOpen}
+                onPair={() => {
+                  toggleConnection("session");
+                }}
+                onReveal={store.reveal}
+                onAutoCapture={store.setAutoCapture}
+              />
+            )}
           </div>
         </main>
       </div>
