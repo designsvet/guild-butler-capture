@@ -610,6 +610,20 @@ const run = async () => {
     const width = Math.round(sc.width * Number(SCALE));
     const picture = shot.getSize().width === width ? shot : shot.resize({ width, quality: "best" });
     writeFileSync(join(OUT, `${sc.name}.png`), picture.toPNG());
+    if (sc.name.startsWith("session-replay-") && sc.width === 768) {
+      for (const [name, selector] of [
+        ["header", ".lb-head"],
+        ["activity", ".lb-activity-cards > section"],
+      ]) {
+        const crop = await win.webContents.executeJavaScript(
+          `(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.floor(r.x - 8), y: Math.floor(r.y - 8), width: Math.ceil(r.width + 16), height: Math.ceil(r.height + 16) }; })()`,
+        );
+        const detail = await win.webContents.capturePage(crop);
+        const px = Math.round(crop.width * Number(SCALE));
+        const sized = detail.getSize().width === px ? detail : detail.resize({ width: px, quality: "best" });
+        writeFileSync(join(OUT, `${sc.name}-${name}.png`), sized.toPNG());
+      }
+    }
     win.destroy();
     console.log(
       `${refused.length > 0 ? "CSP " : "shot"} ${sc.name}${asked != null ? `  asked the bridge: ${asked.join(", ") || "nothing"}` : ""}${refused.length > 0 ? `  refused: ${refused.join(" | ")}` : ""}`,

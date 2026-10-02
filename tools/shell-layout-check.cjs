@@ -482,6 +482,17 @@ const measure = ({ route, zones, mayCut, surfaces, scope, veils = [], overlay = 
     return [...range.getClientRects()].filter((r) => r.width > 0.5 && r.height > 0.5).map(box);
   };
 
+  // The tab's underline has a glow outside its box. Wrapped metadata needs its own
+  // clear row; non-overlapping text rectangles alone miss the line crowding it.
+  const pageHeader = within.matches(".lb-head") ? within : within.querySelector(".lb-head");
+  if (W < 1280 && pageHeader != null) {
+    const tabs = pageHeader.querySelector(".gb-tabs");
+    const meta = pageHeader.querySelector(".lb-head-meta");
+    if (tabs != null && meta != null && meta.getBoundingClientRect().top < tabs.getBoundingClientRect().bottom + 8 - T) {
+      problems.add("the page metadata crowds the tab underline (less than 8px clear space)");
+    }
+  }
+
   // The page drew.
   for (const [selector, what] of !wholePage ? [] : [
     ["header.lb-titlebar", "the title bar"],
@@ -1626,6 +1637,12 @@ const run = async () => {
           const range = document.createRange();
           range.selectNodeContents(time);
           if (range.getClientRects().length > 1) { errors.push('A feed timestamp wraps onto another line'); }
+        }
+        for (const stats of data.querySelectorAll('.lb-mini-stats')) {
+          const widths = [...stats.children].map((cell) => rect(cell).width);
+          if (Math.max(...widths) - Math.min(...widths) > 1) {
+            errors.push('Activity counters do not occupy equal-width columns');
+          }
         }
         return errors;
       })()`)

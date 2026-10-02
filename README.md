@@ -571,6 +571,8 @@ after Stop, and after New session, with rendered raw-total/count assertions in e
 
 - Session rows leaving unused space, a misplaced New session button, narrow activity cards,
   stacked source cards at 768, or feed timestamps wrapping onto two lines;
+- wrapped page metadata crowding the tab underline (less than 8px clear space);
+- activity counters packing to one side instead of occupying equal-width columns;
 - sideways scroll — the window, or anything in it that scrolls, wider than it is;
 - clipped text — words cut by a box that hides its overflow, or past the window's edge. Two cuts are
   the design's and pass while they end in "…" with the whole text in a title: a device's name in

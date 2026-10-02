@@ -85,8 +85,11 @@ use the existing plural rules, including Ukrainian/Russian few and many.
 At 768 × 620, currency tiles wrap in three columns and the unpriced loot quantity
 uses a compact full-width row. Activity summaries use two columns, with an odd last
 card filling its row. Fame and silver sources remain side by side after the main
-columns stack; New session stays at the right of the header. Feed timestamps take
-their natural width so the OS's 12-hour format stays on one line.
+columns stack. Each activity card divides its counters into equal-width columns.
+New session stays at the right of the header, aligned with its title.
+Below 1280, the metadata has its own 20px line with 8px of clear space below the
+glowing tab underline; a negative margin must not pull it into the glow. Feed
+timestamps take their natural width so the OS's 12-hour format stays on one line.
 
 R5's public price endpoint does not exist yet. Loot/resource/catch item values,
 value rates, comparisons, party, journals, PvP and other pages wait for their own
