@@ -198,6 +198,9 @@ const feedText = (event: TSessionEvent, lang: TLang, text: TSessionStrings): str
     case "harvest": {
       return text.feedHarvest(itemLabel(event.item, text, lang), event.std + event.bonus + event.premium);
     }
+    case "journal": {
+      return text.feedJournal(itemLabel(event.item, text, lang), event.qty);
+    }
     case "fish": {
       return event.outcome === "escaped"
         ? text.feedEscape()
@@ -252,7 +255,7 @@ export const SessionData = ({
   const unknown =
     Object.keys(session.mobs).some((index) => mobName(Number(index), lang) == null) ||
     Object.keys(session.zones).some((id) => worldName(id) == null) ||
-    [...Object.values(session.harvests), ...Object.values(session.catches)].some(
+    [...Object.values(session.harvests), ...Object.values(session.catches), ...Object.values(session.journals)].some(
       (item) => item.item == null || item.item.startsWith("UNKNOWN_"),
     ) ||
     Object.values(session.looters).some((looter) =>
@@ -406,7 +409,11 @@ export const SessionData = ({
             <Panel title={text.feed} subtitle={text.eventCount(session.events)}>
               <ol className="lb-feed">
                 {feed.map(({ event, words, index }) => (
-                  <li key={index}>
+                  <li
+                    key={index}
+                    data-session-event={event.t}
+                    data-session-quantity={event.t === "journal" ? event.qty : undefined}
+                  >
                     <time dateTime={new Date(event.at).toISOString()}>{formatClock(event.at)}</time>
                     <span>{words}</span>
                   </li>

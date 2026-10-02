@@ -1989,6 +1989,11 @@ body {
   flex-direction: column;
   gap: 14px;
 }
+.lb-stats:empty,
+.lb-activity-cards:empty,
+.lb-sources:empty {
+  display: none;
+}
 .lb-stats {
   display: flex;
   flex-wrap: wrap;

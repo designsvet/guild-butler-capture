@@ -74,6 +74,8 @@ const EN = {
     `Gathered ${plural("en", qty, { one: "# resource", few: "# resources", many: "# resources", other: "# resources" })} · ${name}`,
   feedFish: (name: string, qty: number): string => `${name} ×${formatCount("en", qty)}`,
   feedEscape: (): string => "Fish escaped",
+  feedJournal: (name: string, qty: number): string =>
+    `Completed ${plural("en", qty, { one: "# journal", other: "# journals" })} · ${name}`,
   feedChest: (name: string): string => `Opened ${name}`,
   feedZone: (name: string): string => `Entered ${name}`,
   feedLoot: (looter: string, name: string, qty: number): string =>
@@ -154,6 +156,8 @@ const UK: TSessionStrings = {
     `Зібрано ${plural("uk", qty, { one: "# ресурс", few: "# ресурси", many: "# ресурсів", other: "# ресурсу" })} · ${name}`,
   feedFish: (name: string, qty: number): string => `${name} ×${formatCount("uk", qty)}`,
   feedEscape: (): string => "Риба втекла",
+  feedJournal: (name: string, qty: number): string =>
+    `Заповнено ${plural("uk", qty, { one: "# журнал", few: "# журнали", many: "# журналів", other: "# журналу" })} · ${name}`,
   feedChest: (name: string): string => `Відкрито ${name}`,
   feedZone: (name: string): string => `Вхід у зону · ${name}`,
   feedLoot: (looter: string, name: string, qty: number): string =>
@@ -237,6 +241,8 @@ const FR: TSessionStrings = {
     `Récolte : ${plural("fr", qty, { one: "# ressource", few: "# ressources", many: "# de ressources", other: "# ressources" })} · ${name}`,
   feedFish: (name: string, qty: number): string => `${name} ×${formatCount("fr", qty)}`,
   feedEscape: (): string => "Le poisson s'est échappé",
+  feedJournal: (name: string, qty: number): string =>
+    `${plural("fr", qty, { one: "# journal rempli", other: "# journaux remplis" })} · ${name}`,
   feedChest: (name: string): string => `Ouverture : ${name}`,
   feedZone: (name: string): string => `Entrée dans ${name}`,
   feedLoot: (looter: string, name: string, qty: number): string =>
@@ -317,6 +323,8 @@ const RU: TSessionStrings = {
     `Собрано ${plural("ru", qty, { one: "# ресурс", few: "# ресурса", many: "# ресурсов", other: "# ресурса" })} · ${name}`,
   feedFish: (name: string, qty: number): string => `${name} ×${formatCount("ru", qty)}`,
   feedEscape: (): string => "Рыба уплыла",
+  feedJournal: (name: string, qty: number): string =>
+    `Заполнено ${plural("ru", qty, { one: "# журнал", few: "# журнала", many: "# журналов", other: "# журнала" })} · ${name}`,
   feedChest: (name: string): string => `Открыто ${name}`,
   feedZone: (name: string): string => `Вход в зону · ${name}`,
   feedLoot: (looter: string, name: string, qty: number): string =>
@@ -400,6 +408,8 @@ const PT: TSessionStrings = {
     `Coleta: ${plural("pt", qty, { one: "# recurso", few: "# recursos", many: "# de recursos", other: "# recursos" })} · ${name}`,
   feedFish: (name: string, qty: number): string => `${name} ×${formatCount("pt", qty)}`,
   feedEscape: (): string => "O peixe escapou",
+  feedJournal: (name: string, qty: number): string =>
+    `${plural("pt", qty, { one: "# diário preenchido", other: "# diários preenchidos" })} · ${name}`,
   feedChest: (name: string): string => `Abertura: ${name}`,
   feedZone: (name: string): string => `Entrada em ${name}`,
   feedLoot: (looter: string, name: string, qty: number): string =>
@@ -478,6 +488,8 @@ const DE: TSessionStrings = {
     `${plural("de", qty, { one: "# Ressource", few: "# Ressourcen", many: "# Ressourcen", other: "# Ressourcen" })} gesammelt · ${name}`,
   feedFish: (name: string, qty: number): string => `${name} ×${formatCount("de", qty)}`,
   feedEscape: (): string => "Fisch entkommen",
+  feedJournal: (name: string, qty: number): string =>
+    `${plural("de", qty, { one: "# Tagebuch gefüllt", other: "# Tagebücher gefüllt" })} · ${name}`,
   feedChest: (name: string): string => `${name} geöffnet`,
   feedZone: (name: string): string => `${name} betreten`,
   feedLoot: (looter: string, name: string, qty: number): string =>

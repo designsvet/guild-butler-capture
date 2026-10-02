@@ -267,6 +267,12 @@ Architecture, name/art provenance, byte ranges and rebuild rules are in
 [docs/session.md](docs/session.md); [built F1 proofs](docs/design/session-proof.md) show both themes and the narrow window.
 The old renderer remains the default at 0.8.8.
 
+**Slice 2 is in progress.** Self-owned completed journals now enter the same
+session snapshot and localized activity feed. The engine patch, frozen packet
+evidence and assembled-bundle gate are described in [docs/slice2.md](docs/slice2.md).
+PvE still needs its approved F3 export; Gathering/Fishing await the layout choice
+between the drawn proposals. None of those pages is added to the sidebar yet.
+
 **Try it:** `pnpm dev:v5`. It builds, then opens the new shell with the mock engine in a throwaway
 data folder of its own (`.dev-v5-data/`, git-ignored) — never the installed app's, so your settings,
 pairing and captures are not touched and nothing reaches your guild's bot. `pnpm dev:v5 -- --real`
@@ -553,7 +559,7 @@ layout check below does.
 old window's check) drives the built page behind the same stub bridge and measures every route at
 768, 1024, 1280 and 1440 — the narrowest width of each of the shell's layouts, and the boards' width
 — all at the window's smallest height, 620, in both themes, the six languages, both platforms and
-the forty states that change the layout: every capture state the shell draws, each with a guild
+the forty-one states that change the layout: every capture state the shell draws, each with a guild
 connection that gives the sidebar's foot one of its shapes, the foot's remaining states over a
 running capture, and every notice of Fh5 at its tallest — the blocked cards with their notes, the
 decoder's four steps over a held upload, the logger stopping, an update ready — the broken
@@ -561,13 +567,15 @@ decoder's dialog itself, the settings drawer — open over a running capture, wi
 menu open, and over an idle capture with no engine found — and the guild connection's panel: not
 connected (from the foot and from Session's button), a code refused (the board's refusal and the
 longest in every language), a code being checked, opened under the band's gold fix, connected (as
-the board draws it, and with the longest sentence the details carry): 3,840 scenarios, from 960
+the board draws it, and with the longest sentence the details carry): 3,936 scenarios, from 984
 windows each shrunk through the four widths. Then the title bar's button changing face, the one part of the shell
 that moves its own layout: in a window with motion back on, both directions as the logger goes
 (Start pressed, the logger stopped), at every 55ms from the change to the drain's end, at the four
 widths, in both themes, the six languages and both platforms — 1,728 more, from 24 windows, measured
-on the bar. 5,568 in all. The three new states replay the scrubbed evening while capturing,
-after Stop, and after New session, with rendered raw-total/count assertions in every locale. It fails on:
+on the bar. 5,664 in all. Three data states replay the scrubbed evening while capturing,
+after Stop, and after New session, with rendered raw-total/count assertions in every locale.
+The independent journal-only excerpt asserts three completion events/six books,
+no inferred fame, and no gap reserved by empty metric/source wrappers. It fails on:
 
 - Session rows leaving unused space, a misplaced New session button, narrow activity cards,
   stacked source cards at 768, or feed timestamps wrapping onto two lines;

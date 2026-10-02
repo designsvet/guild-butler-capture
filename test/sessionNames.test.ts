@@ -27,5 +27,8 @@ describe("generated world and mob names", () => {
     expect(mobName(999999, "en")).toBeNull();
     expect(resourceName("T6_HIDE", "en")).toBe("Robust Hide");
     expect(resourceName("T3_FISH_FRESHWATER_STEPPE_RARE", "en")).toBe("Lowriver Crab");
+    expect(resourceName("T8_JOURNAL_WARRIOR_FULL", "en")).toBe("Elder Blacksmith's Journal (Full)");
+    expect(resourceName("T8_JOURNAL_WARRIOR_FULL", "de")).toBe("Journal des Schmiedeältesten (voll)");
+    expect(resourceName("T8_JOURNAL_WARRIOR_FULL_DESC", "en")).toBeNull();
   });
 });

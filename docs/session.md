@@ -60,7 +60,9 @@ checks the committed bytes. Mob indices preserve file order with the protocol's
 [Statistics Analysis Tool](https://github.com/Triky313/AlbionOnline-StatisticsAnalysis/blob/main/src/StatisticsAnalysisTool/GameFileData/MobsData.cs).
 Dynamic dungeon UUIDs say Dungeon; they do not reveal solo/group size, a name,
 tier or colour. An unknown mob keeps its index. `UNKNOWN_<index>` items warn
-across harvesting, fishing and loot.
+across harvesting, fishing, journal completions and loot. The same pinned
+localization generator now includes journal names; unavailable localized names
+retain the existing English fallback, and genuinely unknown IDs stay visible.
 
 Item images use `albion-art://item/<ID>`. Main accepts only canonical uppercase
 item IDs, fetches only Albion's official HTTPS render service, refuses redirects,
@@ -92,9 +94,12 @@ glowing tab underline; a negative margin must not pull it into the glow. Feed
 timestamps take their natural width so the OS's 12-hour format stays on one line.
 
 R5's public price endpoint does not exist yet. Loot/resource/catch item values,
-value rates, comparisons, party, journals, PvP and other pages wait for their own
+value rates, comparisons, party, journal progress, PvP and other pages wait for their own
 slices. Recent loot explicitly says Not priced. Only Session is in the sidebar;
 there are no links into unbuilt pages. New session is unavailable after Stop.
+Slice 2's observed journal completions appear in the existing activity feed and
+are retained by item/index in summaries; an empty journal map does not establish
+zero books or zero progress. [Slice 2](slice2.md) records the evidence and limits.
 
 ## Proof and checks
 

@@ -9,6 +9,7 @@ import {
   ownLoot,
   quantityTotal,
   reduceSession,
+  restartSession,
 } from "../src/shared/session/model.js";
 const DIR = join(__dirname, "fixtures", "session");
 const evening = () => {
@@ -92,6 +93,41 @@ describe("September 21 evening through the session model", () => {
 describe("session invariants", () => {
   const zone = { v: 1, t: "zone", at: 100, char: "Me", zone: "1354", items: "live", fame_total: 1000 } as const;
   const fame = { v: 1, t: "fame", at: 110, char: "Me", zone: "1354", gain: 101, premium: false } as const;
+  it("keeps completed journals by item/index without inventing progress or counting a new session twice", () => {
+    const book = {
+      v: 1,
+      t: "journal",
+      at: 110,
+      char: "Me",
+      zone: "1354",
+      item: "T8_JOURNAL_WARRIOR_FULL",
+      index: 12055,
+      qty: 1,
+    } as const;
+    const empty = newSession("one", 100);
+    let session = reduceSession(empty, zone);
+    for (const qty of [1, 4, 1]) {
+      session = reduceSession(session, { ...book, qty });
+    }
+    session = reduceSession(session, { ...book, item: null, index: 99999, qty: 2 });
+    expect(session.journals.T8_JOURNAL_WARRIOR_FULL?.qty).toBe(6);
+    expect(session.journals["index:99999"]).toEqual({ item: null, index: 99999, qty: 2 });
+    expect(empty.journals).toEqual({});
+    expect(session.totals.fame).toBeNull();
+    expect(restartSession(session, "two", 120).journals).toEqual({});
+    const closed = closeSession(session, 120);
+    expect(reduceSession(closed, book)).toBe(closed);
+  });
+  it("refuses malformed journal counts and preserves unknown names", () => {
+    const book = { v: 1, t: "journal", at: 110, char: "Me", zone: null, item: null, index: 12055, qty: 1 };
+    expect(parseActivityLine(JSON.stringify(book))).toEqual(book);
+    for (const qty of [undefined, null, "1", 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(parseActivityLine(JSON.stringify({ ...book, qty }))).toBeNull();
+    }
+    for (const index of [undefined, null, "12055", 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(parseActivityLine(JSON.stringify({ ...book, index }))).toBeNull();
+    }
+  });
   it("keeps unknown totals null and leaves the input immutable", () => {
     const empty = newSession("one", 100);
     const next = reduceSession(empty, zone);
@@ -137,7 +173,9 @@ describe("session invariants", () => {
       expect(parseActivityLine(JSON.stringify(row))).toBeNull();
     }
     expect(parseActivityLine("{")).toBeNull();
-    expect(parseActivityLine(JSON.stringify({ ...fame, t: "fish", outcome: "escaped", catch: "malformed" }))).toBeNull();
+    expect(
+      parseActivityLine(JSON.stringify({ ...fame, t: "fish", outcome: "escaped", catch: "malformed" })),
+    ).toBeNull();
     expect(parseLootLine("timestamp_utc;header")).toBeNull();
   });
 });

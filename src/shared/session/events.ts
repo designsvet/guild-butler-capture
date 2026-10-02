@@ -18,6 +18,8 @@ export type TActivityEvent = TBase &
     | { t: "faction"; city: number; gained: number; total?: number }
     | { t: "kill"; mob: number; hp: number | null }
     | { t: "harvest"; item: string | null; index: number; std: number; bonus: number; premium: number }
+    /** Self-owned completed books (event 292), never inventory snapshots or partial progress. */
+    | { t: "journal"; item: string | null; index: number; qty: number }
     | { t: "fish"; outcome: "landed" | "escaped"; catch?: { item: string | null; index: number; qty: number }[] }
     | { t: "chest"; name: string | null; rarity: number | null }
   );
@@ -88,6 +90,10 @@ export const parseActivityLine = (line: string): TActivityEvent | null => {
     }
     case "harvest": {
       valid = nullableText(row.item) && numbers(row, ["index", "std", "bonus", "premium"]);
+      break;
+    }
+    case "journal": {
+      valid = nullableText(row.item) && unsigned(row.index) && row.index > 0 && unsigned(row.qty) && row.qty > 0;
       break;
     }
     case "fish": {

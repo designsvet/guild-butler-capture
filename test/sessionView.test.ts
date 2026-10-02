@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { newSession, reduceSession, type TSession } from "../src/shared/session/model.js";
 import { SUPPORTED_LANGS, type TLang } from "../src/shared/i18n.js";
 import { sessionStrings } from "../src/shared/sessionStrings.js";
+import { resourceName } from "../src/shared/session/names.js";
 
 // Assert the rendered sink, including locale formatting and unknown-data warnings.
 const require = createRequire(import.meta.url);
@@ -66,6 +67,13 @@ describe("Session's rendered values", () => {
       outcome: "landed",
       catch: [{ item: "UNKNOWN_123", index: 123, qty: 1 }],
     });
+    const journal = reduceSession(empty, {
+      ...activity,
+      t: "journal",
+      item: "UNKNOWN_123",
+      index: 123,
+      qty: 2,
+    });
     const loot = reduceSession(empty, {
       t: "loot",
       at: 100,
@@ -77,10 +85,28 @@ describe("Session's rendered values", () => {
       server: "Europe",
     });
     for (const lang of SUPPORTED_LANGS) {
-      for (const state of [harvest, fishing, loot]) {
+      for (const state of [harvest, fishing, journal, loot]) {
         expect(render(state, lang)).toContain(sessionStrings(lang).tableWarning);
       }
       expect(render({ ...empty, refused: 1 }, lang)).toContain(sessionStrings(lang).auditWarning);
+    }
+  });
+  it("renders observed completions in each locale's activity feed, with no guessed fame or progress", () => {
+    const session = reduceSession(newSession("books", 100), {
+      v: 1,
+      t: "journal",
+      at: 110,
+      char: "Me",
+      zone: null,
+      item: "T8_JOURNAL_WARRIOR_FULL",
+      index: 12055,
+      qty: 4,
+    });
+    for (const lang of SUPPORTED_LANGS) {
+      const html = render(session, lang);
+      const words = sessionStrings(lang).feedJournal(resourceName("T8_JOURNAL_WARRIOR_FULL", lang)!, 4);
+      expect(html).toContain(words.replaceAll("&", "&amp;").replaceAll("'", "&#x27;"));
+      expect(html).not.toContain('data-session-metric="fame"');
     }
   });
 });

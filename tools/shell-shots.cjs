@@ -169,7 +169,7 @@ const scenarios = () => {
       add({ state: "capturing", theme: "obsidian", platform, width, height, paired: true, sentAgoMs: 60_000 });
     }
   }
-  const { replayedSession } = require("./session-fixture.cjs");
+  const { replayedSession, journalSession } = require("./session-fixture.cjs");
   const { closeSession } = require("./session-fixture.cjs").fromSource("src/shared/session/model.ts");
   const recorded = replayedSession();
   for (const theme of ["obsidian", "parchment"]) {
@@ -187,6 +187,7 @@ const scenarios = () => {
         session: recorded,
         name: `session-replay-${theme}-${width}`,
       });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: journalSession(), name: `journal-completions-${theme}-${width}` });
     }
     add({
       state: "idle",

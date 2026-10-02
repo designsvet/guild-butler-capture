@@ -47,6 +47,8 @@ export type TSession = {
   zoneSince: number | null;
   mobs: Record<string, number>;
   harvests: Record<string, TItemQuantity>;
+  /** Observed completions only; an empty map does not assert that the player has no journals. */
+  journals: Record<string, TItemQuantity>;
   catches: Record<string, TItemQuantity>;
   fishing: { landed: number; escaped: number };
   chests: { at: number; zone: string | null; name: string | null; rarity: number | null }[];
@@ -88,6 +90,7 @@ export const newSession = (id: string, at: number, character: string | null = nu
   zoneSince: null,
   mobs: {},
   harvests: {},
+  journals: {},
   catches: {},
   fishing: { landed: 0, escaped: 0 },
   chests: [],
@@ -250,6 +253,10 @@ export const reduceSession = (state: TSession, ev: TSessionEvent, stream = "acti
     }
     case "harvest": {
       next.harvests = sumItem(state.harvests, { item: ev.item, index: ev.index, qty: ev.std + ev.bonus + ev.premium });
+      break;
+    }
+    case "journal": {
+      next.journals = sumItem(state.journals, { item: ev.item, index: ev.index, qty: ev.qty });
       break;
     }
     case "fish": {

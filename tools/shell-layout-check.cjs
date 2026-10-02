@@ -111,13 +111,14 @@ const fromSource = (file) => {
  * the error and waits), and CI would sit through to its timeout. Inside the run a throw exits 1.
  */
 const readLists = () => {
-  const { replayedSession, fromSource: sessionSource } = require("./session-fixture.cjs");
+  const { replayedSession, journalSession, fromSource: sessionSource } = require("./session-fixture.cjs");
   const session = replayedSession();
   const { closeSession } = sessionSource("src/shared/session/model.ts");
   STATES.push(
     { name: "session-replay", state: "capturing", session, paired: true, notice: null },
     { name: "session-stopped", state: "idle", session: closeSession(session, session.lastAt), paired: false, notice: null },
     { name: "session-next", state: "capturing", session, paired: true, notice: null, press: { selector: "[data-new-session]", on: ["darwin", "win32"] } },
+    { name: "journal-completions", state: "capturing", session: journalSession(), paired: false, notice: null },
   );
   return {
     ROUTES: fromSource("src/app/router.ts").ROUTES,
@@ -1592,6 +1593,18 @@ const run = async () => {
         const data = document.querySelector('[data-session-data]');
         if (${JSON.stringify(load.stateName)} === 'session-next') { return data == null ? [] : ['New session kept the old counters']; }
         if (data == null) { return ['Replay did not draw the Session page']; }
+        if (${JSON.stringify(load.stateName)} === 'journal-completions') {
+          const quantities = [...data.querySelectorAll('[data-session-event="journal"]')].map((el) => Number(el.dataset.sessionQuantity));
+          const errors = [];
+          if (quantities.length !== 3 || quantities.reduce((sum, qty) => sum + qty, 0) !== 6 || data.querySelector('[data-session-metric="fame"]') != null) {
+            errors.push('Journal feed lost a recorded completion or invented fame');
+          }
+          const feed = data.querySelector('.lb-feed').closest('.lb-data-card');
+          if (Math.abs(feed.getBoundingClientRect().top - data.getBoundingClientRect().top) > 1) {
+            errors.push('Empty metrics/sources reserve a gap above the first journal card');
+          }
+          return errors;
+        }
         const counts = { kills: '40', resources: '19', fish: '2', chests: '1' };
         const errors = [];
         for (const [key, n] of Object.entries(counts)) {

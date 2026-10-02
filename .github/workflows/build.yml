@@ -199,6 +199,9 @@ jobs:
       - name: Assemble engine-dist
         run: node tools/prepare-engine-dist.mjs engine-src engine-dist
 
+      - name: Verify journal lines from the assembled engine
+        run: node tools/check-journal-bundle.mjs engine-dist
+
       - name: Build the installer (unsigned)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -379,6 +382,9 @@ jobs:
 
       - name: Assemble engine-dist
         run: node tools/prepare-engine-dist.mjs engine-src engine-dist
+
+      - name: Verify journal lines from the assembled engine
+        run: node tools/check-journal-bundle.mjs engine-dist
 
       # Decide, once, whether this build can be signed and notarized, and
       # write the credentials out as environment for the steps that follow.
