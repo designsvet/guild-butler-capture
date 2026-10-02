@@ -374,6 +374,15 @@ const EN = {
       files: "Files",
       about: "About",
     },
+    /**
+     * The guild connection's panel (board Fh2, "What opens from it"), opened from the sidebar's
+     * foot and from Session's Pair with Discord. Its steps, its field, its failures and the
+     * connected details are the old pairing block's words (pairing); this is the panel's own
+     * line under them.
+     */
+    connection: {
+      noGuild: "No guild on Guild Butler? Everything here works without one.",
+    },
   },
 };
 
@@ -683,6 +692,9 @@ const UK: TStrings = {
       files: "Файли",
       about: "Про застосунок",
     },
+    connection: {
+      noGuild: "Вашої гільдії немає на Guild Butler? Тут усе працює і без неї.",
+    },
   },
 };
 
@@ -986,6 +998,9 @@ const RU: TStrings = {
       files: "Файлы",
       about: "О приложении",
     },
+    connection: {
+      noGuild: "Вашей гильдии нет на Guild Butler? Здесь всё работает и без неё.",
+    },
   },
 };
 
@@ -1286,6 +1301,9 @@ const DE: TStrings = {
       appearance: "Darstellung",
       files: "Dateien",
       about: "Über",
+    },
+    connection: {
+      noGuild: "Deine Gilde nutzt Guild Butler nicht? Hier funktioniert alles auch ohne.",
     },
   },
 };
@@ -1589,6 +1607,9 @@ const FR: TStrings = {
       files: "Fichiers",
       about: "À propos",
     },
+    connection: {
+      noGuild: "Pas de guilde sur Guild Butler ? Tout ici fonctionne sans.",
+    },
   },
 };
 
@@ -1885,6 +1906,9 @@ const PT: TStrings = {
       appearance: "Aparência",
       files: "Arquivos",
       about: "Sobre",
+    },
+    connection: {
+      noGuild: "Sem guilda no Guild Butler? Tudo aqui funciona sem uma.",
     },
   },
 };

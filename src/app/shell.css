@@ -31,6 +31,9 @@
   /* Fh3: the icon tiles' corner, a step inside --gb-r-sm (8px); the package's small tile uses
      the same 7px */
   --lb-r-tile: 7px;
+  /* Fh2: the corner of the 24px copy button inside the `/capture pair` well, a step inside the
+     tiles' — no token is that small */
+  --lb-r-mini: 6px;
 
   /* The title bar's Start/Stop changing face (StartStop.tsx) — the old window's motion, kept: its
      `--gb-t-*` timings (src/renderer/styles.css, from the 2026-08-29 transition study,
@@ -627,14 +630,38 @@ body {
 }
 
 /* The foot (Fh2): one line — a dot and the device, or "Connect a guild" in gold — and a quieter
-   line under it, indented to the words. */
+   line under it, indented to the words. Both are one button, the door to the connection's panel:
+   the neutral wash under the pointer, the pressed wash while the panel is open (the package's quiet
+   button's two). The door takes the board's padding, so the words sit where Fh2 draws them. */
 .lb-foot {
   display: flex;
   flex-direction: column;
-  gap: 3px;
   min-width: 0;
-  padding: 10px 10px 4px;
+  padding: 4px 0 0;
   border-top: 1px solid var(--lb-bar-line);
+}
+.lb-foot-door {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 10px 4px;
+  border: 0;
+  border-radius: var(--gb-r-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.lb-foot-door:hover {
+  background: var(--gb-neutral-wash);
+}
+.lb-foot-door[aria-expanded="true"] {
+  background: var(--gb-neutral-wash-strong);
 }
 .lb-foot-line {
   display: flex;
@@ -684,6 +711,7 @@ body {
    "Sessions stay on this computer" (Windows) and most of the other languages run past the 153px
    it has, and a sentence cut to "Sessions stay on this co…" says nothing. */
 .lb-foot-sub {
+  display: block;
   padding-left: 15px;
   font-size: var(--gb-text-caption);
   color: var(--gb-muted);
@@ -745,9 +773,14 @@ body {
   }
   .lb-foot {
     align-items: center;
-    gap: 0;
     width: 44px;
     padding: 8px 0 0;
+  }
+  /* The rail's door is Fh2's 44 × 28 target around the dot. */
+  .lb-foot-door {
+    gap: 0;
+    width: 44px;
+    padding: 0;
   }
   .lb-foot-line {
     justify-content: center;
@@ -1665,5 +1698,278 @@ body {
   }
   .lb-select {
     border-color: ButtonText;
+  }
+}
+
+/* — The guild connection's panel (Fh2, "What opens from it") — the package's vellum overlay, fixed to
+   the window and opening upward from the sidebar's foot: 8px above its rule and 8px in from its
+   edge, 348px wide, padded 16/16/14 (ConnectionPanel.tsx places it through the CSSOM). In the
+   sidebar's stacking context, so a dialog or the settings drawer goes over it. It scrolls only in a
+   window too short for it, rather than run under the title bar. It rises into place in the
+   package's quick step; reduced motion (base.css) puts it there at once. */
+.lb-pair {
+  position: fixed;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 348px;
+  max-width: calc(100vw - 16px);
+  padding: 16px 16px 14px;
+  overflow-y: auto;
+  color: var(--gb-ink);
+  text-align: left;
+  cursor: default;
+  animation: lb-pop-in var(--gb-motion-fast) var(--gb-ease) backwards;
+}
+/* It takes the focus only as a place to land (a code accepted, the computer disconnected): a ring
+   round the whole panel would say "press me". */
+.lb-pair:focus {
+  outline: none;
+}
+@keyframes lb-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.lb-pair-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lb-pair-head--connected {
+  gap: 7px;
+}
+/* Fh2's panel title: Rubik 15, a half-step over the body. */
+.lb-pair-title {
+  margin: 0;
+  font-family: var(--gb-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--gb-ink);
+  overflow-wrap: anywhere;
+}
+.lb-pair-text {
+  margin: 0;
+  font-size: var(--gb-text-dense);
+  line-height: 1.55;
+  color: var(--gb-muted);
+  text-wrap: pretty;
+}
+
+/* The two steps: a number pressed into the panel (the package's well), then what to do. */
+.lb-pair-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lb-pair-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+/* Fh2's step number: mono 11.5, a half-step under the label's 12. */
+.lb-pair-num {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--gb-r-pill);
+  background: var(--gb-well);
+  box-shadow: var(--gb-press);
+  font-family: var(--gb-font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--gb-ink);
+}
+.lb-pair-step-body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.lb-pair-step-text {
+  font-size: var(--gb-text-dense);
+  line-height: 22px;
+  color: var(--gb-ink-2);
+  text-wrap: pretty;
+}
+.lb-pair-cmd-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+/* The command, pressed into the panel (.gb-well), and the button that copies it. */
+.lb-pair-cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px 5px 11px;
+  font-family: var(--gb-font-mono);
+  font-size: var(--gb-text-dense);
+  color: var(--gb-ink);
+  white-space: nowrap;
+}
+.lb-pair-copy {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--gb-outline);
+  border-radius: var(--lb-r-mini);
+  background: transparent;
+  color: var(--gb-ink-2);
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.lb-pair-copy:hover {
+  color: var(--gb-ink);
+  background: var(--gb-neutral-wash);
+  border-color: var(--gb-outline-hover);
+}
+.lb-pair-copy:active {
+  background: var(--gb-neutral-wash-strong);
+}
+.lb-pair-copied {
+  font-size: var(--gb-text-caption);
+  color: var(--gb-muted);
+}
+.lb-pair-code-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* The code: a value pressed in — the well, its neutral line and its inner shadow — in mono, tracked
+   a little, as the bot shows it. */
+.lb-pair-code {
+  width: 132px;
+  height: 34px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 11px;
+  border: 1px solid var(--gb-outline);
+  border-radius: var(--gb-r-sm);
+  background: var(--gb-well);
+  box-shadow: var(--gb-sunk);
+  font-family: var(--gb-font-mono);
+  font-size: var(--gb-text-dense);
+  letter-spacing: 0.06em;
+  color: var(--gb-ink);
+  transition: border-color 0.15s;
+}
+.lb-pair-code:hover {
+  border-color: var(--gb-outline-hover);
+}
+.lb-pair-code::placeholder {
+  color: var(--gb-dim);
+}
+/* A refused code: Fh2's sentence in Stop's red, a step under the body. */
+.lb-pair-failure {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--lb-danger-text);
+  text-wrap: pretty;
+}
+.lb-pair-rule {
+  flex: none;
+  height: 1px;
+  background: var(--gb-card-rule);
+}
+.lb-pair-note {
+  margin: 0;
+  font-size: var(--gb-text-caption);
+  line-height: 1.5;
+  color: var(--gb-dim);
+  text-wrap: balance;
+}
+
+/* Connected: the upload's state beside its dot (the foot's tones), the old window's whole sentence
+   under it where it says more, then the switch, View my loot and Disconnect. */
+.lb-pair-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--gb-ink-2);
+}
+.lb-pair-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lb-tone);
+}
+.lb-pair-detail {
+  margin: 0;
+  padding-left: 15px;
+  font-size: var(--gb-text-caption);
+  line-height: 1.5;
+  color: var(--gb-muted);
+  text-wrap: pretty;
+}
+.lb-pair-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+/* The link's padding reaches into the panel's, so its words line up with the text above. */
+.lb-pair-loot {
+  margin-left: -8px;
+  font-size: var(--gb-text-dense);
+}
+/* Disconnect: the small outlined danger at the dense step, its words and line Stop's (Fh1, Fh2). */
+.lb-pair .gbtn-sm {
+  font-size: var(--gb-text-dense);
+}
+.gbtn-outline-danger.lb-pair-disconnect {
+  color: var(--lb-danger-text);
+  border-color: color-mix(in srgb, var(--gb-red) 55%, transparent);
+}
+
+@media (forced-colors: active) {
+  .lb-foot-door[aria-expanded="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .lb-pair-code,
+  .lb-pair-copy {
+    border-color: ButtonText;
+  }
+  /* The system paints every ground its own Canvas, and a rule drawn as a ground with it. */
+  .lb-pair-rule {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+}
+
+/* Windows high contrast paints every background with the system colour, so the state dots — the
+   title bar's, the foot's, the connection panel's — vanished with it. They keep their authored colour
+   (each sits beside words, so the colour is a second signal, never the only one). */
+@media (forced-colors: active) {
+  .lb-status-dot,
+  .lb-foot-dot,
+  .lb-pair-dot {
+    forced-color-adjust: none;
   }
 }

@@ -11,6 +11,7 @@ import {
   type TAppSettings,
   type TCaptureState,
   type TNpcapFixResult,
+  type TPairAttempt,
   type TPairingStatus,
   type TPermissionFixResult,
   type TRestartResult,
@@ -19,6 +20,7 @@ import {
   ECaptureAccess,
   ENpcapInstallOutcome,
   EPermissionFixOutcome,
+  EPairFailure,
   ERestartRefusal,
   EUpdatePhase,
 } from "../src/shared/captureTypes.js";
@@ -71,6 +73,9 @@ const fakeBridge = () => {
   const npcapAnswer = deferred<TNpcapFixResult>();
   const languageAnswer = deferred<TAppSettings>();
   const themeAnswer = deferred<TAppSettings>();
+  const pairAnswer = deferred<TPairAttempt>();
+  const uploadAnswer = deferred<TPairingStatus>();
+  const copyAnswer = deferred<void>();
   const bridge = {
     platform: "darwin",
     getState: () => (calls.push("getState"), answers.state.promise),
@@ -94,6 +99,11 @@ const fakeBridge = () => {
     installNpcap: vi.fn(() => npcapAnswer.promise),
     openNpcapPage: vi.fn(() => Promise.resolve()),
     pickEnginePath: vi.fn(() => Promise.resolve({ ...SETUP, engineEntry: "/picked/src/index.js" })),
+    pair: vi.fn(() => pairAnswer.promise),
+    unpair: vi.fn(() => Promise.resolve(initialPairingStatus)),
+    setUpload: vi.fn(() => uploadAnswer.promise),
+    openLoot: vi.fn(() => Promise.resolve()),
+    copyText: vi.fn(() => copyAnswer.promise),
   } as unknown as TGbc & {
     start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
@@ -107,6 +117,11 @@ const fakeBridge = () => {
     installNpcap: ReturnType<typeof vi.fn>;
     openNpcapPage: ReturnType<typeof vi.fn>;
     pickEnginePath: ReturnType<typeof vi.fn>;
+    pair: ReturnType<typeof vi.fn>;
+    unpair: ReturnType<typeof vi.fn>;
+    setUpload: ReturnType<typeof vi.fn>;
+    openLoot: ReturnType<typeof vi.fn>;
+    copyText: ReturnType<typeof vi.fn>;
   };
   let onFocus: () => void = () => {};
   const focus = {
@@ -128,6 +143,9 @@ const fakeBridge = () => {
     npcapAnswer,
     languageAnswer,
     themeAnswer,
+    pairAnswer,
+    uploadAnswer,
+    copyAnswer,
     focusWindow: () => onFocus(),
   };
 };
@@ -301,6 +319,109 @@ describe("the shell's store: the settings drawer", () => {
     const { fake, store } = await booted();
     store.openPrivacy();
     expect(fake.bridge.openPrivacy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the shell's store: the guild connection's panel", () => {
+  const PAIRED: TPairingStatus = {
+    ...initialPairingStatus,
+    paired: true,
+    deviceName: "MacBook",
+    guildId: "42",
+    lootUrl: "https://app.guild-butler.com/?guild=42&tab=loot",
+    pairedAt: 1,
+  };
+  const booted = async () => {
+    const fake = fakeBridge();
+    const store = createShellStore(fake.bridge, fake.focus);
+    const booting = store.boot();
+    answerAll(fake, {}, {});
+    await booting;
+    await flush();
+    return { fake, store };
+  };
+
+  it("Pair: one code at a time, busy until main answers, then main's pairing", async () => {
+    const { fake, store } = await booted();
+    store.pair("abcd-efgh");
+    expect(fake.bridge.pair).toHaveBeenCalledWith("abcd-efgh");
+    expect(store.getSnapshot().ui.pairBusy).toBe(true);
+    store.pair("abcd-efgh");
+    expect(fake.bridge.pair).toHaveBeenCalledTimes(1);
+    fake.pairAnswer.resolve({ ok: true, failure: null, detail: null, status: PAIRED });
+    await flush();
+    expect(store.getSnapshot().ui.pairBusy).toBe(false);
+    expect(store.getSnapshot().ui.pairFailure).toBeNull();
+    expect(store.getSnapshot().pairing).toEqual(PAIRED);
+  });
+
+  it("a refused code is kept until the next try, which forgets it while main checks", async () => {
+    const { fake, store } = await booted();
+    store.pair("WRONG");
+    fake.pairAnswer.resolve({ ok: false, failure: EPairFailure.BadCode, detail: null, status: initialPairingStatus });
+    await flush();
+    expect(store.getSnapshot().ui.pairFailure).toBe(EPairFailure.BadCode);
+    store.pair("again");
+    expect(store.getSnapshot().ui.pairFailure).toBeNull();
+  });
+
+  it("a call that never comes back is the old window's: the bot could not be reached", async () => {
+    const fake = fakeBridge();
+    fake.bridge.pair.mockImplementation(() => Promise.reject(new Error("ipc gone")));
+    const store = createShellStore(fake.bridge, fake.focus);
+    const booting = store.boot();
+    answerAll(fake, {}, {});
+    await booting;
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    store.pair("abcd-efgh");
+    await flush();
+    errors.mockRestore();
+    expect(store.getSnapshot().ui).toMatchObject({ pairBusy: false, pairFailure: EPairFailure.Unreachable });
+  });
+
+  it("the panel closing forgets a refusal", async () => {
+    const { fake, store } = await booted();
+    store.pair("x");
+    fake.pairAnswer.resolve({ ok: false, failure: EPairFailure.Refused, detail: null, status: initialPairingStatus });
+    await flush();
+    store.forgetPairFailure();
+    expect(store.getSnapshot().ui.pairFailure).toBeNull();
+  });
+
+  it("Disconnect forgets a refusal too — the steps it brings back start clean — and keeps main's pairing", async () => {
+    const { fake, store } = await booted();
+    store.pair("x");
+    fake.pairAnswer.resolve({ ok: false, failure: EPairFailure.Refused, detail: null, status: initialPairingStatus });
+    await flush();
+    // paired since, from elsewhere, with the refusal still held
+    fake.push.pairing?.(PAIRED);
+    expect(store.getSnapshot().ui.pairFailure).toBe(EPairFailure.Refused);
+    store.unpair();
+    await flush();
+    expect(fake.bridge.unpair).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().ui.pairFailure).toBeNull();
+    expect(store.getSnapshot().pairing).toEqual(initialPairingStatus);
+  });
+
+  it("draws Send loot automatically at once, then keeps what main stored", async () => {
+    const { fake, store } = await booted();
+    fake.push.pairing?.(PAIRED);
+    store.setUpload(false);
+    expect(store.getSnapshot().pairing?.uploadEnabled).toBe(false);
+    expect(fake.bridge.setUpload).toHaveBeenCalledWith(false);
+    fake.uploadAnswer.resolve({ ...PAIRED, uploadEnabled: true });
+    await flush();
+    expect(store.getSnapshot().pairing?.uploadEnabled).toBe(true);
+  });
+
+  it("View my loot is main's to open; the command copied is Discord's, and says when it is on the clipboard", async () => {
+    const { fake, store } = await booted();
+    store.openLoot();
+    expect(fake.bridge.openLoot).toHaveBeenCalledTimes(1);
+    const copied = store.copyPairCommand();
+    expect(fake.bridge.copyText).toHaveBeenCalledWith("/capture pair");
+    fake.copyAnswer.resolve();
+    await expect(copied).resolves.toBe(true);
   });
 });
 

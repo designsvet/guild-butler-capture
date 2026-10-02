@@ -290,7 +290,7 @@ that theme, and that the faces are the package's files, byte for byte, with thei
 them.
 
 **What is in it.** The shell around one page, drawn from the canvas's boards (page v5): Fh1 for the
-title bar, Fh2 for the sidebar's foot, Fh3 and Fh7 for Session, Fh4 and Fh5 for the notices, Fh6
+title bar, Fh2 for the sidebar's foot and the guild connection's panel, Fh3 and Fh7 for Session, Fh4 and Fh5 for the notices, Fh6
 (option C) and F1s for the settings drawer, F1 and Fr for the frame, Fa for the keyboard and the
 screen reader.
 
@@ -313,14 +313,16 @@ screen reader.
   reduced motion). Its foot shows the guild connection: `Connect a guild` and where sessions stay
   when unpaired, else the device's name and a short form of the upload state (`312 lines sent · 1 min
   ago`, `Sending…`, `Couldn't send — retrying`, `Auto-send off`, …, and `Held until the update` in
-  amber while a broken decoder holds the upload — below). It is not yet a door: the panel it will
-  open comes with the pairing step, so for now Tab passes it by.
+  amber while a broken decoder holds the upload — below). The foot is one button over both lines,
+  the door to the guild connection's panel (below): the neutral wash under the pointer, the pressed
+  wash while the panel is open; in the rail it is the 44 × 28 target around the dot.
 - **The page header** is the range tabs where a title would be — only Session so far, since Today
   and 7 days need History — with a light running along its underline while capturing, and the meta
   line (`Listening since 14:33`, `Started 14:33 · 1 h 20 min`) beside it, or under it below 1280px.
 - **Session before data**: a card for the capture's state (the waiting reasons join it after 90 s
   of waiting, as in the old window), what will appear here, and at the right a guild to connect
-  (Pair with Discord does nothing yet), the data folder (Open folder is the old window's Reveal) and
+  (Pair with Discord opens the panel the foot opens, and shows itself pressed while it is open),
+  the data folder (Open folder is the old window's Reveal) and
   the auto-start switch (the stored setting, as in the old window). From 1280px the right column is
   400px, at 1024 it is 320, below that it moves under the page.
 - **The notices** (Fh5): one slot at the top of every page, above the header — the band — one notice
@@ -383,6 +385,49 @@ screen reader.
   words does not strand the keys — and so does a press outside it; the focus starts on Close and
   goes back to the gear. The broken decoder's dialog can still interrupt it: the drawer is inert
   under the dialog, and "Later" gives it its focus back.
+- **The guild connection's panel** (Fh2, "What opens from it"; `src/app/ConnectionPanel.tsx`, its
+  words and its place pure in `src/app/connection.ts`): the package's vellum overlay, 348px, opening
+  upward from the sidebar's foot over the page — 8px above the foot's rule, 8px in from its edge,
+  never under the title bar (fixed to the window and placed from the foot through the CSSOM, so
+  nothing in the page holds or cuts it; it would scroll only in a window shorter than the smallest).
+  The foot opens it and so does Session's Pair with Discord; it is the same panel. What it says is
+  the old window's pairing block, in its words and wired to the same bridge calls:
+  - **Not connected**: "Send loot to your guild" and the old pitch, then the two steps — run
+    `/capture pair` in the guild's Discord (beside a button that copies it, `copyText`, and says
+    "Copied!" for a moment), then type the code the bot replies with and Pair (`pair`). Pair waits
+    for a code; while main checks one it says "Connecting…" and refuses a second press, keeping the
+    focus (`aria-disabled`); Enter in the field presses it. A code of the wrong shape is main's to
+    refuse, at once and with no round trip, in the old window's "That code doesn't look right" sentence — so
+    Pair waits only for the field to hold something. Pair is the kit's filled steel button
+    (`<Button variant="share">`, `gbtn-share`) in every state, not the gold Fh2 draws — the owner's
+    ruling (2026-10-02): in the kit steel means shared, and pairing is what shares a member's loot
+    with the guild. With no code typed it wears the kit's own disabled look. So the panel takes no
+    gold: the bar's Start capture keeps the window's one gold button while it is open — or, under a
+    band whose fix is gold, the fix holds it and Start steps back to its neutral face, as it always
+    does there — and Pair is steel under a band too. Under a line, the board's "No guild on Guild
+    Butler? Everything here works without one." (the panel's one new string).
+  - **A refused code**: the old window's sentence for that `EPairFailure` — every one of the seven —
+    under the field in Stop's red, the field marked invalid and described by it, the code left in
+    it, and the sentence read out once through the page's one polite region. A try forgets the last
+    refusal, and so does the panel closing.
+  - **Connected**: "Connected as …" (the device's name alone once Discord has disconnected it — a
+    title that says "Connected" over "Disconnected in Discord" would contradict itself), the
+    upload's state beside its dot as the foot says it, and, where there is more to say, the old
+    window's whole sentence under it ("…Your log file is safe."; "Held until the update" over why);
+    the "Send loot automatically" switch (`setUpload`, drawn at once, then what main stored); View
+    my loot as a link — a real address, which main now hands over with the pairing (`lootUrl`, built
+    by `lootPageUrl` in `src/shared/pairing.ts`, the same function main's own `openLoot` opens) — that
+    main opens in the browser (`openLoot`; the window never navigates); and Disconnect this computer
+    (`unpair`), after which the panel shows the steps.
+  A popover, not a modal (board Fa): the page stays live around it. It opens onto the code field
+  (what the member comes back from Discord with, as the old window's steps do) or, connected, onto
+  itself (the first control there is a switch a stray Space would turn off); when a code is accepted
+  or the computer disconnected, the control that held the focus is gone, so the panel takes it.
+  Escape closes it and gives the focus back to the door it came from (the foot, if Session's button
+  has gone since); a press outside it closes it, and so does the focus leaving it — none of them,
+  nor its doors, while a code is being checked, since the answer lands in it. A dialog or the
+  settings drawer over the window suspends it. Under Windows' high contrast the open door keeps an
+  outline in the system's Highlight.
 - **The held upload** (main process, `src/main/uploader.ts`; ADR 0159's amendment of 2026-10-01):
   while the decoder is broken where loot is concerned (`lootBroken` in `src/shared/engineHealth.ts`:
   any broken handler but the five that feed no loot — an unknown one counts as feeding it, the safe
@@ -401,11 +446,15 @@ screen reader.
   — and the setup probed again on window focus. It also keeps the little the notices' buttons need
   that main does not: a fix attempt's outcome, a running install or check, Stop capture and
   update's wait for the engine, and the dialog's answered events. The settings drawer's theme and
-  language go through it too, drawn at once and then set to what main stored. Auto-start runs once
+  language go through it too, drawn at once and then set to what main stored, and so does the
+  connection panel: a code with main (one at a time; a call that never comes back is the old
+  window's "Couldn't reach your guild's bot"), why the last one was refused, the upload switch drawn
+  at once. Auto-start runs once
   per window over an idle capture, as the old window's does. `src/app/router.ts` keeps the page in the hash (`#/session`);
   any hash not starting `#/`, like the skip link's `#main`, is left alone. The stored theme and
   language apply as they arrive. What each state says is pure (`src/app/model.ts`), held to the
-  boards by `test/shellModel.test.ts`; the store and the router by `test/shellStore.test.ts`. The
+  boards by `test/shellModel.test.ts`, the connection panel's words and place by
+  `test/shellConnection.test.ts`; the store and the router by `test/shellStore.test.ts`. The
   bridge's type is shared with the old window (`src/shared/bridge.ts`, types only, so the old
   window's built JavaScript is unchanged).
 - **Accessibility**: a skip link first, then the title bar (banner), the sidebar (navigation
@@ -473,23 +522,38 @@ folders a real install reports, at their longest (`longPaths` in the stub bridge
 from the keyboard alone (a scenario's `keys`): Tab from the top of the page to the gear, Enter, Tab
 on to the Parchment tile, Enter, so the shot is the page re-themed behind the open drawer, and the
 tool prints what the page asked of the bridge on the way (the stub records every call,
-`gbcStub.calls()`). It measures nothing; the layout check below does.
+`gbcStub.calls()`). `ONLY=connection` shoots the guild connection's panel: Fh2's three scenes — not
+connected, a code that was not accepted (a `press` may type into a field, `{ fill, value }`: the
+board's code, then Pair, which the stub refuses), connected — at 1440 on a Mac and 768 on Windows in
+both themes, laid out with the foot under each in `connection-<theme>-<width>.png`, with a code
+typed and not yet sent between the first two (Pair live, in the kit's steel); then a code being
+checked, the panel opened from Session's button, the panel under the band's gold fix (Pair steel
+beside it and the bar's Start neutral; at 1440 and 768, and with a code typed in both themes), Pair
+holding the keyboard's focus ring in both themes, the connected details in each upload state that
+says more than its line, the longest refusal in English, German, Ukrainian and Russian at 768,
+Windows' high contrast, and the door reached from the keyboard alone. The stub now keeps a pairing
+as main would — a code it is told to accept pairs, Disconnect unpairs, the switch switches — and can
+refuse with any failure (`pairFailure`) or never answer (`pairPending`). It measures nothing; the
+layout check below does.
 
 **Checking it.** `pnpm check:layout:v5` (`tools/shell-layout-check.cjs`, in CI under xvfb beside the
 old window's check) drives the built page behind the same stub bridge and measures every route at
 768, 1024, 1280 and 1440 — the narrowest width of each of the shell's layouts, and the boards' width
 — all at the window's smallest height, 620, in both themes, the six languages, both platforms and
-the twenty-nine states that change the layout: every capture state the shell draws, each with a guild
+the thirty-seven states that change the layout: every capture state the shell draws, each with a guild
 connection that gives the sidebar's foot one of its shapes, the foot's remaining states over a
 running capture, and every notice of Fh5 at its tallest — the blocked cards with their notes, the
 decoder's four steps over a held upload, the logger stopping, an update ready — the broken
-decoder's dialog itself, and the settings drawer: open over a running capture, with its language
-menu open, and over an idle capture with no engine found: 2,784 scenarios, from 696 windows each
-shrunk through the four widths. Then the title bar's button changing face, the one part of the shell
+decoder's dialog itself, the settings drawer — open over a running capture, with its language
+menu open, and over an idle capture with no engine found — and the guild connection's panel: not
+connected (from the foot and from Session's button), a code refused (the board's refusal and the
+longest in every language), a code being checked, opened under the band's gold fix, connected (as
+the board draws it, and with the longest sentence the details carry): 3,552 scenarios, from 888
+windows each shrunk through the four widths. Then the title bar's button changing face, the one part of the shell
 that moves its own layout: in a window with motion back on, both directions as the logger goes
 (Start pressed, the logger stopped), at every 55ms from the change to the drain's end, at the four
 widths, in both themes, the six languages and both platforms — 1,728 more, from 24 windows, measured
-on the bar. 4,512 in all. It fails on:
+on the bar. 5,280 in all. It fails on:
 
 - sideways scroll — the window, or anything in it that scrolls, wider than it is;
 - clipped text — words cut by a box that hides its overflow, or past the window's edge. Two cuts are
@@ -530,6 +594,34 @@ on the bar. 4,512 in all. It fails on:
   focus outside it) and by a press on the scrim, opens again by Enter on the gear, goes inert under
   the broken decoder's dialog and has its focus back once "Later" is pressed — and every close
   leaves the drawer gone, the window alive and the focus on the gear;
+- the guild connection's panel open when no door was pressed, shut when one was, or showing the
+  wrong face; a panel that leaves the window, reaches within 8px of the title bar, covers the foot
+  it opens from, or scrolls; the focus outside it; a foot's door that does not say its panel is
+  open or is not drawn pressed. Boxes in the panel are in their own layer. Then the keys and the
+  pointer, at the last width (the stub records every bridge call): not connected, the focus starts
+  in the code field and Pair waits for a code; Escape closes it onto the door and Enter on the door
+  opens it again; Enter on the copy button copies `/capture pair` (`copyText`, and nothing else)
+  and says so; a code typed and Enter asks to pair that code, once, and the refusal is said under
+  the field, which keeps the focus and says it is invalid; Tab out past Pair closes it; a press on
+  the door opens it with no refusal and no code left; a press outside — on a spot that takes no
+  focus, so the press alone — closes it. Only spaces in the field leave Pair waiting. In the window
+  of a refused code, every `EPairFailure` in turn (the stub refuses each, `gbcStub.refuseWith`): the
+  sentence under the field must be the app's own for it — the catalog's `fail` + the failure's name
+  — and the page's polite region must say the same. Opened from Session's button, that button says it is open,
+  and Escape gives the focus back to it; opened again, a code the stub accepts turns the panel to
+  the details with the focus on it, Session's pair card gone and the foot naming the computer, and
+  Escape then gives the focus to the foot's door, the other one having gone. While a code
+  is being checked, Escape, a press outside, either door and the focus leaving all leave it open,
+  and Enter sends no second code. Connected, the focus starts on the panel; Space on the switch,
+  Enter on View my loot (without the window navigating) and Enter on Disconnect each make their own
+  call and no other (`setUpload(false)`, `openLoot()`, `unpair()`); after Disconnect the panel shows
+  the steps with the focus in it and the foot says Connect a guild; Escape closes it onto the door;
+- more than one gold button in sight, in any state: the band's fix, else the bar's Start capture,
+  holds it, and what lies inert under the dialog or the drawer is veiled, not in sight;
+- with the connection panel open, a Pair that is not the kit's steel button (`gbtn-share`), or a gold
+  button other than the one the state names: the bar's Start while the steps show over an idle
+  capture (with a code typed too, in the keys), the band's fix — with Start stepped back to its
+  neutral face — under a band, none while the bar shows Stop;
 - in the morph: a word outside the button at any frame, the version or the gear moving by half a
   pixel, a change that did not play its drain, its width or its words (a run whose morph never
   played proves nothing), and a button that keeps its eased width, or a leaving word, once the
@@ -544,7 +636,7 @@ theme applied, every slice of the bridge drawn, the faces loaded, nothing that p
 playing — the drawer's fade) rather than a fixed time. A state that is a press away (Later, the fix
 that reports back, the install still fetching, the gear and the language) presses first, on the
 platforms whose card has that button, and waits for what the press brings. `OUT=<dir>` writes a PNG
-of each failing scenario. About five minutes on an Apple-silicon Mac.
+of each failing scenario. About seven minutes on an Apple-silicon Mac.
 
 **The window.** Behind the flag the window is the shell's own (`src/main/windowOptions.ts`):
 resizable down to 768×620, maximizable and full-screenable, and opening at 1280×800 the first time —
@@ -577,7 +669,9 @@ clamped to the screen's work area and centred on it — then wherever it was lef
 With the flag off, the old window's options are 0.8.8's byte for byte (`test/windowOptions.test.ts`
 compares them with JSON produced from 0.8.8's own source), and none of the above applies to it.
 
-**Not yet.** Pair with Discord does nothing, and the sidebar's foot opens nothing. The settings
+**Not yet.** The connection panel has no way to name the computer (main still sends the hostname,
+as the old window does), and a computer Discord has disconnected is paired again by Disconnect,
+then the steps. The settings
 have no beta channel (it needs the release pipeline), and a folder's path is shown as the OS gives
 it, not shortened the way the board draws it (`%APPDATA%\…`, `…\resources\engine`). The numbers
 a broken decoder feeds are not marked ("may be wrong since 14:41", Fh4): there are no numbers on

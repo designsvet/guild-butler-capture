@@ -24,12 +24,19 @@
  * switch, the theme and the language — each drawn at once, then set to what main stored — the
  * engine folder and the check for updates; the folder and the privacy policy are main's to open.
  *
+ * So does the guild connection's panel (src/app/ConnectionPanel.tsx), with the old window's pairing
+ * block's rules: one code at a time, checked by main — while it is, the panel cannot be closed, as
+ * the answer lands in it — and what was refused said until the next try, a disconnect, or the panel
+ * closing; the "Send loot automatically" switch drawn at once, then what main stored; Disconnect,
+ * View my loot and the command to copy are main's.
+ *
  * Pure of the DOM (the window arrives as `TFocusSource`), so test/shellStore.test.ts drives it with
  * a fake bridge.
  */
 
 import {
   ECaptureStatus,
+  EPairFailure,
   type TAppSettings,
   type TCaptureState,
   type TNpcapFixResult,
@@ -42,6 +49,7 @@ import {
 import type { TGbc } from "../shared/bridge.js";
 import { engineRunning } from "../shared/engineHealth.js";
 import type { TLang } from "../shared/i18n.js";
+import { PAIR_COMMAND } from "../shared/ipc.js";
 
 /** What the page remembers about the notices' buttons — nothing main keeps for it. */
 export type TShellUi = {
@@ -59,6 +67,10 @@ export type TShellUi = {
   restartRefused: boolean;
   /** The broken decoder's dialog events answered "Later" in this window (notices.ts). */
   dismissed: readonly string[];
+  /** A pairing code is with main: the panel's Pair refuses, and the panel stays open for the answer. */
+  pairBusy: boolean;
+  /** Why the last code was refused (the old window's sentence for it), until the next try. */
+  pairFailure: EPairFailure | null;
 };
 
 export type TShellSnapshot = {
@@ -103,6 +115,18 @@ export type TShellStore = {
   updateNow: () => void;
   /** "Later" on the broken decoder's dialog: this event is answered, the notice stays. */
   dismissDialog: (event: string) => void;
+  /** The panel's Pair: trade the code for a device token (main checks its shape first). One at a time. */
+  pair: (code: string) => void;
+  /** The panel closed: a refusal said in it is not said again when it opens. */
+  forgetPairFailure: () => void;
+  /** "Disconnect this computer": main forgets the token here (the server keeps the device's row). */
+  unpair: () => void;
+  /** "Send loot automatically". */
+  setUpload: (enabled: boolean) => void;
+  /** "View my loot": the member's loot page, in the browser. */
+  openLoot: () => void;
+  /** The copy button beside `/capture pair`. Resolves true once main has put it on the clipboard. */
+  copyPairCommand: () => Promise<boolean>;
 };
 
 export const INITIAL_UI: TShellUi = {
@@ -113,6 +137,8 @@ export const INITIAL_UI: TShellUi = {
   updateAfterStop: false,
   restartRefused: false,
   dismissed: [],
+  pairBusy: false,
+  pairFailure: null,
 };
 
 const EMPTY: TShellSnapshot = { capture: null, setup: null, pairing: null, update: null, settings: null, ui: INITIAL_UI };
@@ -326,5 +352,52 @@ export const createShellStore = (bridge: TGbc, focus: TFocusSource): TShellStore
         setUi({ dismissed: [...snapshot.ui.dismissed, event] });
       }
     },
+    pair: (code) => {
+      if (snapshot.ui.pairBusy) {
+        return;
+      }
+      setUi({ pairBusy: true, pairFailure: null });
+      bridge
+        .pair(code)
+        .then(
+          (attempt) => {
+            set({ pairing: attempt.status, ui: { ...snapshot.ui, pairFailure: attempt.failure } });
+          },
+          // The old window's answer to a call that never came back: the bot could not be reached.
+          (error: unknown) => {
+            console.error("[shell] bridge call failed", error);
+            setUi({ pairFailure: EPairFailure.Unreachable });
+          },
+        )
+        .finally(() => {
+          setUi({ pairBusy: false });
+        });
+    },
+    forgetPairFailure: () => {
+      if (snapshot.ui.pairFailure != null) {
+        setUi({ pairFailure: null });
+      }
+    },
+    unpair: () => {
+      quietly(bridge.unpair().then((pairing) => set({ pairing, ui: { ...snapshot.ui, pairFailure: null } })));
+    },
+    setUpload: (enabled) => {
+      // Drawn at once, then whatever main stored.
+      if (snapshot.pairing != null) {
+        set({ pairing: { ...snapshot.pairing, uploadEnabled: enabled } });
+      }
+      quietly(bridge.setUpload(enabled).then((pairing) => set({ pairing })));
+    },
+    openLoot: () => {
+      quietly(bridge.openLoot());
+    },
+    copyPairCommand: () =>
+      bridge.copyText(PAIR_COMMAND).then(
+        () => true,
+        (error: unknown) => {
+          console.error("[shell] bridge call failed", error);
+          return false;
+        },
+      ),
   };
 };

@@ -41,6 +41,18 @@
  * Enter, Tab on to the Parchment tile, Enter) and shoot the page re-themed behind the open drawer,
  * printing what the page asked of the bridge on the way (the stub records it).
  *
+ * The guild connection's panel (board Fh2, "What opens from it"): the `connection-*` scenarios open it
+ * from the sidebar's foot and shoot Fh2's three scenes — not connected, a code that was not accepted
+ * (a `press` may fill a field: `{ fill, value }`), connected — with a code typed and not yet sent
+ * between the first two (Pair live, the kit's steel), at 1440 on a Mac and at 768 on Windows, in both
+ * themes; then, at 1440, the panel while a code is checked, opened from Session's Pair with Discord,
+ * opened under the band's gold fix (Pair steel beside it, the bar's Start neutral; with and without a
+ * code, at 768 too), Pair holding the keyboard's focus ring in both themes, connected in each upload
+ * state that says more than the line, the longest refusal in the languages that run longest at 768,
+ * under Windows' high contrast, and reached from the keyboard alone. Each panel is also cropped out
+ * with the foot under it and laid in a sheet per theme and width, `connection-<theme>-<width>.png`,
+ * in Fh2's order (ONLY=connection for those alone).
+ *
  * Not a check: it measures nothing and passes everything. tools/shell-layout-check.cjs measures.
  */
 
@@ -114,6 +126,22 @@ const DIALOGS = [
 /** The gear, and the language dropdown inside the drawer it opens (Fh6, option C). */
 const GEAR = "[data-settings-gear]";
 const LANGUAGE = "[data-language-picker]";
+
+/**
+ * The guild connection's panel (Fh2): its door in the sidebar's foot, the other on Session, and the
+ * board's three scenes — a code is typed (the board's) and Pair pressed for the refusal, which the
+ * stub bridge gives every code.
+ */
+const DOOR = "[data-connection-door]";
+const SESSION_PAIR = "[data-connection-opener='session']";
+const TYPE_CODE = { fill: "[data-pair-code]", value: "ABCD-EFGH" };
+const PAIR = "[data-pair-submit]";
+const PANELS = [
+  { panel: "connect", title: "Not connected → Connect a guild", state: "idle", press: [DOOR] },
+  { panel: "typed", title: "A code typed → Pair is live (steel)", state: "idle", press: [DOOR, TYPE_CODE] },
+  { panel: "refused", title: "A code that was not accepted", state: "idle", press: [DOOR, TYPE_CODE, PAIR] },
+  { panel: "connected", title: "Connected → the details", state: "capturing", paired: true, sentAgoMs: 60_000, press: [DOOR] },
+];
 
 app.commandLine.appendSwitch("force-prefers-reduced-motion");
 app.commandLine.appendSwitch("force-device-scale-factor", SCALE);
@@ -209,6 +237,75 @@ const scenarios = () => {
       paired: true,
       keys: [{ tabTo: GEAR }, "Enter", { tabTo: "[data-theme-pick='parchment']" }, "Enter"],
       name: `settings-keys-obsidian-to-parchment-${platform}-${width}x${height}`,
+    });
+  }
+  // The guild connection's panel (Fh2): its three scenes at 1440 on a Mac and at 768 on Windows, in
+  // both themes, each laid in that theme and width's sheet.
+  for (const theme of ["obsidian", "parchment"]) {
+    for (const [platform, width, height] of [
+      ["darwin", 1440, 900],
+      ["win32", 768, 620],
+    ]) {
+      for (const p of PANELS) {
+        add({ ...p, theme, platform, width, height, name: `connection-${p.panel}-${theme}-${platform}-${width}x${height}` });
+      }
+    }
+  }
+  // …and the rest of it at 1440 (not in the sheets but where named): a code being checked, opened
+  // from Session's own button, connected in each upload state that says more than its line.
+  const more = { theme: "obsidian", platform: "darwin", width: 1440, height: 900, sheet: false };
+  add({ ...more, state: "idle", pairPending: true, press: [DOOR, TYPE_CODE, PAIR], name: "connection-checking-obsidian-darwin-1440x900" });
+  add({ ...more, state: "waiting", press: [SESSION_PAIR], name: "connection-from-session-obsidian-darwin-1440x900" });
+  // Under the band's gold fix (no engine found): the fix holds the window's one gold button, the
+  // bar's Start steps back to its neutral face, and Pair is steel as everywhere — waiting for a code,
+  // and live with one typed.
+  add({ ...more, state: "idle", engineMissing: true, press: [DOOR], name: "connection-under-fix-obsidian-darwin-1440x900" });
+  add({ ...more, theme: "parchment", platform: "win32", width: 768, height: 620, state: "idle", engineMissing: true, press: [DOOR], name: "connection-under-fix-parchment-win32-768x620" });
+  for (const theme of ["obsidian", "parchment"]) {
+    add({ ...more, theme, state: "idle", engineMissing: true, press: [DOOR, TYPE_CODE], name: `connection-under-fix-typed-${theme}-darwin-1440x900` });
+  }
+  // Pair holding the keyboard's focus — a code typed, then Tab from the field — in both themes: the
+  // kit's steel ring, 2px out from a steel fill.
+  for (const theme of ["obsidian", "parchment"]) {
+    add({ ...more, theme, state: "idle", press: [DOOR, TYPE_CODE], keys: [{ tabTo: PAIR }], name: `connection-pair-focus-${theme}-darwin-1440x900` });
+  }
+  for (const upload of ["retrying", "held", "bot-outdated", "blocked", "unauthorized"]) {
+    add({ ...more, state: "capturing", paired: true, upload, press: [DOOR], name: `connection-connected-${upload}-obsidian-darwin-1440x900` });
+  }
+  add({ ...more, state: "capturing", paired: true, uploadEnabled: false, press: [DOOR], name: "connection-connected-off-obsidian-darwin-1440x900" });
+  // The longest refusal in every language (this computer cannot store the token securely), in the
+  // languages that run longest, at 768.
+  for (const lang of ["en", "de", "uk", "ru"]) {
+    add({
+      state: "idle",
+      theme: "obsidian",
+      platform: "win32",
+      width: 768,
+      height: 620,
+      lang,
+      pairFailure: "no-encryption",
+      press: [DOOR, TYPE_CODE, PAIR],
+      sheet: false,
+      name: `connection-no-encryption-${lang}-obsidian-win32-768x620`,
+    });
+  }
+  // Windows high contrast: the open door keeps an outline, the field and the copy button their borders.
+  add({ ...more, platform: "win32", state: "idle", forced: true, press: [DOOR], name: "forced-colors-connection-win32-1440x900" });
+  // From the keyboard alone: Tab from the top of the page to the foot's door and Enter — the panel
+  // opens onto the code field.
+  for (const [platform, width, height] of [
+    ["darwin", 1440, 900],
+    ["win32", 768, 620],
+  ]) {
+    add({
+      state: "idle",
+      theme: "parchment",
+      platform,
+      width,
+      height,
+      keys: [{ tabTo: DOOR }, "Enter"],
+      sheet: false,
+      name: `connection-keys-parchment-${platform}-${width}x${height}`,
     });
   }
   // The Start/Stop morph, frame by frame (board Fh1's button), in both themes.
@@ -385,12 +482,16 @@ const run = async () => {
     win.webContents.off("console-message", onConsole);
     refused.push(...refusedAtLoad);
     for (const press of sc.press == null ? [] : [sc.press].flat()) {
-      // as a member would: the button, pressed (an offscreen window takes no clicks, so the page's own)
+      // as a member would: the button, pressed (an offscreen window takes no clicks, so the page's
+      // own) — or a field, typed into: its value set as the browser sets it, then the input event a
+      // keystroke raises, which is what React listens for
       const pressed = await win.webContents.executeJavaScript(
-        `(() => { const el = document.querySelector(${JSON.stringify(press)}); el?.click(); return el != null; })()`,
+        typeof press === "string"
+          ? `(() => { const el = document.querySelector(${JSON.stringify(press)}); el?.click(); return el != null; })()`
+          : `(() => { const el = document.querySelector(${JSON.stringify(press.fill)}); if (el == null) return false; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(press.value)}); el.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`,
       );
       if (!pressed) {
-        throw new Error(`${sc.name}: nothing to press at ${press}`);
+        throw new Error(`${sc.name}: nothing to press at ${typeof press === "string" ? press : press.fill}`);
       }
       await wait(150);
       // and whatever the press set moving (the drawer's arrival) has arrived
@@ -425,8 +526,29 @@ const run = async () => {
       const shot = await win.webContents.capturePage(crop);
       const px = Math.round(crop.width * Number(SCALE));
       const png = (shot.getSize().width === px ? shot : shot.resize({ width: px, quality: "best" })).toPNG();
-      const key = `${sc.theme}-${sc.width}`;
+      const key = `notices-${sc.theme}-${sc.width}`;
       sheets.set(key, [...(sheets.get(key) ?? []), { title: sc.title, kind: band.kind, png, width: crop.width, height: crop.height }]);
+    }
+    if (sc.panel != null && sc.sheet !== false) {
+      // The panel and the foot it opens from, as Fh2's scenes frame them.
+      const area = await win.webContents.executeJavaScript(
+        "(() => { const p = document.querySelector('[data-connection-panel]')?.getBoundingClientRect(); const f = document.querySelector('.lb-foot')?.getBoundingClientRect(); return p == null || f == null ? null : { left: Math.min(p.left, f.left), top: p.top, right: Math.max(p.right, f.right), bottom: f.bottom, face: document.querySelector('[data-connection-panel]').dataset.connectionPanel }; })()",
+      );
+      if (area == null) {
+        throw new Error(`${sc.name}: the connection panel is not open`);
+      }
+      const pad = 16;
+      const crop = {
+        x: Math.max(0, Math.floor(area.left - pad)),
+        y: Math.max(0, Math.floor(area.top - pad)),
+        width: Math.ceil(area.right - area.left + 2 * pad),
+        height: Math.min(sc.height, Math.ceil(area.bottom + pad)) - Math.max(0, Math.floor(area.top - pad)),
+      };
+      const shot = await win.webContents.capturePage(crop);
+      const px = Math.round(crop.width * Number(SCALE));
+      const png = (shot.getSize().width === px ? shot : shot.resize({ width: px, quality: "best" })).toPNG();
+      const key = `connection-${sc.theme}-${sc.width}`;
+      sheets.set(key, [...(sheets.get(key) ?? []), { title: sc.title, kind: area.face, png, width: crop.width, height: crop.height }]);
     }
     // Offscreen windows render at the screen's own scale whatever the switch says: bring the
     // picture to the scale asked for, so SCALE=1 gives a 1440×900 window as 1440×900 pixels.
@@ -443,13 +565,21 @@ const run = async () => {
     await shootStrip(strip);
   }
   for (const [key, rows] of sheets) {
-    await shootSheet(`notices-${key}.png`, key, rows);
+    await shootSheet(`${key}.png`, key, rows);
   }
 };
 
-/** The bands of one theme and width, one under another in Fh5's order, each under its scenario's name. */
+/**
+ * The bands of one theme and width, one under another in Fh5's order — or the connection panels, in
+ * Fh2's — each under its scenario's name.
+ */
 const shootSheet = async (file, key, rows) => {
-  const dark = key.startsWith("obsidian");
+  const [what, theme, width] = key.split("-");
+  const dark = theme === "obsidian";
+  const heading =
+    what === "connection"
+      ? `The guild connection's panel — ${theme} · ${width} px (board Fh2's scenes; tools/shell-shots.cjs)`
+      : `The notices in the band — ${theme} · ${width} px (board Fh5's order; tools/shell-shots.cjs)`;
   const body = rows
     .map(
       (row) =>
@@ -462,7 +592,7 @@ const shootSheet = async (file, key, rows) => {
     h2 { margin: 16px 0 6px; font: 600 12px/1.3 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
     h2 span { font-weight: 400; opacity: .6; text-transform: none; letter-spacing: 0; }
     img { display: block; }
-  </style></head><body><h1>The notices in the band — ${key.replace("-", " · ")} px (board Fh5's order; tools/shell-shots.cjs)</h1>${body}</body></html>`;
+  </style></head><body><h1>${heading}</h1>${body}</body></html>`;
   const win = new BrowserWindow({ show: false, width: 1600, height: 400, useContentSize: true, frame: false, webPreferences: { offscreen: true } });
   // From a file, not a data: URL — fourteen bands of pictures run past what a URL may carry.
   const page = join(OUT, `.${file}.html`);
@@ -476,7 +606,7 @@ const shootSheet = async (file, key, rows) => {
   const px = Math.round(size[0] * Number(SCALE));
   writeFileSync(join(OUT, file), (shot.getSize().width === px ? shot : shot.resize({ width: px, quality: "best" })).toPNG());
   win.destroy();
-  console.log(`sheet ${file} (${rows.length} notices)`);
+  console.log(`sheet ${file} (${rows.length} ${what === "connection" ? "panels" : "notices"})`);
 };
 
 /**

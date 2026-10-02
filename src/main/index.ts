@@ -43,7 +43,7 @@ import {
   type TSetupStatus,
   type TAppSettings,
 } from "../shared/captureTypes.js";
-import { defaultDeviceName, isValidPairCodeShape, normalizePairCode } from "../shared/pairing.js";
+import { defaultDeviceName, isValidPairCodeShape, lootPageUrl, normalizePairCode } from "../shared/pairing.js";
 import { IPC, NPCAP_URL, PRIVACY_URL } from "../shared/ipc.js";
 import { reduceCaptureSession, type TSessionEvent } from "./captureSession.js";
 import { resolveEngine, type TResolvedEngine } from "./engineLocator.js";
@@ -75,6 +75,7 @@ import {
 } from "./uploadClient.js";
 import { lootBroken, newlyBroken } from "../shared/engineHealth.js";
 import { createHeldStore, heldUploadsFilePath } from "./heldUploads.js";
+import { decoderVerdictFilePath, forgetDecoderVerdict, loadDecoderVerdict, saveDecoderVerdict } from "./decoderVerdict.js";
 import electronUpdater from "electron-updater";
 
 import { createUpdateController, updaterEnabled, type TUpdateController } from "./updateController.js";
@@ -96,6 +97,8 @@ const WINDOW_STATE_FILE = windowStateFilePath(app.getPath("userData"));
 const APP_LOG = join(app.getPath("userData"), "logs", "capture-app.log");
 /** The lines the guild never gets — decoded while the decoder was broken (heldUploads.ts). */
 const HELD_UPLOADS_FILE = heldUploadsFilePath(app.getPath("userData"));
+/** A broken decoder, kept with the app version it was reached on (decoderVerdict.ts). */
+const DECODER_VERDICT_FILE = decoderVerdictFilePath(app.getPath("userData"));
 
 /** Build timestamp stamped by tools/build-static.mjs — identifies WHICH build runs. */
 const BUILT_AT: string | null = (() => {
@@ -148,6 +151,10 @@ const dispatch = (ev: TSessionEvent): void => {
   const toBot = talksToBot(currentEngine?.source);
   if (toBot && fresh.length > 0) {
     forwardEngineHealth(fresh);
+  }
+  if (toBot && fresh.length > 0 && state.engineBroken != null) {
+    // Remembered so this version, reopened, holds from its first second (decoderVerdict.ts).
+    saveDecoderVerdict(DECODER_VERDICT_FILE, app.getVersion(), state.engineBroken);
   }
   // The flag last: it reads settings.json from disk, and this runs for every line the engine prints —
   // only the one event that breaks the decoder for loot should pay for that read.
@@ -364,6 +371,7 @@ const pairingStatus = (): TPairingStatus => {
     paired: pairing != null,
     deviceName: pairing?.deviceName ?? null,
     guildId: pairing?.guildId ?? null,
+    lootUrl: pairing != null ? lootPageUrl(apiBase(settings.apiBase), pairing.guildId) : null,
     pairedAt: pairing?.pairedAt ?? null,
     uploadEnabled: settings.uploadEnabled !== false,
     upload:
@@ -1051,25 +1059,14 @@ const registerIpc = (): void => {
 
   ipcMain.handle(IPC.pairingOpenLoot, async () => {
     const settings = loadSettings(SETTINGS_FILE);
-    const guildId = settings.pairing?.guildId;
-    // `tab=loot` lands them ON the Loot tab. Without it the dashboard follows the
-    // guild and stops on Overview, so every press of this button ended with the
-    // member hunting for the tab themselves — the actual complaint, reported
-    // 2026-08-30. The dashboard validates the value against its own tab ids and
-    // ignores anything else, so an old build sending a renamed id degrades to
-    // today's behaviour rather than breaking.
+    // The deep link to the Loot tab, or the dashboard's root without a guild
+    // (lootPageUrl says why). The v5 shell's link carries the same address
+    // (pairingStatus's lootUrl).
     //
     // What this does NOT fix, and cannot: `shell.openExternal` hands a URL to the
     // system browser, which opens a new tab every time. Nothing outside a browser
     // can name or focus a tab already open in it.
-    //
-    // Without a guild the deep link has no target — send them to the app root
-    // rather than a 404 that reads as the feature being broken.
-    const url =
-      guildId != null && guildId.length > 0
-        ? `${apiBase(settings.apiBase)}/?guild=${encodeURIComponent(guildId)}&tab=loot`
-        : apiBase(settings.apiBase);
-    await shell.openExternal(url);
+    await shell.openExternal(lootPageUrl(apiBase(settings.apiBase), settings.pairing?.guildId ?? null));
   });
 
   ipcMain.handle(IPC.setupOpenNpcapPage, async () => {
@@ -1118,6 +1115,16 @@ if (!gotLock) {
   }
 
   void app.whenReady().then(() => {
+    // A decoder this very version found broken before is broken still: start from that verdict, so a
+    // reopened build holds the upload from its first line rather than from the engine's next report.
+    // Behind the same flag as the hold itself; a verdict for another version is the update — forget it.
+    const remembered = loadDecoderVerdict(DECODER_VERDICT_FILE, app.getVersion());
+    if (remembered.stale) {
+      forgetDecoderVerdict(DECODER_VERDICT_FILE);
+    } else if (remembered.broken != null && heldUploadOn()) {
+      state = { ...state, engineBroken: remembered.broken };
+      appLog(`decoder: broken before on v${app.getVersion()} — the upload is held from the start`);
+    }
     registerIpc();
     createWindow();
     updates.start();

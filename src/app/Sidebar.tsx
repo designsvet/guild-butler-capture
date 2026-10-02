@@ -1,6 +1,7 @@
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 
 import type { TStrings } from "../shared/strings.js";
+import { CONNECTION_PANEL_ID } from "./ConnectionPanel.js";
 import { CHEVRON, Icon, SESSION } from "./icons.js";
 import type { TFoot } from "./model.js";
 import { hrefOf, type TRoute } from "./router.js";
@@ -13,24 +14,45 @@ import { hrefOf, type TRoute } from "./router.js";
  *
  * Only pages that exist are listed: in slice 0 that is Session, under Live.
  *
- * The foot shows the state only. It will be the door to the connection panel (Fh2's lower half),
- * which arrives with the pairing step; until then it is not a control, and Tab passes it by.
+ * The foot is the door to the guild connection's panel (Fh2's lower half, ConnectionPanel.tsx): a
+ * button over both its lines, which shows itself pressed while the panel is open. The panel is
+ * drawn inside the foot, after the door, so Tab goes from the door into it.
  */
 
-const Foot = ({ foot }: { foot: TFoot }) => (
-  <div className="lb-foot" data-dot={foot.dot} title={`${foot.line1} — ${foot.line2}`}>
-    <div className={foot.connect ? "lb-foot-line lb-foot-line--connect" : "lb-foot-line"}>
-      <span className="lb-foot-dot" aria-hidden="true" />
-      <span className={foot.named ? "lb-foot-text" : "lb-foot-text lb-foot-text--words"}>{foot.line1}</span>
-      <span className="lb-foot-chevron" aria-hidden="true">
-        <Icon paths={CHEVRON} size={14} />
+/** The connection's door: the panel open or not, and what pressing it does. */
+export type TFootDoor = {
+  open: boolean;
+  onToggle: () => void;
+  /** The panel, while it is open. */
+  panel: ReactNode;
+};
+
+const Foot = ({ foot, door }: { foot: TFoot; door: TFootDoor }) => (
+  <div className="lb-foot" data-dot={foot.dot}>
+    <button
+      type="button"
+      className="lb-foot-door"
+      title={`${foot.line1} — ${foot.line2}`}
+      aria-haspopup="dialog"
+      aria-expanded={door.open}
+      aria-controls={door.open ? CONNECTION_PANEL_ID : undefined}
+      data-connection-door=""
+      onClick={door.onToggle}
+    >
+      <span className={foot.connect ? "lb-foot-line lb-foot-line--connect" : "lb-foot-line"}>
+        <span className="lb-foot-dot" aria-hidden="true" />
+        <span className={foot.named ? "lb-foot-text" : "lb-foot-text lb-foot-text--words"}>{foot.line1}</span>
+        <span className="lb-foot-chevron" aria-hidden="true">
+          <Icon paths={CHEVRON} size={14} />
+        </span>
       </span>
-    </div>
-    <div className="lb-foot-sub">{foot.line2}</div>
+      <span className="lb-foot-sub">{foot.line2}</span>
+    </button>
+    {door.open ? door.panel : null}
   </div>
 );
 
-export const Sidebar = ({ s, route, foot }: { s: TStrings; route: TRoute; foot: TFoot | null }) => {
+export const Sidebar = ({ s, route, foot, door }: { s: TStrings; route: TRoute; foot: TFoot | null; door: TFootDoor }) => {
   const live = useId();
   const active = route === "session";
   return (
@@ -53,7 +75,7 @@ export const Sidebar = ({ s, route, foot }: { s: TStrings; route: TRoute; foot: 
         </a>
       </div>
       <div className="lb-side-fill" />
-      {foot != null ? <Foot foot={foot} /> : null}
+      {foot != null ? <Foot foot={foot} door={door} /> : null}
     </nav>
   );
 };

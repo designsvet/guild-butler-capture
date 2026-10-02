@@ -6,6 +6,7 @@ import { ECaptureStatus } from "../shared/captureTypes.js";
 import { asLang, detectLang } from "../shared/i18n.js";
 import { captureBlock, decoderDialogEvent, ENotice, noticesNow } from "../shared/notices.js";
 import { stringsFor, type TStrings } from "../shared/strings.js";
+import { ConnectionPanel } from "./ConnectionPanel.js";
 import { formatClock } from "./format.js";
 import { barAction, barStatus, headerMeta, sessionHero, sidebarFoot } from "./model.js";
 import { DecoderDialog, NoticeBand } from "./Notice.js";
@@ -23,13 +24,17 @@ import { TitleBar } from "./TitleBar.js";
  * The shell (Loot Butler, raid-bot ADR 0159; boards Fh1, Fh2, Fh3, Fh4, Fh5, Fh6, Fh7, F1, Fa): the
  * skip link, the title bar (banner), the sidebar (navigation "Views") and the page (main) — the
  * band's notice at its top, on every page — with one polite live region; the settings drawer the
- * gear opens, and the broken decoder's dialog over it all when it interrupts. Everything it shows
- * comes from the store, which mirrors the main process; the only state of its own is the clock that
- * moves "listening for 40 s" and whether the drawer is open.
+ * gear opens, the guild connection's panel the sidebar's foot opens, and the broken decoder's dialog
+ * over it all when it interrupts. Everything it shows comes from the store, which mirrors the main
+ * process; the only state of its own is the clock that moves "listening for 40 s", whether the
+ * drawer is open, and which door the connection's panel was opened from.
  */
 
 /** The drawer: shut, open, or on its way out (it leaves inert, and goes once its exit has played). */
 type TDrawerState = "closed" | "open" | "closing";
+
+/** The connection panel's doors (Fh2): the sidebar's foot, and Session's "Pair with Discord". */
+type TConnectionDoor = "foot" | "session";
 
 /** The second hand: the bar counts seconds for the first minute. */
 const useNow = (): number => {
@@ -163,6 +168,45 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
   // Modal, either of them: the rest of the window takes no press and no focus.
   const modal = dialogOpen || settingsOpen;
 
+  // The guild connection's panel (Fh2): one panel, two doors. Either door opens it and, pressed
+  // again, closes it — except while a code is being checked, since the answer lands in it. Escape
+  // gives the focus back to the door it came from (to the foot, if that was Session's button and a
+  // pairing has since taken its card away); a press outside leaves the focus where it went.
+  const [connection, setConnection] = useState<TConnectionDoor | null>(null);
+  const openedFrom = useRef<TConnectionDoor | null>(connection);
+  openedFrom.current = connection;
+  const refocusTo = useRef<TConnectionDoor | null>(null);
+  const closeConnection = useCallback(
+    (refocus: boolean) => {
+      const from = openedFrom.current;
+      if (from == null) {
+        return;
+      }
+      refocusTo.current = refocus ? from : null;
+      setConnection(null);
+      // A refusal belongs to the code that was typed, which goes with the panel.
+      store.forgetPairFailure();
+    },
+    [store],
+  );
+  useEffect(() => {
+    const to = refocusTo.current;
+    if (connection != null || to == null) {
+      return;
+    }
+    refocusTo.current = null;
+    const session = to === "session" ? document.querySelector<HTMLElement>("[data-connection-opener='session']") : null;
+    (session ?? document.querySelector<HTMLElement>("[data-connection-door]"))?.focus();
+  }, [connection]);
+  const toggleConnection = (from: TConnectionDoor): void => {
+    if (connection == null) {
+      setConnection(from);
+    } else if (!snap.ui.pairBusy) {
+      closeConnection(false);
+    }
+  };
+  const connectionOpen = connection != null && snap.pairing != null;
+
   return (
     <>
       <a className="gb-skip" href="#main" inert={modal}>
@@ -171,7 +215,9 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
       <TitleBar
         s={s}
         status={barStatus(capture, now, s, block != null)}
-        // The band holds the next step: Start steps back to the neutral face (one gold button per window).
+        // The band holds the next step: Start steps back to the neutral face (one gold button per
+        // window). The connection panel never does — its Pair is steel (ConnectionPanel.tsx) — so
+        // Start keeps the gold while it is open.
         action={barAction(capture, block != null || holdsTheGold(view))}
         version={snap.setup != null ? `v${snap.setup.appVersion}` : null}
         inert={modal}
@@ -183,7 +229,37 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
         onStop={store.stop}
       />
       <div className="lb-body" inert={modal}>
-        <Sidebar s={s} route={route} foot={sidebarFoot(snap.pairing, now, platform, s)} />
+        <Sidebar
+          s={s}
+          route={route}
+          foot={sidebarFoot(snap.pairing, now, platform, s)}
+          door={{
+            open: connectionOpen,
+            onToggle: () => {
+              toggleConnection("foot");
+            },
+            panel:
+              snap.pairing != null ? (
+                <ConnectionPanel
+                  s={s}
+                  platform={platform}
+                  pairing={snap.pairing}
+                  now={now}
+                  busy={snap.ui.pairBusy}
+                  failure={snap.ui.pairFailure}
+                  suspended={modal}
+                  on={{
+                    onClose: closeConnection,
+                    onPair: store.pair,
+                    onUpload: store.setUpload,
+                    onLoot: store.openLoot,
+                    onUnpair: store.unpair,
+                    onCopy: store.copyPairCommand,
+                  }}
+                />
+              ) : null,
+          }}
+        />
         <main id="main" tabIndex={-1} className="lb-main">
           {/* The page's one h1 (board Fa) comes first, so the band's h2 sits under it. */}
           <h1 className="gb-sr-only">{s.shell.pages.session}</h1>
@@ -200,6 +276,10 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
               platform={platform}
               paired={snap.pairing?.paired ?? null}
               autoCapture={snap.settings?.autoCapture ?? null}
+              connectionOpen={connectionOpen}
+              onPair={() => {
+                toggleConnection("session");
+              }}
               onReveal={store.reveal}
               onAutoCapture={store.setAutoCapture}
             />
