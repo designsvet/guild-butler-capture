@@ -43,13 +43,15 @@
  *
  * The guild connection's panel (board Fh2, "What opens from it"): the `connection-*` scenarios open it
  * from the sidebar's foot and shoot Fh2's three scenes — not connected, a code that was not accepted
- * (a `press` may fill a field: `{ fill, value }`), connected — at 1440 on a Mac and at 768 on Windows,
- * in both themes; then, at 1440, the panel while a code is checked, opened from Session's Pair with
- * Discord, opened under the band's gold fix (Pair outlined; at 768 too), connected in each upload
- * state that says more than the line, the longest refusal in the
- * languages that run longest at 768, under Windows' high contrast, and reached from the keyboard
- * alone. Each panel is also cropped out with the foot under it and laid in a sheet per theme and
- * width, `connection-<theme>-<width>.png`, in Fh2's order (ONLY=connection for those alone).
+ * (a `press` may fill a field: `{ fill, value }`), connected — with a code typed and not yet sent
+ * between the first two (Pair live, the kit's steel), at 1440 on a Mac and at 768 on Windows, in both
+ * themes; then, at 1440, the panel while a code is checked, opened from Session's Pair with Discord,
+ * opened under the band's gold fix (Pair steel beside it, the bar's Start neutral; with and without a
+ * code, at 768 too), Pair holding the keyboard's focus ring in both themes, connected in each upload
+ * state that says more than the line, the longest refusal in the languages that run longest at 768,
+ * under Windows' high contrast, and reached from the keyboard alone. Each panel is also cropped out
+ * with the foot under it and laid in a sheet per theme and width, `connection-<theme>-<width>.png`,
+ * in Fh2's order (ONLY=connection for those alone).
  *
  * Not a check: it measures nothing and passes everything. tools/shell-layout-check.cjs measures.
  */
@@ -136,6 +138,7 @@ const TYPE_CODE = { fill: "[data-pair-code]", value: "ABCD-EFGH" };
 const PAIR = "[data-pair-submit]";
 const PANELS = [
   { panel: "connect", title: "Not connected → Connect a guild", state: "idle", press: [DOOR] },
+  { panel: "typed", title: "A code typed → Pair is live (steel)", state: "idle", press: [DOOR, TYPE_CODE] },
   { panel: "refused", title: "A code that was not accepted", state: "idle", press: [DOOR, TYPE_CODE, PAIR] },
   { panel: "connected", title: "Connected → the details", state: "capturing", paired: true, sentAgoMs: 60_000, press: [DOOR] },
 ];
@@ -253,10 +256,19 @@ const scenarios = () => {
   const more = { theme: "obsidian", platform: "darwin", width: 1440, height: 900, sheet: false };
   add({ ...more, state: "idle", pairPending: true, press: [DOOR, TYPE_CODE, PAIR], name: "connection-checking-obsidian-darwin-1440x900" });
   add({ ...more, state: "waiting", press: [SESSION_PAIR], name: "connection-from-session-obsidian-darwin-1440x900" });
-  // Under the band's gold fix (no engine found): the fix keeps the window's one gold button, Pair is
-  // outlined, and the bar's Start stays neutral.
+  // Under the band's gold fix (no engine found): the fix holds the window's one gold button, the
+  // bar's Start steps back to its neutral face, and Pair is steel as everywhere — waiting for a code,
+  // and live with one typed.
   add({ ...more, state: "idle", engineMissing: true, press: [DOOR], name: "connection-under-fix-obsidian-darwin-1440x900" });
   add({ ...more, theme: "parchment", platform: "win32", width: 768, height: 620, state: "idle", engineMissing: true, press: [DOOR], name: "connection-under-fix-parchment-win32-768x620" });
+  for (const theme of ["obsidian", "parchment"]) {
+    add({ ...more, theme, state: "idle", engineMissing: true, press: [DOOR, TYPE_CODE], name: `connection-under-fix-typed-${theme}-darwin-1440x900` });
+  }
+  // Pair holding the keyboard's focus — a code typed, then Tab from the field — in both themes: the
+  // kit's steel ring, 2px out from a steel fill.
+  for (const theme of ["obsidian", "parchment"]) {
+    add({ ...more, theme, state: "idle", press: [DOOR, TYPE_CODE], keys: [{ tabTo: PAIR }], name: `connection-pair-focus-${theme}-darwin-1440x900` });
+  }
   for (const upload of ["retrying", "held", "bot-outdated", "blocked", "unauthorized"]) {
     add({ ...more, state: "capturing", paired: true, upload, press: [DOOR], name: `connection-connected-${upload}-obsidian-darwin-1440x900` });
   }

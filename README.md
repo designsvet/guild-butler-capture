@@ -525,10 +525,12 @@ tool prints what the page asked of the bridge on the way (the stub records every
 `gbcStub.calls()`). `ONLY=connection` shoots the guild connection's panel: Fh2's three scenes — not
 connected, a code that was not accepted (a `press` may type into a field, `{ fill, value }`: the
 board's code, then Pair, which the stub refuses), connected — at 1440 on a Mac and 768 on Windows in
-both themes, laid out with the foot under each in `connection-<theme>-<width>.png`; then a code being
-checked, the panel opened from Session's button, the panel under the band's gold fix (Pair
-outlined, at 1440 and 768), the connected details in each upload state that says more than its
-line, the longest refusal in English, German, Ukrainian and Russian at 768,
+both themes, laid out with the foot under each in `connection-<theme>-<width>.png`, with a code
+typed and not yet sent between the first two (Pair live, in the kit's steel); then a code being
+checked, the panel opened from Session's button, the panel under the band's gold fix (Pair steel
+beside it and the bar's Start neutral; at 1440 and 768, and with a code typed in both themes), Pair
+holding the keyboard's focus ring in both themes, the connected details in each upload state that
+says more than its line, the longest refusal in English, German, Ukrainian and Russian at 768,
 Windows' high contrast, and the door reached from the keyboard alone. The stub now keeps a pairing
 as main would — a code it is told to accept pairs, Disconnect unpairs, the switch switches — and can
 refuse with any failure (`pairFailure`) or never answer (`pairPending`). It measures nothing; the
@@ -614,9 +616,12 @@ on the bar. 5,280 in all. It fails on:
   Enter on View my loot (without the window navigating) and Enter on Disconnect each make their own
   call and no other (`setUpload(false)`, `openLoot()`, `unpair()`); after Disconnect the panel shows
   the steps with the focus in it and the foot says Connect a guild; Escape closes it onto the door;
-- more than one gold button in sight, in any state: the band's fix, the connection panel's Pair and
-  the bar's Start capture take the gold in that order, and what lies inert under the dialog or the
-  drawer is veiled, not in sight;
+- more than one gold button in sight, in any state: the band's fix, else the bar's Start capture,
+  holds it, and what lies inert under the dialog or the drawer is veiled, not in sight;
+- with the connection panel open, a Pair that is not the kit's steel button (`gbtn-share`), or a gold
+  button other than the one the state names: the bar's Start while the steps show over an idle
+  capture (with a code typed too, in the keys), the band's fix — with Start stepped back to its
+  neutral face — under a band, none while the bar shows Stop;
 - in the morph: a word outside the button at any frame, the version or the gear moving by half a
   pixel, a change that did not play its drain, its width or its words (a run whose morph never
   played proves nothing), and a button that keeps its eased width, or a leaving word, once the

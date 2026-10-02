@@ -42,7 +42,9 @@
  *   the gear;
  * - the guild connection's panel (board Fh2) open when a door was pressed and not otherwise, showing
  *   the face the pairing calls for, whole in the window under the title bar, over its foot and not on
- *   it, not scrolling, the focus in it, the foot's door saying it is open and drawn pressed. Then the
+ *   it, not scrolling, the focus in it, the foot's door saying it is open and drawn pressed; its Pair
+ *   the kit's steel button (`gbtn-share`), and the window's one gold button the one the state names —
+ *   the bar's Start, or the band's fix over a neutral Start — never the panel's. Then the
  *   keys (`connectionKeys`): every control pressed from the keyboard making its own bridge call and
  *   no other (`pair`, `copyText`, `setUpload`, `openLoot`, `unpair`), Pair waiting for a code, a
  *   refusal said under the field, Escape, a press outside and the focus leaving closing it — none of
@@ -147,7 +149,10 @@ const PLATFORMS = ["darwin", "win32"];
  * the language; required on the platforms named (`on`), not tried on the others, where the card
  * has no such button; `waitFor` is what the press must bring before measuring. A press may type into
  * a field instead (`{ fill, value }`): the connection panel's code. `panel` is the face of the guild
- * connection's panel (board Fh2) the state must show — "connect" or "connected" — or none.
+ * connection's panel (board Fh2) the state must show — "connect" or "connected" — or none. `gold`,
+ * where a state names it, is the window's one gold button: "start" (the bar's Start capture), "fix"
+ * (the band's, with Start stepped back to its neutral face), or null (none in sight: the bar shows
+ * Stop).
  */
 const LATER = { selector: "[data-dialog-later]", on: ["darwin", "win32"] };
 const GEAR = "[data-settings-gear]";
@@ -247,17 +252,19 @@ const STATES = [
   // store the token securely) — and, from the keys, every other refusal in turn; a code being
   // checked ("Connecting…"); opened under the band's fix; connected, as the board draws it and with
   // the longest sentence the details can carry (the bot needs an update).
-  { name: "connect", state: "idle", paired: false, press: CONNECT, waitFor: "[data-connection-panel='connect']", notice: null, panel: "connect" },
+  // Pair is steel in every one of them, and the gold is not the panel's: the bar's Start over an
+  // idle capture, the band's fix under a band, none while the bar shows Stop.
+  { name: "connect", state: "idle", paired: false, press: CONNECT, waitFor: "[data-connection-panel='connect']", notice: null, panel: "connect", gold: "start" },
   // (the stub accepts its code: the keys pair this one)
-  { name: "connect-from-session", state: "waiting", paired: false, pairOk: true, press: FROM_SESSION, waitFor: "[data-connection-panel='connect']", notice: null, panel: "connect" },
-  { name: "connect-refused", state: "idle", paired: false, press: REFUSED, waitFor: "[data-pair-failure]", notice: null, panel: "connect" },
-  { name: "connect-no-encryption", state: "idle", paired: false, pairFailure: "no-encryption", press: REFUSED, waitFor: "[data-pair-failure]", notice: null, panel: "connect" },
-  { name: "connect-checking", state: "idle", paired: false, pairPending: true, press: REFUSED, waitFor: "[data-pair-submit][aria-disabled='true']", notice: null, panel: "connect" },
-  // Under the band's gold fix (no engine found): the fix keeps the window's one gold button, so Pair
-  // is outlined — and the bar's Start stays neutral.
-  { name: "connect-under-fix", state: "idle", engineMissing: true, paired: false, press: CONNECT, waitFor: "[data-connection-panel='connect']", notice: "blocked", panel: "connect" },
-  { name: "connected", state: "capturing", paired: true, sentAgoMs: 60_000, press: CONNECT, waitFor: "[data-connection-panel='connected']", notice: null, panel: "connected" },
-  { name: "connected-outdated", state: "capturing", paired: true, upload: "bot-outdated", press: CONNECT, waitFor: "[data-connection-panel='connected']", notice: null, panel: "connected" },
+  { name: "connect-from-session", state: "waiting", paired: false, pairOk: true, press: FROM_SESSION, waitFor: "[data-connection-panel='connect']", notice: null, panel: "connect", gold: null },
+  { name: "connect-refused", state: "idle", paired: false, press: REFUSED, waitFor: "[data-pair-failure]", notice: null, panel: "connect", gold: "start" },
+  { name: "connect-no-encryption", state: "idle", paired: false, pairFailure: "no-encryption", press: REFUSED, waitFor: "[data-pair-failure]", notice: null, panel: "connect", gold: "start" },
+  { name: "connect-checking", state: "idle", paired: false, pairPending: true, press: REFUSED, waitFor: "[data-pair-submit][aria-disabled='true']", notice: null, panel: "connect", gold: "start" },
+  // Under the band's gold fix (no engine found): the fix holds the window's one gold button, the
+  // bar's Start steps back to its neutral face, and Pair is still steel.
+  { name: "connect-under-fix", state: "idle", engineMissing: true, paired: false, press: CONNECT, waitFor: "[data-connection-panel='connect']", notice: "blocked", panel: "connect", gold: "fix" },
+  { name: "connected", state: "capturing", paired: true, sentAgoMs: 60_000, press: CONNECT, waitFor: "[data-connection-panel='connected']", notice: null, panel: "connected", gold: null },
+  { name: "connected-outdated", state: "capturing", paired: true, upload: "bot-outdated", press: CONNECT, waitFor: "[data-connection-panel='connected']", notice: null, panel: "connected", gold: null },
 ];
 
 /**
@@ -315,7 +322,7 @@ const loads = ({ ROUTES, SUPPORTED_LANGS }) => {
     for (const platform of PLATFORMS) {
       for (const theme of THEMES) {
         for (const lang of SUPPORTED_LANGS) {
-          for (const { name, notice, dialog, drawer, menu, panel, press, waitFor, ...stub } of STATES) {
+          for (const { name, notice, dialog, drawer, menu, panel, gold, press, waitFor, ...stub } of STATES) {
             const pressed = press != null && press.on.includes(platform);
             list.push({
               route,
@@ -323,7 +330,8 @@ const loads = ({ ROUTES, SUPPORTED_LANGS }) => {
               theme,
               lang,
               stateName: name,
-              expect: { notice, dialog: dialog === true, drawer: drawer === true, menu: menu === true, panel: panel ?? null },
+              // `gold` left out where a state names none: only "one gold button at most" is held there
+              expect: { notice, dialog: dialog === true, drawer: drawer === true, menu: menu === true, panel: panel ?? null, ...(gold === undefined ? {} : { gold }) },
               press: pressed ? [press.selector].flat() : [],
               waitFor: pressed ? (waitFor ?? null) : null,
               // a real install's folders, at their longest (the settings drawer shows them whole)
@@ -594,14 +602,44 @@ const measure = ({ route, zones, mayCut, surfaces, scope, veils = [], overlay = 
           problems.add("the foot's door is not drawn pressed while its panel is open");
         }
       }
-      // One gold button per window (model.ts `barAction`, connection.ts `pairHoldsTheGold`): the
-      // band's fix, else the connection panel's Pair, else the bar's Start — never two in sight. What
-      // lies inert under the dialog or the drawer is veiled, not in sight.
+      // One gold button per window (model.ts `barAction`): the band's fix, else the bar's Start —
+      // never two in sight. What lies inert under the dialog or the drawer is veiled, not in sight.
       const golds = [...document.querySelectorAll(".gbtn-primary, .lb-act[data-kind='start'][data-surface='gold']")].filter(
         (el) => el.closest("[inert]") == null && !unseen(el),
       );
       if (golds.length > 1) {
         problems.add(`${golds.length} gold buttons in sight, not one: ${golds.map(say).join(", ")}`);
+      }
+      // The connection panel's Pair is the kit's filled steel button in every state (the owner's
+      // ruling, 2026-10-02: in the kit steel means shared, and pairing is what shares a member's loot
+      // with the guild) — so the panel never takes the gold, and the one gold button is the one the
+      // state names: the bar's Start while the steps show over an idle capture; under a band, its
+      // fix, with Start stepped back to its neutral face (the lifted surface, morph.ts topSurface).
+      const submit = pair?.querySelector("[data-pair-submit]") ?? null;
+      if (face === "connect" && (submit == null || !submit.classList.contains("gbtn-share") || submit.classList.contains("gbtn-primary"))) {
+        problems.add(`the connection panel's Pair is ${submit == null ? "not drawn" : `${say(submit)} (${submit.className})`}, not the kit's steel button (gbtn-share)`);
+      }
+      if (expect.gold !== undefined) {
+        const start = document.querySelector(".lb-titlebar .lb-act[data-kind='start']");
+        let holder = null;
+        if (expect.gold === "start") {
+          holder = start?.dataset.surface === "gold" ? start : null;
+          if (holder == null) {
+            problems.add(`the bar's Start is not gold (${start == null ? "no Start in the bar" : `its surface is ${start.dataset.surface}`}) while the connection panel is open`);
+          }
+        } else if (expect.gold === "fix") {
+          holder = document.querySelector("main .lb-notice .gbtn-primary");
+          if (holder == null) {
+            problems.add("the band's fix is not gold");
+          }
+          if (start?.dataset.surface !== "lift") {
+            problems.add(`under the band's gold fix the bar's Start is ${start == null ? "not drawn" : `on its ${start.dataset.surface} surface`}, not stepped back to its neutral face`);
+          }
+        }
+        const strays = golds.filter((el) => el !== holder);
+        if (strays.length > 0) {
+          problems.add(`gold on ${strays.map(say).join(", ")}, where the state names ${expect.gold == null ? "no gold button" : expect.gold === "start" ? "the bar's Start" : "the band's fix"}`);
+        }
       }
     }
 
@@ -1245,6 +1283,13 @@ const connectionKeys = async (win, load) => {
         await settle();
         if ((await js("document.querySelector('[data-pair-submit]')?.disabled")) !== false) {
           out.push("Pair stayed refusing with a code typed");
+        }
+        // Live, Pair is still the steel button, and the bar's Start still the window's gold.
+        if ((await js("document.querySelector('[data-pair-submit]')?.classList.contains('gbtn-share') === true")) !== true) {
+          out.push("with a code typed, Pair is not the kit's steel button");
+        }
+        if ((await js("document.querySelector(\".lb-titlebar .lb-act[data-kind='start']\")?.dataset.surface ?? null")) !== "gold") {
+          out.push("with a code typed, the bar's Start is not gold");
         }
         await makes("the code field", "Enter", 'pair("abcd efgh")', out);
         if ((await js("document.querySelector('[data-pair-failure]')?.dataset.pairFailure ?? null")) !== "refused") {
