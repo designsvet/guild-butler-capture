@@ -8,6 +8,12 @@ neither slice is merged or released by this work.
 
 ## Design state
 
+Build the already approved PvE page first. The owner corrected the order on
+2026-10-02: work on the existing approved screens takes priority over proposing
+new Gathering/Fishing pages. The latter proposals are paused while F3 is recovered
+and implemented. PvP and DPS are also designed; the overall plan places them in
+slices 5 and 6 because their data sources and decoding still need work.
+
 PvE's approved board is F3 on the [v5 canvas](https://claude.ai/artifact/FbLQ85VeKLddohadcMNqYT).
 The available local exports do not contain F3, and the canvas requires sign-in.
 Implementation waits for that source rather than guessing its layout.
