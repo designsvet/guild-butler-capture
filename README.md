@@ -398,10 +398,13 @@ screen reader.
     for a code; while main checks one it says "Connecting…" and refuses a second press, keeping the
     focus (`aria-disabled`); Enter in the field presses it. A code of the wrong shape is main's to
     refuse, at once and with no round trip, in the old window's "That code doesn't look right" sentence — so
-    Pair waits only for the field to hold something. Pair is gold, as Fh2 draws it, and while it
-    shows the bar's Start capture steps back to its neutral face, as it does for the band's fix: one
-    gold button per window (`pairHoldsTheGold` in `src/app/connection.ts`). Under a band whose fix is
-    gold, the fix keeps it and Pair is outlined. Under a line, the board's "No guild on Guild
+    Pair waits only for the field to hold something. Pair is the kit's filled steel button
+    (`<Button variant="share">`, `gbtn-share`) in every state, not the gold Fh2 draws — the owner's
+    ruling (2026-10-02): in the kit steel means shared, and pairing is what shares a member's loot
+    with the guild. With no code typed it wears the kit's own disabled look. So the panel takes no
+    gold: the bar's Start capture keeps the window's one gold button while it is open — or, under a
+    band whose fix is gold, the fix holds it and Start steps back to its neutral face, as it always
+    does there — and Pair is steel under a band too. Under a line, the board's "No guild on Guild
     Butler? Everything here works without one." (the panel's one new string).
   - **A refused code**: the old window's sentence for that `EPairFailure` — every one of the seven —
     under the field in Stop's red, the field marked invalid and described by it, the code left in

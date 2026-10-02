@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { connectionView, PANEL_GAP, pairFailureSentence, pairHoldsTheGold, placePanel } from "../src/app/connection.js";
+import { connectionView, PANEL_GAP, pairFailureSentence, placePanel } from "../src/app/connection.js";
 import { barAction, sidebarFoot } from "../src/app/model.js";
 import { ECaptureStatus, EPairFailure, initialCaptureState, initialPairingStatus, type TPairingStatus } from "../src/shared/captureTypes.js";
 import { SUPPORTED_LANGS } from "../src/shared/i18n.js";
@@ -113,21 +113,23 @@ describe("the connected details (Fh2's third scene)", () => {
   });
 });
 
-describe("one gold button per window: Pair holds it while the steps show", () => {
-  it("holds it over an idle capture, and the bar's Start steps back to its neutral face", () => {
-    const gold = pairHoldsTheGold(true, initialPairingStatus, false);
-    expect(gold).toBe(true);
-    expect(barAction({ ...initialCaptureState, status: ECaptureStatus.Idle }, gold)).toMatchObject({ kind: "start", look: "neutral" });
+/**
+ * Pair is the kit's filled steel button in every state (the owner's ruling, 2026-10-02): in the kit
+ * steel means shared, and pairing is what shares a member's loot with the guild. So the panel takes
+ * no gold, and nothing about it reaches the bar: Start keeps the window's one gold button, or the
+ * band's fix does. What the page draws — Pair `gbtn-share`, Start gold, the fix gold over a neutral
+ * Start — is held by tools/shell-layout-check.cjs; this holds the decisions behind it.
+ */
+describe("Pair is steel, and the bar's Start keeps the gold", () => {
+  const idle = { ...initialCaptureState, status: ECaptureStatus.Idle };
+
+  it("with the panel showing its steps over an idle capture, the bar's Start is gold", () => {
+    // The shell steps Start back for the band alone (Shell.tsx): with no band, nothing does.
+    expect(barAction(idle, false)).toEqual({ kind: "start", look: "primary", disabled: false });
   });
 
-  it("not while the panel is shut, nor connected (no gold button there), nor before the pairing is known", () => {
-    expect(pairHoldsTheGold(false, initialPairingStatus, false)).toBe(false);
-    expect(pairHoldsTheGold(true, paired({}), false)).toBe(false);
-    expect(pairHoldsTheGold(true, null, false)).toBe(false);
-  });
-
-  it("gives way to the band's fix: Pair is outlined under it", () => {
-    expect(pairHoldsTheGold(true, initialPairingStatus, true)).toBe(false);
+  it("under a band whose fix is gold, the fix holds it and Start steps back, the panel open or not", () => {
+    expect(barAction(idle, true)).toEqual({ kind: "start", look: "neutral", disabled: false });
   });
 });
 
