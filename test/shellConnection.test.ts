@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { connectionView, PANEL_GAP, pairFailureSentence, placePanel } from "../src/app/connection.js";
-import { barAction, sidebarFoot } from "../src/app/model.js";
-import { ECaptureStatus, EPairFailure, initialCaptureState, initialPairingStatus, type TPairingStatus } from "../src/shared/captureTypes.js";
+import { sidebarFoot } from "../src/app/model.js";
+import { EPairFailure, initialPairingStatus, type TPairingStatus } from "../src/shared/captureTypes.js";
 import { SUPPORTED_LANGS } from "../src/shared/i18n.js";
 import { lootPageUrl } from "../src/shared/pairing.js";
 import { stringsFor } from "../src/shared/strings.js";
@@ -10,8 +10,9 @@ import { stringsFor } from "../src/shared/strings.js";
 /**
  * The guild connection's panel (src/app/connection.ts; board Fh2, "What opens from it"), held
  * without a window: what a refused code says, what the connected details say, where the panel goes.
- * How it behaves in the page — the focus, the keys, the fit at every width — is
- * tools/shell-layout-check.cjs's.
+ * How it behaves in the page — the focus, the keys, the fit at every width, and its Pair drawn in the
+ * kit's steel while the window's one gold button is the bar's Start or the band's fix — is
+ * tools/shell-layout-check.cjs's: nothing about the panel reaches the bar (model.ts `barAction`).
  */
 
 const en = stringsFor("en");
@@ -110,26 +111,6 @@ describe("the connected details (Fh2's third scene)", () => {
   it("speaks the window's language, and names a computer that has no name", () => {
     const view = connectionView(paired({}, { deviceName: null }), NOW, "win32", uk);
     expect(view?.title).toBe(uk.pairing.pairedAs(uk.shell.foot.unnamedDevice));
-  });
-});
-
-/**
- * Pair is the kit's filled steel button in every state (the owner's ruling, 2026-10-02): in the kit
- * steel means shared, and pairing is what shares a member's loot with the guild. So the panel takes
- * no gold, and nothing about it reaches the bar: Start keeps the window's one gold button, or the
- * band's fix does. What the page draws — Pair `gbtn-share`, Start gold, the fix gold over a neutral
- * Start — is held by tools/shell-layout-check.cjs; this holds the decisions behind it.
- */
-describe("Pair is steel, and the bar's Start keeps the gold", () => {
-  const idle = { ...initialCaptureState, status: ECaptureStatus.Idle };
-
-  it("with the panel showing its steps over an idle capture, the bar's Start is gold", () => {
-    // The shell steps Start back for the band alone (Shell.tsx): with no band, nothing does.
-    expect(barAction(idle, false)).toEqual({ kind: "start", look: "primary", disabled: false });
-  });
-
-  it("under a band whose fix is gold, the fix holds it and Start steps back, the panel open or not", () => {
-    expect(barAction(idle, true)).toEqual({ kind: "start", look: "neutral", disabled: false });
   });
 });
 
