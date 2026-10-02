@@ -20,3 +20,6 @@ engine-output-*.log
 activity-events-*.jsonl
 !test/fixtures/session/activity-events-*.jsonl
 !test/fixtures/session/loot-events-*.txt
+
+# Derived local history (including mock-engine development runs)
+sessions/
