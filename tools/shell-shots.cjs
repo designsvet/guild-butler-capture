@@ -187,6 +187,9 @@ const scenarios = () => {
         session: recorded,
         name: `session-replay-${theme}-${width}`,
       });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: recorded, route: "pve", name: `pve-replay-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: recorded, route: "pve", scroll: ".lb-pve-columns", name: `pve-mobs-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: recorded, route: "pve", scroll: ".lb-pve-aside", name: `pve-chests-${theme}-${width}` });
       add({ state: "capturing", theme, platform: "darwin", width, height, session: journalSession(), name: `journal-completions-${theme}-${width}` });
     }
     add({
@@ -509,7 +512,7 @@ const run = async () => {
       }
     };
     win.webContents.on("console-message", onConsole);
-    await win.loadFile(PAGE);
+    await win.loadFile(PAGE, { hash: `/${sc.route ?? "session"}` });
     // the boot promises settle, the stored language and theme land, the faces arrive; anything the
     // page's policy refused meanwhile is counted (the stand-ins below go in after)
     const refused = await win.webContents.executeJavaScript(

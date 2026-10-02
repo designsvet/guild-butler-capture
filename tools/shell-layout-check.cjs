@@ -110,10 +110,23 @@ const fromSource = (file) => {
  * longer compiles, or touches `window` on import — leaves Electron up with no window (it reports
  * the error and waits), and CI would sit through to its timeout. Inside the run a throw exits 1.
  */
+let hasPve = null;
+let pveVisitsOf = null;
 const readLists = () => {
   const { replayedSession, journalSession, fromSource: sessionSource } = require("./session-fixture.cjs");
   const session = replayedSession();
-  const { closeSession } = sessionSource("src/shared/session/model.ts");
+  const { closeSession, newSession, reduceSession } = sessionSource("src/shared/session/model.ts");
+  const pve = sessionSource("src/shared/session/pve.ts");
+  hasPve = pve.hasPve;
+  pveVisitsOf = pve.pveVisits;
+  const edge = newSession("unplaced", session.lastAt);
+  const chestOnly = reduceSession(edge, { v:1, t:"chest", at:session.lastAt, char:null, zone:null, name:null, rarity:null });
+  const unknown = reduceSession(chestOnly, { v:1, t:"kill", at:session.lastAt, char:null, zone:"UNRECOGNIZED_ZONE", mob:9999999, hp:null });
+  STATES.push(
+    { name:"pve-chest-only", routes:["pve"], state:"capturing", session:chestOnly, paired:false, notice:null },
+    { name:"pve-unplaced", routes:["pve"], state:"capturing", session:unknown, paired:false, notice:null },
+    { name:"pve-missing-currency", routes:["pve"], state:"capturing", session:{ ...session, totals:{ ...session.totals, favor:null } }, paired:false, notice:null },
+  );
   STATES.push(
     { name: "session-replay", state: "capturing", session, paired: true, notice: null },
     { name: "session-stopped", state: "idle", session: closeSession(session, session.lastAt), paired: false, notice: null },
@@ -334,7 +347,9 @@ const loads = ({ ROUTES, SUPPORTED_LANGS }) => {
     for (const platform of PLATFORMS) {
       for (const theme of THEMES) {
         for (const lang of SUPPORTED_LANGS) {
-          for (const { name, notice, dialog, drawer, menu, panel, gold, press, waitFor, ...stub } of STATES) {
+          for (const { name, routes, notice, dialog, drawer, menu, panel, gold, press, waitFor, ...stub } of STATES) {
+            if (routes != null && !routes.includes(route)) { continue; }
+            if (route === "pve" && !hasPve(stub.session ?? null) && name !== "journal-completions") { continue; }
             const pressed = press != null && press.on.includes(platform);
             list.push({
               route,
@@ -358,7 +373,8 @@ const loads = ({ ROUTES, SUPPORTED_LANGS }) => {
 };
 
 /** One window per entry, from idle; both directions of the morph are played in it at every width. */
-const morphLoads = ({ ROUTES, SUPPORTED_LANGS }) => {
+const morphLoads = ({ SUPPORTED_LANGS }) => {
+  const ROUTES = ["session"];
   const list = [];
   for (const route of ROUTES) {
     for (const platform of PLATFORMS) {
@@ -1484,6 +1500,50 @@ const connectionKeys = async (win, load) => {
   }
 };
 
+const pveProof = async (win, session) => win.webContents.executeJavaScript(`(async () => {
+  const errors = [];
+  const data = document.querySelector('[data-pve-data]');
+  if (data == null) { return ['PvE page is missing']; }
+  if (${pveVisitsOf(session).some((visit) => visit.startedAt == null)} && data.querySelector('.lb-pve-visits').closest('section').querySelector('.lb-data-sub') != null) {
+    errors.push('Unplaced events are claimed as established visits');
+  }
+  for (const [metric, raw] of Object.entries(${JSON.stringify(session.totals)})) {
+    if (!['fame','respec','silver','might','favor'].includes(metric)) { continue; }
+    const actual = data.querySelector('[data-session-metric="'+metric+'"]');
+    if (raw == null || raw === 0) { if (actual != null) { errors.push('PvE invented '+metric); } }
+    else if (Number(actual?.dataset.raw) !== raw) { errors.push('PvE changed raw '+metric); }
+  }
+  const sum = (selector, key) => [...data.querySelectorAll(selector)].reduce((n, el) => n + Number(el.dataset[key]), 0);
+  const stats = data.querySelector('.lb-pve-stats');
+  const rightByRow = new Map();
+  for (const stat of stats.children) {
+    const box = stat.getBoundingClientRect();
+    rightByRow.set(Math.round(box.top),Math.max(rightByRow.get(Math.round(box.top)) ?? 0,box.right));
+  }
+  if ([...rightByRow.values()].some((right) => Math.abs(right-stats.getBoundingClientRect().right)>1)) { errors.push('PvE metrics leave unused row space'); }
+  const kills = ${Object.values(session.mobs).reduce((n, qty) => n + qty, 0)};
+  if (sum('[data-pve-visit]', 'kills') !== kills || sum('[data-pve-mob]', 'kills') !== kills) { errors.push('PvE lost recorded kills'); }
+  if (sum('[data-pve-visit]', 'chests') !== ${session.chestCount}) { errors.push('PvE lost recorded chests'); }
+  const settle = () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+  for (const filter of data.querySelectorAll('[data-pve-filter]')) {
+    filter.click(); await settle();
+    if (filter.getAttribute('aria-pressed') !== 'true') { errors.push('Content filter is not selected'); }
+    const expected = ${JSON.stringify(pveVisitsOf(session).map((visit) => ({content:visit.content,kills:visit.kills})))}.filter((visit) => filter.dataset.pveFilter === 'all' || visit.content === filter.dataset.pveFilter);
+    if ([...data.querySelectorAll('[data-pve-visit]')].length !== expected.length || sum('[data-pve-visit]','kills') !== expected.reduce((n,visit) => n+visit.kills,0)) { errors.push('Content filter lost or invented visits'); }
+    if (filter.dataset.pveFilter !== 'all' && [...data.querySelectorAll('[data-pve-visit]')].some((el) => el.dataset.content !== filter.dataset.pveFilter)) {
+      errors.push('Content filter kept another content kind');
+    }
+  }
+  data.querySelector('[data-pve-filter="all"]').click(); await settle();
+  for (const sort of ['recent','kills']) {
+    data.querySelector('[data-pve-sort="'+sort+'"]')?.click(); await settle();
+    const values = [...data.querySelectorAll('[data-pve-mob]')].map((el) => Number(el.dataset[sort === 'kills' ? 'kills' : 'last']));
+    if (values.some((value, index) => index > 0 && value > values[index-1])) { errors.push('Mob sort is not ordered'); }
+  }
+  if (document.querySelectorAll('nav [aria-current="page"]').length !== 1) { errors.push('More than one current page'); }
+  return errors;
+})()`);
+
 const run = async () => {
   stubItemArt();
   const { ROUTES, SUPPORTED_LANGS } = readLists();
@@ -1503,28 +1563,19 @@ const run = async () => {
     console.log(`Nothing to check: no ${none.join(", no ")}. A run that measures nothing does not pass.`);
     return 1;
   }
-  const morphLists = [
-    ["route", ROUTES],
-    ["width", WIDTHS],
-    ["theme", THEMES],
-    ["language", SUPPORTED_LANGS],
-    ["direction", MORPHS],
-    ["frame", MORPH_FRAMES],
-    ["platform", PLATFORMS],
-  ];
-  const product = (ls) => ls.reduce((n, [, list]) => n * list.length, 1);
-  const describe = (ls) => ls.map(([what, list]) => `${list.length} ${what}${list.length === 1 ? "" : "s"}`).join(" × ");
-  const expectedStill = product(lists);
-  const expectedMorph = product(morphLists);
+  const stillLoads = loads({ ROUTES, SUPPORTED_LANGS }).sort((a,b) => Number(b.route === "pve") - Number(a.route === "pve"));
+  const animatedLoads = morphLoads({ ROUTES, SUPPORTED_LANGS });
+  const expectedStill = stillLoads.length * WIDTHS.length;
+  const expectedMorph = animatedLoads.length * WIDTHS.length * MORPHS.length * MORPH_FRAMES.length;
   const expected = expectedStill + expectedMorph;
-  const factors = `${expectedStill} still (${describe(lists)}) + ${expectedMorph} in the Start/Stop morph (${describe(morphLists)})`;
+  const factors = `${expectedStill} still (data-gated routes, all widths/themes/languages/platforms) + ${expectedMorph} in the Start/Stop morph (Session shell)`;
   if (OUT != null) {
     mkdirSync(OUT, { recursive: true });
   }
   const allowed = new Map();
   let measured = 0;
   let failed = 0;
-  for (const load of loads({ ROUTES, SUPPORTED_LANGS })) {
+  for (const load of stillLoads) {
     const label = `#/${load.route} ${load.platform} ${load.theme} ${load.lang} ${load.stateName}`;
     const win = new BrowserWindow({
       show: false,
@@ -1583,12 +1634,15 @@ const run = async () => {
           waitFor: load.waitFor,
         }),
       );
+      const showingPve = load.route === "pve" && load.stateName !== "session-next" && hasPve(load.sc.session ?? null);
+      const activeRoute = showingPve ? "pve" : "session";
+      const expectedRoutes = load.stateName !== "session-next" && hasPve(load.sc.session ?? null) ? ROUTES : ["session"];
       const { problems, marked, offered } = await win.webContents.executeJavaScript(
-        `(${measure.toString()})(${JSON.stringify({ route: load.route, zones: OS_ZONES[load.platform], mayCut: MAY_CUT, surfaces: SURFACES, veils: VEILS, overlay: OVERLAY, expect: load.expect })})`,
+        `(${measure.toString()})(${JSON.stringify({ route: activeRoute, zones: OS_ZONES[load.platform], mayCut: MAY_CUT, surfaces: SURFACES, veils: VEILS, overlay: OVERLAY, expect: load.expect })})`,
       );
       const refused = await win.webContents.executeJavaScript("window.gbcCheck.refused()");
       const replayProof =
-        load.sc.session != null
+        load.sc.session != null && !showingPve
           ? await win.webContents.executeJavaScript(`(() => {
         const data = document.querySelector('[data-session-data]');
         if (${JSON.stringify(load.stateName)} === 'session-next') { return data == null ? [] : ['New session kept the old counters']; }
@@ -1660,15 +1714,17 @@ const run = async () => {
         return errors;
       })()`)
           : [];
+      const pveErrors = showingPve ? await pveProof(win, load.sc.session) : [];
       const all = [
+        ...pveErrors,
         ...replayProof,
         ...pressFailed,
         ...(waitingFor.length > 0 ? [`the page never settled: no ${waitingFor.join(", no ")}`] : []),
         ...problems,
         ...refused.map((r) => `the content-security policy refused ${r}`),
         ...logged.map((m) => `the page logged an error: ${m}`),
-        ...offered.filter((r) => !ROUTES.includes(r)).map((r) => `the sidebar offers #/${r}, which is not a route`),
-        ...ROUTES.filter((r) => !offered.includes(r)).map((r) => `the sidebar does not offer #/${r}`),
+        ...offered.filter((r) => !expectedRoutes.includes(r)).map((r) => `the sidebar offers #/${r}, which is not a route`),
+        ...expectedRoutes.filter((r) => !offered.includes(r)).map((r) => `the sidebar does not offer #/${r}`),
       ];
       for (const m of marked) {
         allowed.set(m, (allowed.get(m) ?? 0) + 1);
@@ -1709,7 +1765,7 @@ const run = async () => {
       console.log(`FAIL ${label.padEnd(44)} ${r.width}  ${r.all.join("; ")}`);
     }
   }
-  for (const load of morphLoads({ ROUTES, SUPPORTED_LANGS })) {
+  for (const load of animatedLoads) {
     const label = `morph #/${load.route} ${load.platform} ${load.theme} ${load.lang}`;
     const win = new BrowserWindow({
       show: false,

@@ -270,8 +270,11 @@ The old renderer remains the default at 0.8.8.
 **Slice 2 is in progress.** Self-owned completed journals now enter the same
 session snapshot and localized activity feed. The engine patch, frozen packet
 evidence and assembled-bundle gate are described in [docs/slice2.md](docs/slice2.md).
-PvE still needs its approved F3 export; Gathering/Fishing await the layout choice
-between the drawn proposals. None of those pages is added to the sidebar yet.
+The approved F3 PvE view now shows visits, sortable mobs, standouts and chests
+from the same snapshot. Its navigation appears after a kill or chest; New session
+returns to Session and Stop freezes its clocks. [Built PvE proofs](docs/design/pve-proof.md)
+cover both themes at 1440, 1024 and 768. Gathering/Fishing await the layout choice
+between the drawn proposals.
 
 **Try it:** `pnpm dev:v5`. It builds, then opens the new shell with the mock engine in a throwaway
 data folder of its own (`.dev-v5-data/`, git-ignored) — never the installed app's, so your settings,

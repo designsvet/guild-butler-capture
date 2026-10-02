@@ -14,6 +14,17 @@ export type TZoneStats = {
   kills: number;
   chests: number;
 };
+/** A known zone interval, or an explicit unplaced bucket when a recovered line has no matching interval. */
+export type TVisit = {
+  zone: string | null;
+  startedAt: number | null;
+  endedAt: number | null;
+  kills: number;
+  chests: number;
+  rarities: Record<string, number>;
+  fame: number | null;
+  silver: number | null;
+};
 export type TItemQuantity = { item: string | null; index: number | null; qty: number };
 export type TLooter = {
   name: string;
@@ -46,6 +57,9 @@ export type TSession = {
   currentZone: string | null;
   zoneSince: number | null;
   mobs: Record<string, number>;
+  mobLast: Record<string, { at: number; zone: string | null }>;
+  visits: TVisit[];
+  activeVisit: number | null;
   harvests: Record<string, TItemQuantity>;
   /** Observed completions only; an empty map does not assert that the player has no journals. */
   journals: Record<string, TItemQuantity>;
@@ -89,6 +103,9 @@ export const newSession = (id: string, at: number, character: string | null = nu
   currentZone: null,
   zoneSince: null,
   mobs: {},
+  mobLast: {},
+  visits: [],
+  activeVisit: null,
   harvests: {},
   journals: {},
   catches: {},
@@ -103,6 +120,16 @@ export const newSession = (id: string, at: number, character: string | null = nu
   files: [],
 });
 const emptyZone = (id: string): TZoneStats => ({ id, visits: 0, ms: 0, fame: 0, silver: 0, kills: 0, chests: 0 });
+const emptyVisit = (zone: string | null, at: number, placed: boolean): TVisit => ({
+  zone,
+  startedAt: placed ? at : null,
+  endedAt: null,
+  kills: 0,
+  chests: 0,
+  rarities: {},
+  fame: null,
+  silver: null,
+});
 export const restartSession = (previous: TSession, id: string, at: number): TSession => {
   const audits = Object.fromEntries(
     Object.entries(previous.audits).map(([stream, audit]) => [stream, { ...audit, spans: 0, mismatches: 0 }]),
@@ -115,6 +142,8 @@ export const restartSession = (previous: TSession, id: string, at: number): TSes
     currentZone: zone,
     zoneSince: zone == null ? null : at,
     zones: zone == null ? {} : { [zone]: { ...emptyZone(zone), visits: 1 } },
+    visits: zone == null ? [] : [emptyVisit(zone, at, true)],
+    activeVisit: zone == null ? null : 0,
   };
 };
 const sumItem = (items: Record<string, TItemQuantity>, item: TItemQuantity): Record<string, TItemQuantity> => {
@@ -162,6 +191,33 @@ export const reduceSession = (state: TSession, ev: TSessionEvent, stream = "acti
   const add = (key: TMetric, amount: number): void => {
     next.totals = { ...next.totals, [key]: (next.totals[key] ?? 0) + amount };
   };
+  // Locate by both zone and time. Never put a late/recovered event in the current visit just
+  // because its zone matches, or invent a visit duration from that event's timestamp.
+  const visitEvent = (update: (visit: TVisit) => TVisit): void => {
+    let index = -1;
+    for (let i = next.visits.length - 1; i >= 0; i -= 1) {
+      const visit = next.visits[i]!;
+      if (
+        visit.zone === ev.zone &&
+        visit.startedAt != null &&
+        ev.at >= visit.startedAt &&
+        (visit.endedAt == null || ev.at < visit.endedAt)
+      ) {
+        index = i;
+        break;
+      }
+    }
+    if (index < 0) {
+      index = next.visits.findIndex((visit) => visit.zone === ev.zone && visit.startedAt == null);
+    }
+    const visits = [...next.visits];
+    if (index < 0) {
+      index = visits.length;
+      visits.push(emptyVisit(ev.zone, ev.at, false));
+    }
+    visits[index] = update({ ...visits[index]! });
+    next.visits = visits;
+  };
   const zone =
     ev.zone != null
       ? { ...((Object.hasOwn(state.zones, ev.zone) ? state.zones[ev.zone] : undefined) ?? emptyZone(ev.zone)) }
@@ -184,6 +240,12 @@ export const reduceSession = (state: TSession, ev: TSessionEvent, stream = "acti
         }
         next.currentZone = ev.zone;
         next.zoneSince = ev.at;
+        const visits = [...state.visits];
+        if (state.activeVisit != null) {
+          visits[state.activeVisit] = { ...visits[state.activeVisit]!, endedAt: ev.at };
+        }
+        next.activeVisit = visits.length;
+        next.visits = [...visits, emptyVisit(ev.zone, ev.at, true)];
       }
       const previous = Object.hasOwn(state.audits, stream) ? state.audits[stream] : undefined;
       // Each file is an engine run: joins in different files do not bracket a continuously observed span.
@@ -204,6 +266,7 @@ export const reduceSession = (state: TSession, ev: TSessionEvent, stream = "acti
     }
     case "fame": {
       add("fame", ev.gain);
+      visitEvent((visit) => ({ ...visit, fame: (visit.fame ?? 0) + ev.gain }));
       if (zone != null) {
         zone.fame += ev.gain;
       } else {
@@ -221,6 +284,7 @@ export const reduceSession = (state: TSession, ev: TSessionEvent, stream = "acti
       add("silverGross", ev.yield);
       add("silverTax", tax);
       add("silver", net);
+      visitEvent((visit) => ({ ...visit, silver: (visit.silver ?? 0) + net }));
       if (zone != null) {
         zone.silver += net;
       } else {
@@ -246,6 +310,10 @@ export const reduceSession = (state: TSession, ev: TSessionEvent, stream = "acti
     case "kill": {
       const key = String(ev.mob);
       next.mobs = { ...state.mobs, [key]: (state.mobs[key] ?? 0) + 1 };
+      if (state.mobLast[key] == null || ev.at >= state.mobLast[key]!.at) {
+        next.mobLast = { ...state.mobLast, [key]: { at: ev.at, zone: ev.zone } };
+      }
+      visitEvent((visit) => ({ ...visit, kills: visit.kills + 1 }));
       if (zone != null) {
         zone.kills += 1;
       }
@@ -268,7 +336,14 @@ export const reduceSession = (state: TSession, ev: TSessionEvent, stream = "acti
     }
     case "chest": {
       next.chestCount += 1;
-      next.chests = [...state.chests, { at: ev.at, zone: ev.zone, name: ev.name, rarity: ev.rarity }].slice(-61);
+      visitEvent((visit) => ({
+        ...visit,
+        chests: visit.chests + 1,
+        rarities: { ...visit.rarities, [String(ev.rarity)]: (visit.rarities[String(ev.rarity)] ?? 0) + 1 },
+      }));
+      next.chests = [...state.chests, { at: ev.at, zone: ev.zone, name: ev.name, rarity: ev.rarity }]
+        .sort((a, b) => a.at - b.at)
+        .slice(-FEED_LIMIT);
       if (zone != null) {
         zone.chests += 1;
       }
@@ -296,6 +371,8 @@ export const closeSession = (state: TSession, at: number): TSession => {
         ? { ...state.zones, [zone.id]: { ...zone, ms: zone.ms + Math.max(0, end - state.zoneSince) } }
         : state.zones,
     zoneSince: null,
+    visits: state.visits.map((visit, index) => (index === state.activeVisit ? { ...visit, endedAt: end } : visit)),
+    activeVisit: null,
   };
 };
 

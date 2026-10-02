@@ -1989,6 +1989,271 @@ body {
   flex-direction: column;
   gap: 14px;
 }
+/* Approved F3: visit rows and a mob list beside standouts/chests. Secondary fields
+   move into their row at narrow widths; no horizontal scrolling or clipped names. */
+.lb-head-page-title {
+  flex: none;
+  font-family: var(--gb-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  padding-right: 16px;
+  border-right: 1px solid var(--gb-card-rule);
+}
+.lb-pve {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lb-pve-stats .lb-stat {
+  flex-basis: calc((100% - 60px) / 6);
+}
+.lb-pve-note,
+.lb-pve-caption {
+  margin: 0;
+  color: var(--gb-ink-2);
+  font-size: var(--gb-text-caption);
+  line-height: 1.5;
+}
+.lb-pve-note {
+  margin-top: -6px;
+}
+.lb-pve-caption {
+  padding-top: 10px;
+}
+.lb-pve-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px 0;
+  color: var(--gb-ink-2);
+  font-size: var(--gb-text-caption);
+}
+.lb-pve-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.lb-pve-filters button {
+  color: var(--gb-ink-2);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+.lb-pve-filters button[aria-pressed="true"] {
+  color: var(--gb-ink);
+  background: var(--gb-well);
+  box-shadow: inset 0 0 0 1px var(--gb-card-rule);
+}
+.lb-pve-filters button:focus-visible {
+  outline: 2px solid var(--gb-focus);
+  outline-offset: 2px;
+}
+.lb-pve-visits {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+.lb-pve-visits th {
+  color: var(--gb-ink-2);
+  font-size: var(--gb-text-caption);
+  font-weight: 500;
+  text-align: left;
+  padding: 8px 6px;
+}
+.lb-pve-visits th:nth-child(n + 4),
+.lb-pve-visits td:nth-child(n + 4) {
+  text-align: right;
+}
+.lb-pve-visits th:nth-child(1) {
+  width: 92px;
+}
+.lb-pve-visits th:nth-child(2) {
+  width: 140px;
+}
+.lb-pve-visits th:nth-child(4) {
+  width: 58px;
+}
+.lb-pve-visits th:nth-child(5) {
+  width: 56px;
+}
+.lb-pve-visits th:nth-child(6),
+.lb-pve-visits th:nth-child(7) {
+  width: 76px;
+}
+.lb-pve-visits th:nth-child(8) {
+  width: 60px;
+}
+.lb-pve-visits td {
+  padding: 13px 6px;
+  border-top: 1px solid var(--gb-card-rule);
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+.lb-pve-place > span {
+  display: block;
+}
+.lb-pve-visits .lb-pve-inline-time,
+.lb-pve-visits .lb-pve-inline-content,
+.lb-pve-visits .lb-pve-inline-currency,
+.lb-pve-inline-location {
+  display: none;
+}
+.lb-pve-secondary {
+  color: var(--gb-ink-2);
+  font-size: var(--gb-text-caption);
+  font-weight: 400;
+  line-height: 1.45;
+}
+.lb-pve-total {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 6px 0;
+  border-top: 1px solid var(--gb-card-rule);
+  font-size: 13px;
+}
+.lb-pve-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 14px;
+  align-items: start;
+}
+.lb-pve-columns.lb-pve-columns--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.lb-pve-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.lb-pve-mobs,
+.lb-pve-standouts,
+.lb-pve-chests {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.lb-pve-mobs li {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 40px 138px 50px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--gb-card-rule);
+}
+.lb-pve-mob-well {
+  width: 48px;
+  height: 48px;
+}
+.lb-pve-mob-name {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13.5px;
+}
+.lb-pve-mob-name b,
+.lb-pve-standouts b,
+.lb-pve-chests b {
+  font-weight: 600;
+}
+.lb-pve-mobs li > .lb-number {
+  text-align: right;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.lb-pve-mob-location {
+  overflow-wrap: anywhere;
+}
+.lb-pve-standouts li,
+.lb-pve-chests li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 13px;
+}
+.lb-pve-standouts li + li,
+.lb-pve-chests li + li {
+  border-top: 1px solid var(--gb-card-rule);
+}
+.lb-pve-standouts li > span:nth-child(2),
+.lb-pve-chests li > span:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-wrap: anywhere;
+}
+.lb-pve-chests [data-rarity="2"] {
+  color: var(--gb-green);
+}
+.lb-pve-chests [data-rarity="3"] {
+  color: var(--gb-blue);
+}
+.lb-pve-chests [data-rarity="4"] {
+  color: var(--gb-gold);
+}
+@media (max-width: 1439px) {
+  .lb-pve-stats .lb-stat {
+    flex-basis: calc((100% - 24px) / 3);
+  }
+}
+@media (max-width: 1279px) {
+  .lb-pve-columns {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+  .lb-pve-visits .lb-pve-time {
+    display: none;
+  }
+  .lb-pve-visits .lb-pve-inline-time {
+    display: block;
+    margin-top: 4px;
+  }
+  .lb-pve-mobs li {
+    grid-template-columns: 44px minmax(0, 1fr) 36px 50px;
+    gap: 10px;
+  }
+  .lb-pve-mob-well {
+    width: 44px;
+    height: 44px;
+  }
+  .lb-pve-mob-location {
+    display: none;
+  }
+  .lb-pve-inline-location {
+    display: block;
+  }
+}
+@media (max-width: 1023px) {
+  .lb-pve-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lb-pve-visits .lb-pve-content,
+  .lb-pve-visits .lb-pve-currency {
+    display: none;
+  }
+  .lb-pve-visits .lb-pve-inline-content,
+  .lb-pve-visits .lb-pve-inline-currency {
+    display: block;
+    margin-top: 4px;
+  }
+  .lb-pve-mobs li {
+    grid-template-columns: 48px minmax(0, 1fr) 40px 50px;
+  }
+  .lb-pve-aside {
+    display: flex;
+  }
+}
 .lb-stats:empty,
 .lb-activity-cards:empty,
 .lb-sources:empty {

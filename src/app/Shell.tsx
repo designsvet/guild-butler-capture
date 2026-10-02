@@ -14,6 +14,9 @@ import { holdsTheGold, noticeView, type TNoticeActionId } from "./notices.js";
 import { PAGE_PANEL_ID, PageHeader } from "./PageHeader.js";
 import type { TRouter } from "./router.js";
 import { SessionData } from "./SessionData.js";
+import { PvePage } from "./PvePage.js";
+import { hasPve } from "../shared/session/pve.js";
+import { pveStrings } from "../shared/pveStrings.js";
 import { sessionStrings } from "../shared/sessionStrings.js";
 import { SessionPage } from "./SessionPage.js";
 import { langChoiceOf, storedLang } from "./settings.js";
@@ -100,7 +103,7 @@ const useAnnounceNotice = (opened: boolean, key: string | null, title: string | 
 
 export const Shell = ({ store, router, platform }: { store: TShellStore; router: TRouter; platform: string }) => {
   const snap = useSyncExternalStore(store.subscribe, store.getSnapshot);
-  const route = useSyncExternalStore(router.subscribe, router.getSnapshot);
+  const requestedRoute = useSyncExternalStore(router.subscribe, router.getSnapshot);
   const now = useNow();
 
   // The stored language, else the OS's; the stored theme, else dark — as the old window does.
@@ -121,6 +124,22 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
   const sessionWords = sessionStrings(lang);
   const sessionNow = snap.setup?.engineSource === "replay" ? (session?.lastAt ?? now) : now;
   const data = session != null && (session.events > 0 || session.refused > 0);
+  const pveAvailable = hasPve(session);
+  const route = requestedRoute === "pve" && pveAvailable ? "pve" : "session";
+  const pageTitle = route === "pve" ? sessionWords.pve : s.shell.pages.session;
+  const lastRoute = useRef(route);
+  useEffect(() => {
+    if (session != null && requestedRoute === "pve" && !pveAvailable) {
+      window.location.hash = "#/session";
+    }
+    if (lastRoute.current !== route) {
+      const main = document.getElementById("main");
+      main?.focus({ preventScroll: true });
+      main?.scrollTo({ top: 0 });
+      announce(pageTitle);
+    }
+    lastRoute.current = route;
+  }, [route, requestedRoute, pveAvailable, session, pageTitle]);
   const block = captureBlock(capture, snap.setup);
   const all = noticesNow({ capture, setup: snap.setup, update: snap.update, now });
   const notice = all[0] ?? null;
@@ -238,6 +257,7 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
         <Sidebar
           s={s}
           route={route}
+          pve={pveAvailable ? { label: sessionWords.pve, group: pveStrings(lang).thisSession } : undefined}
           foot={sidebarFoot(snap.pairing, now, platform, s)}
           door={{
             open: connectionOpen,
@@ -268,10 +288,11 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
         />
         <main id="main" tabIndex={-1} className="lb-main">
           {/* The page's one h1 (board Fa) comes first, so the band's h2 sits under it. */}
-          <h1 className="gb-sr-only">{s.shell.pages.session}</h1>
+          <h1 className="gb-sr-only">{pageTitle}</h1>
           {view != null ? <NoticeBand view={view} onAction={onAction} /> : null}
           <PageHeader
             s={s}
+            title={route === "pve" ? sessionWords.pve : undefined}
             meta={
               data && session != null
                 ? `${session.character ?? ""} · ${sessionWords.zoneCount(Object.keys(session.zones).length)}`
@@ -288,13 +309,15 @@ export const Shell = ({ store, router, platform }: { store: TShellStore; router:
                 : undefined
             }
           />
-          <div id={PAGE_PANEL_ID} role="tabpanel" aria-label={s.shell.pages.session}>
+          <div id={PAGE_PANEL_ID} role="tabpanel" aria-label={pageTitle}>
             {snap.ui.newSessionFailed ? (
               <p role="alert" className="lb-data-warning">
                 {sessionWords.newSessionFailure}
               </p>
             ) : null}
-            {data && session != null ? (
+            {route === "pve" && session != null ? (
+              <PvePage key={session.id} session={session} lang={lang} now={sessionNow} />
+            ) : data && session != null ? (
               <SessionData session={session} lang={lang} now={sessionNow} onReveal={store.reveal} />
             ) : (
               <SessionPage
