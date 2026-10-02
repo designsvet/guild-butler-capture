@@ -1592,6 +1592,41 @@ const run = async () => {
           const actual = document.querySelector('[data-session-metric="' + metric + '"]')?.dataset.raw;
           if (actual !== String(raw)) { errors.push(metric + ': expected raw ' + raw + ', got ' + actual); }
         }
+        // F1r768 needs usable groups, not merely text that stays inside the window.
+        const rect = (el) => el.getBoundingClientRect();
+        const rowsFill = (selector) => {
+          const group = data.querySelector(selector);
+          const rows = new Map();
+          for (const child of group.children) {
+            const r = rect(child);
+            const top = Math.round(r.top);
+            rows.set(top, Math.max(rows.get(top) ?? 0, r.right));
+          }
+          if ([...rows.values()].some((right) => Math.abs(right - rect(group).right) > 1)) {
+            errors.push(selector + ': a partial row leaves unused space');
+          }
+        };
+        rowsFill('.lb-stats');
+        const header = document.querySelector('.lb-head');
+        const action = header.querySelector('[data-new-session]');
+        if (Math.abs(rect(action).right - rect(data).right) > 1) {
+          errors.push('New session is not at the right edge of the page');
+        }
+        if (innerWidth < 1024) {
+          rowsFill('.lb-activity-cards');
+          for (const card of data.querySelector('.lb-activity-cards').children) {
+            if (rect(card).width < 300) { errors.push('An activity card is too narrow for its counters'); }
+          }
+          const sources = [...data.querySelector('.lb-sources').children];
+          if (sources.length !== 2 || Math.abs(rect(sources[0]).top - rect(sources[1]).top) > 1) {
+            errors.push('The narrow page stacks the two source cards');
+          }
+        }
+        for (const time of data.querySelectorAll('.lb-feed time')) {
+          const range = document.createRange();
+          range.selectNodeContents(time);
+          if (range.getClientRects().length > 1) { errors.push('A feed timestamp wraps onto another line'); }
+        }
         return errors;
       })()`)
           : [];

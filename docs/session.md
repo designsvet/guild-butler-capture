@@ -82,6 +82,12 @@ Instance IDs count known dungeon visits without guessing dungeon size. Sources
 use the same totals as their tiles. Cards can fold from the keyboard. Six locales
 use the existing plural rules, including Ukrainian/Russian few and many.
 
+At 768 × 620, currency tiles wrap in three columns and the unpriced loot quantity
+uses a compact full-width row. Activity summaries use two columns, with an odd last
+card filling its row. Fame and silver sources remain side by side after the main
+columns stack; New session stays at the right of the header. Feed timestamps take
+their natural width so the OS's 12-hour format stays on one line.
+
 R5's public price endpoint does not exist yet. Loot/resource/catch item values,
 value rates, comparisons, party, journals, PvP and other pages wait for their own
 slices. Recent loot explicitly says Not priced. Only Session is in the sidebar;
@@ -101,7 +107,8 @@ checks the real IPC, page, New session, persisted summaries, Stop, active quit, 
 warning even when every new line is refused, and absence of
 bot traffic. `pnpm check:layout:v5` adds replay-active, stopped, and New session
 states to every width/theme/locale/platform combination; it checks the rendered
-raw totals and counts as well as geometry and CSP. `pnpm check:layout` keeps the
+raw totals and counts as well as geometry, row packing, narrow activity/source
+composition, timestamp wrapping and CSP. `pnpm check:layout` keeps the
 old renderer's gate intact.
 
 `ONLY=session OUT=<folder> pnpm exec electron --no-sandbox tools/shell-shots.cjs`

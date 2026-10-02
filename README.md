@@ -569,6 +569,8 @@ widths, in both themes, the six languages and both platforms — 1,728 more, fro
 on the bar. 5,568 in all. The three new states replay the scrubbed evening while capturing,
 after Stop, and after New session, with rendered raw-total/count assertions in every locale. It fails on:
 
+- Session rows leaving unused space, a misplaced New session button, narrow activity cards,
+  stacked source cards at 768, or feed timestamps wrapping onto two lines;
 - sideways scroll — the window, or anything in it that scrolls, wider than it is;
 - clipped text — words cut by a box that hides its overflow, or past the window's edge. Two cuts are
   the design's and pass while they end in "…" with the whole text in a title: a device's name in

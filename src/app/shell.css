@@ -804,6 +804,7 @@ body {
 }
 .lb-head-titles {
   display: flex;
+  flex: 1;
   align-items: center;
   column-gap: 18px;
   min-width: 0;
@@ -1982,11 +1983,12 @@ body {
   gap: 14px;
 }
 .lb-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .lb-stat {
+  flex: 1 1 178px;
   min-width: 0;
   padding: 14px 16px;
   border-radius: 12px;
@@ -2008,6 +2010,20 @@ body {
   margin-top: 6px;
   font-size: var(--gb-text-caption);
   color: var(--gb-ink-2);
+}
+/* Quantity has no price yet. Keep its shorter readout on one row rather than leave a
+   seventh currency-sized tile alone above the activity cards. */
+.lb-stat[data-session-metric="loot"] {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: 16px;
+}
+.lb-stat[data-session-metric="loot"] .lb-stat-value {
+  margin: 0 0 0 auto;
+}
+.lb-stat[data-session-metric="loot"] .lb-stat-detail {
+  margin: 0;
 }
 .lb-activity-cards {
   display: grid;
@@ -2188,7 +2204,7 @@ body {
 }
 .lb-feed li {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: 12px;
   padding: 9px 0;
   border-bottom: 1px solid var(--gb-card-rule);
@@ -2200,6 +2216,7 @@ body {
 .lb-feed time {
   font-family: var(--gb-font-mono);
   color: var(--gb-ink-2);
+  white-space: nowrap;
 }
 .lb-feed li > span {
   overflow-wrap: anywhere;
@@ -2244,14 +2261,25 @@ body {
   gap: 8px;
   flex: none;
 }
-@media (max-width: 1279px) {
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .lb-stat {
+    flex-basis: calc((100% - 36px) / 4);
+  }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
   .lb-sources {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 1023px) {
-  .lb-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .lb-stat {
+    flex-basis: calc((100% - 24px) / 3);
+  }
+  .lb-activity-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lb-activity-cards > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
   .lb-head {
     flex-wrap: wrap;

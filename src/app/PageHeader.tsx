@@ -10,7 +10,7 @@ import type { TStrings } from "../shared/strings.js";
  * beside the tabs from 1280 up, under them below.
  *
  * In slice 0 the only range is Session: Today and 7 days need History, which is not built yet.
- * Actions at the right appear only when they do something, and none does yet.
+ * Slice 1 puts New session at the right; it stays beside the title at the minimum width.
  */
 
 /** The id of the region the tab controls (Shell.tsx). */
