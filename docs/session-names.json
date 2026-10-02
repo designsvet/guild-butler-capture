@@ -1,0 +1,14 @@
+{
+  "revision": "47e4f5aca4d30b7495afa5a625ce0d5795e32050",
+  "source": "https://github.com/ao-data/ao-bin-dumps/tree/47e4f5aca4d30b7495afa5a625ce0d5795e32050",
+  "mobOffset": 16,
+  "worldCount": 1427,
+  "mobCount": 5479,
+  "tableSha256": "15e7a13f006281fe6cab554a215e4eef6e62b254009beef2bcc3003ad28a7c2d",
+  "inputSha256": {
+    "clusters": "6c3e66e9daf59a2e26a5e98be97b4bdd864e7a3d3243846bc684e3f278de7b7b",
+    "mobs": "c09852d0a06d49d96ae77b1f4b9b2174278c28cfe1118de859fc732dc8525a7b",
+    "localization": "dd94300d690cb56fbf1458178e2bf74610d49bbddb4630b405ba728f8336c5c3",
+    "worldsettings": "3063ccbe9bd80388bcf21a528dfd3aeb7f4c6e9ed9dd739a2a229473b125c82a"
+  }
+}

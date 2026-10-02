@@ -1,0 +1,32 @@
+timestamp_utc;looted_by__alliance;looted_by__guild;looted_by__name;item_id;item_name;quantity;looted_from__alliance;looted_from__guild;looted_from__name;server__region
+2026-09-21T11:38:34.886Z;;;Player1;T6_MAIN_NATURESTAFF_KEEPER@2;Master's Druidic Staff;1;;;Player2;Europe
+2026-09-21T11:38:35.164Z;;;Player1;T5_OFF_DEMONSKULL_HELL@3;Expert's Muisak;1;;;Player2;Europe
+2026-09-21T11:38:35.555Z;;;Player1;T6_SHOES_PLATE_HELL@1;Master's Demon Boots;1;;;Player2;Europe
+2026-09-21T11:38:35.771Z;;;Player1;T6_POTION_GATHER;Gathering Potion;4;;;Player2;Europe
+2026-09-21T11:38:35.960Z;;;Player1;T7_MEAL_PIE@1;Pork Pie;1;;;Player2;Europe
+2026-09-21T11:38:36.191Z;;;Player1;T8_2H_TOOL_SICKLE;Elder's Sickle;1;;;Player2;Europe
+2026-09-21T11:38:36.398Z;;;Player1;T8_POTION_CLEANSE;Invisibility Potion;1;;;Player2;Europe
+2026-09-21T11:38:36.955Z;;;Player1;T6_HIDE_LEVEL3@3;Exceptional Robust Hide;2;;;Player2;Europe
+2026-09-21T11:38:37.287Z;;;Player1;T6_WOOD;Bloodoak Logs;1;;;Player2;Europe
+2026-09-21T11:38:37.494Z;;;Player1;T6_MOUNT_FROSTRAM_ADC;Frost Ram;1;;;Player2;Europe
+2026-09-21T11:38:37.691Z;;;Player1;T6_ARMOR_CLOTH_SET3@1;Master's Mage Robe;1;;;Player2;Europe
+2026-09-21T11:38:37.870Z;;;Player1;T6_HEAD_LEATHER_HELL@1;Master's Hellion Hood;1;;;Player2;Europe
+2026-09-21T11:38:38.181Z;;;Player1;T8_2H_TOOL_AXE;Elder's Axe;1;;;Player2;Europe
+2026-09-21T11:38:38.828Z;;;Player1;T8_2H_TOOL_KNIFE;Elder's Skinning Knife;1;;;Player2;Europe
+2026-09-21T11:42:36.568Z;;;Player3;T4_HEAD_LEATHER_SET1@3;Adept's Mercenary Hood;1;;;Player4;Europe
+2026-09-21T11:42:36.758Z;;;Player3;T4_CAPEITEM_FW_LYMHURST@3;Adept's Lymhurst Cape;1;;;Player4;Europe
+2026-09-21T11:42:36.914Z;;;Player3;T5_RUNE;Expert's Rune;2;;;Player4;Europe
+2026-09-21T11:42:37.088Z;;;Player3;T8_MEAL_STEW;Beef Stew;1;;;Player4;Europe
+2026-09-21T11:42:37.274Z;;;Player3;T4_RUNE;Adept's Rune;1;;;Player4;Europe
+2026-09-21T11:42:37.601Z;;;Player3;T3_MOUNT_HORSE;Journeyman's Riding Horse;1;;;Player4;Europe
+2026-09-21T11:42:37.856Z;;;Player3;T4_ARMOR_LEATHER_SET1@3;Adept's Mercenary Jacket;1;;;Player4;Europe
+2026-09-21T11:42:37.948Z;;;Player3;T4_SHOES_PLATE_SET1@3;Adept's Soldier Boots;1;;;Player4;Europe
+2026-09-21T11:42:38.289Z;;;Player3;T3_POTION_MOB_RESET;Minor Calming Potion;1;;;Player4;Europe
+2026-09-21T11:42:38.483Z;;;Player3;T5_SOUL;Expert's Soul;1;;;Player4;Europe
+2026-09-21T11:44:04.909Z;;;Player3;T6_RUNE;Master's Rune;1;;;Player5;Europe
+2026-09-21T11:44:05.130Z;;;Player3;T4_RUNE;Adept's Rune;1;;;Player5;Europe
+2026-09-21T11:44:30.783Z;;;Player6;T6_2H_TOOL_KNIFE;Master's Skinning Knife;1;;;Player7;Europe
+2026-09-21T11:44:31.099Z;;;Player6;T6_2H_TOOL_AXE;Master's Axe;1;;;Player7;Europe
+2026-09-21T11:44:32.045Z;;;Player6;T8_RUNE;Elder's Rune;1;;;Player7;Europe
+2026-09-21T18:23:13.549Z;;;Player8;TREASURE_DECORATIVE_RARITY1;Simple Stone Toy;1;;;Player9;Europe
+2026-09-21T18:23:13.946Z;;;Player8;TREASURE_SILVERWARE_RARITY1;Silver Cup;1;;;Player9;Europe

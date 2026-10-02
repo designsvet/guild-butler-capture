@@ -81,6 +81,7 @@ const { join, resolve } = require("node:path");
 const { buildSync } = require("esbuild");
 
 const morph = require("./shell-morph.cjs");
+const stubItemArt = require("./item-art-stub.cjs");
 
 const ROOT = resolve(__dirname, "..");
 const PAGE = join(ROOT, "dist", "web", "app", "index.html");
@@ -109,10 +110,20 @@ const fromSource = (file) => {
  * longer compiles, or touches `window` on import — leaves Electron up with no window (it reports
  * the error and waits), and CI would sit through to its timeout. Inside the run a throw exits 1.
  */
-const readLists = () => ({
-  ROUTES: fromSource("src/app/router.ts").ROUTES,
-  SUPPORTED_LANGS: fromSource("src/shared/i18n.ts").SUPPORTED_LANGS,
-});
+const readLists = () => {
+  const { replayedSession, fromSource: sessionSource } = require("./session-fixture.cjs");
+  const session = replayedSession();
+  const { closeSession } = sessionSource("src/shared/session/model.ts");
+  STATES.push(
+    { name: "session-replay", state: "capturing", session, paired: true, notice: null },
+    { name: "session-stopped", state: "idle", session: closeSession(session, session.lastAt), paired: false, notice: null },
+    { name: "session-next", state: "capturing", session, paired: true, notice: null, press: { selector: "[data-new-session]", on: ["darwin", "win32"] } },
+  );
+  return {
+    ROUTES: fromSource("src/app/router.ts").ROUTES,
+    SUPPORTED_LANGS: fromSource("src/shared/i18n.ts").SUPPORTED_LANGS,
+  };
+};
 
 /** The words the connection panel's keys check against: the app's catalog and its failures, read in the run (above). */
 let stringsFor = null;
@@ -470,6 +481,17 @@ const measure = ({ route, zones, mayCut, surfaces, scope, veils = [], overlay = 
     range.selectNodeContents(node);
     return [...range.getClientRects()].filter((r) => r.width > 0.5 && r.height > 0.5).map(box);
   };
+
+  // The tab's underline has a glow outside its box. Wrapped metadata needs its own
+  // clear row; non-overlapping text rectangles alone miss the line crowding it.
+  const pageHeader = within.matches(".lb-head") ? within : within.querySelector(".lb-head");
+  if (W < 1280 && pageHeader != null) {
+    const tabs = pageHeader.querySelector(".gb-tabs");
+    const meta = pageHeader.querySelector(".lb-head-meta");
+    if (tabs != null && meta != null && meta.getBoundingClientRect().top < tabs.getBoundingClientRect().bottom + 8 - T) {
+      problems.add("the page metadata crowds the tab underline (less than 8px clear space)");
+    }
+  }
 
   // The page drew.
   for (const [selector, what] of !wholePage ? [] : [
@@ -1462,6 +1484,7 @@ const connectionKeys = async (win, load) => {
 };
 
 const run = async () => {
+  stubItemArt();
   const { ROUTES, SUPPORTED_LANGS } = readLists();
   readWords();
   const lists = [
@@ -1563,7 +1586,69 @@ const run = async () => {
         `(${measure.toString()})(${JSON.stringify({ route: load.route, zones: OS_ZONES[load.platform], mayCut: MAY_CUT, surfaces: SURFACES, veils: VEILS, overlay: OVERLAY, expect: load.expect })})`,
       );
       const refused = await win.webContents.executeJavaScript("window.gbcCheck.refused()");
+      const replayProof =
+        load.sc.session != null
+          ? await win.webContents.executeJavaScript(`(() => {
+        const data = document.querySelector('[data-session-data]');
+        if (${JSON.stringify(load.stateName)} === 'session-next') { return data == null ? [] : ['New session kept the old counters']; }
+        if (data == null) { return ['Replay did not draw the Session page']; }
+        const counts = { kills: '40', resources: '19', fish: '2', chests: '1' };
+        const errors = [];
+        for (const [key, n] of Object.entries(counts)) {
+          const actual = document.querySelector('[data-session-count="' + key + '"]')?.textContent;
+          if (actual !== n) { errors.push(key + ': expected ' + n + ', got ' + actual); }
+        }
+        const totals = { fame: 13307603664, respec: 2351349126, silver: 142162640, might: 159966314, favor: 70156519, faction: 113949404 };
+        for (const [metric, raw] of Object.entries(totals)) {
+          const actual = document.querySelector('[data-session-metric="' + metric + '"]')?.dataset.raw;
+          if (actual !== String(raw)) { errors.push(metric + ': expected raw ' + raw + ', got ' + actual); }
+        }
+        // F1r768 needs usable groups, not merely text that stays inside the window.
+        const rect = (el) => el.getBoundingClientRect();
+        const rowsFill = (selector) => {
+          const group = data.querySelector(selector);
+          const rows = new Map();
+          for (const child of group.children) {
+            const r = rect(child);
+            const top = Math.round(r.top);
+            rows.set(top, Math.max(rows.get(top) ?? 0, r.right));
+          }
+          if ([...rows.values()].some((right) => Math.abs(right - rect(group).right) > 1)) {
+            errors.push(selector + ': a partial row leaves unused space');
+          }
+        };
+        rowsFill('.lb-stats');
+        const header = document.querySelector('.lb-head');
+        const action = header.querySelector('[data-new-session]');
+        if (Math.abs(rect(action).right - rect(data).right) > 1) {
+          errors.push('New session is not at the right edge of the page');
+        }
+        if (innerWidth < 1024) {
+          rowsFill('.lb-activity-cards');
+          for (const card of data.querySelector('.lb-activity-cards').children) {
+            if (rect(card).width < 300) { errors.push('An activity card is too narrow for its counters'); }
+          }
+          const sources = [...data.querySelector('.lb-sources').children];
+          if (sources.length !== 2 || Math.abs(rect(sources[0]).top - rect(sources[1]).top) > 1) {
+            errors.push('The narrow page stacks the two source cards');
+          }
+        }
+        for (const time of data.querySelectorAll('.lb-feed time')) {
+          const range = document.createRange();
+          range.selectNodeContents(time);
+          if (range.getClientRects().length > 1) { errors.push('A feed timestamp wraps onto another line'); }
+        }
+        for (const stats of data.querySelectorAll('.lb-mini-stats')) {
+          const widths = [...stats.children].map((cell) => rect(cell).width);
+          if (Math.max(...widths) - Math.min(...widths) > 1) {
+            errors.push('Activity counters do not occupy equal-width columns');
+          }
+        }
+        return errors;
+      })()`)
+          : [];
       const all = [
+        ...replayProof,
         ...pressFailed,
         ...(waitingFor.length > 0 ? [`the page never settled: no ${waitingFor.join(", no ")}`] : []),
         ...problems,

@@ -11,6 +11,9 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 const CH = {
+  sessionGet: "session:get",
+  sessionNew: "session:new",
+  sessionChanged: "session:changed",
   captureStart: "capture:start",
   captureStop: "capture:stop",
   captureGetState: "capture:get-state",
@@ -40,6 +43,9 @@ const CH = {
 } as const;
 
 export type TGbcBridge = {
+  getSession: () => Promise<unknown>;
+  newSession: () => Promise<unknown>;
+  onSession: (listener: (session: unknown) => void) => () => void;
   platform: string;
   start: () => Promise<void>;
   stop: () => Promise<void>;
@@ -70,6 +76,17 @@ export type TGbcBridge = {
 };
 
 const bridge: TGbcBridge = {
+  getSession: () => ipcRenderer.invoke(CH.sessionGet),
+  newSession: () => ipcRenderer.invoke(CH.sessionNew),
+  onSession: (listener) => {
+    const wrapped = (_event: unknown, session: unknown): void => {
+      listener(session);
+    };
+    ipcRenderer.on(CH.sessionChanged, wrapped);
+    return () => {
+      ipcRenderer.removeListener(CH.sessionChanged, wrapped);
+    };
+  },
   platform: process.platform,
   start: () => ipcRenderer.invoke(CH.captureStart) as Promise<void>,
   stop: () => ipcRenderer.invoke(CH.captureStop) as Promise<void>,

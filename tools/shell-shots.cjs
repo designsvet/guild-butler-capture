@@ -64,6 +64,7 @@ const { tmpdir } = require("node:os");
 const { join, resolve } = require("node:path");
 
 const morph = require("./shell-morph.cjs");
+const stubItemArt = require("./item-art-stub.cjs");
 
 const ROOT = resolve(__dirname, "..");
 const PAGE = join(ROOT, "dist", "web", "app", "index.html");
@@ -168,6 +169,54 @@ const scenarios = () => {
       add({ state: "capturing", theme: "obsidian", platform, width, height, paired: true, sentAgoMs: 60_000 });
     }
   }
+  const { replayedSession } = require("./session-fixture.cjs");
+  const { closeSession } = require("./session-fixture.cjs").fromSource("src/shared/session/model.ts");
+  const recorded = replayedSession();
+  for (const theme of ["obsidian", "parchment"]) {
+    for (const [width, height] of [
+      [1440, 900],
+      [1024, 768],
+      [768, 620],
+    ]) {
+      add({
+        state: "capturing",
+        theme,
+        platform: "darwin",
+        width,
+        height,
+        session: recorded,
+        name: `session-replay-${theme}-${width}`,
+      });
+    }
+    add({
+      state: "idle",
+      theme,
+      platform: "darwin",
+      width: 1440,
+      height: 900,
+      session: closeSession(recorded, recorded.lastAt),
+      name: `session-stopped-${theme}`,
+    });
+    add({
+      state: "capturing",
+      theme,
+      platform: "darwin",
+      width: 1440,
+      height: 900,
+      session: recorded,
+      press: ["[data-new-session]"],
+      name: `session-next-${theme}`,
+    });
+  }
+  for (const [name, scroll] of [["loot", ".lb-loot-meta"], ["end", ".lb-session-info"]]) {
+    add({ state: "capturing", theme: "obsidian", platform: "darwin", width: 1440, height: 900, session: recorded, scroll, name: `session-${name}-obsidian-1440` });
+  }
+  for (const theme of ["obsidian", "parchment"]) {
+    for (const [name, scroll] of [["sources", ".lb-sources"], ["feed", ".lb-feed"], ["end", ".lb-session-info"]]) {
+      add({ state: "capturing", theme, platform: "darwin", width: 768, height: 620, session: recorded, scroll, name: `session-${name}-${theme}-768` });
+    }
+  }
+  add({ state: "capturing", theme: "obsidian", platform: "win32", width: 768, height: 620, lang: "de", session: recorded, name: "session-replay-de-obsidian-768" });
   // The foot's states (board Fh2), on the Mac at full width.
   for (const upload of ["up-to-date", "sending", "retrying", "unauthorized", "blocked", "bot-outdated"]) {
     add({ state: "capturing", theme: "obsidian", platform: "darwin", width: 1440, height: 900, paired: true, upload, sentAgoMs: 60_000 });
@@ -431,6 +480,7 @@ const typeKeys = async (win, sc) => {
 };
 
 const run = async () => {
+  stubItemArt();
   mkdirSync(OUT, { recursive: true });
   const strip = [];
   /** The bands, cropped, by theme and width — laid out as one sheet each (sheetPage). */
@@ -500,6 +550,10 @@ const run = async () => {
       );
     }
     const asked = sc.keys == null ? null : await typeKeys(win, sc);
+    if (sc.scroll != null) {
+      await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(sc.scroll)})?.scrollIntoView({ block: "start" })`);
+      await wait(100);
+    }
     if (OS_CHROME) {
       await win.webContents.executeJavaScript(osChrome(sc.platform));
     }
@@ -556,6 +610,20 @@ const run = async () => {
     const width = Math.round(sc.width * Number(SCALE));
     const picture = shot.getSize().width === width ? shot : shot.resize({ width, quality: "best" });
     writeFileSync(join(OUT, `${sc.name}.png`), picture.toPNG());
+    if (sc.name.startsWith("session-replay-") && sc.width === 768) {
+      for (const [name, selector] of [
+        ["header", ".lb-head"],
+        ["activity", ".lb-activity-cards > section"],
+      ]) {
+        const crop = await win.webContents.executeJavaScript(
+          `(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.floor(r.x - 8), y: Math.floor(r.y - 8), width: Math.ceil(r.width + 16), height: Math.ceil(r.height + 16) }; })()`,
+        );
+        const detail = await win.webContents.capturePage(crop);
+        const px = Math.round(crop.width * Number(SCALE));
+        const sized = detail.getSize().width === px ? detail : detail.resize({ width: px, quality: "best" });
+        writeFileSync(join(OUT, `${sc.name}-${name}.png`), sized.toPNG());
+      }
+    }
     win.destroy();
     console.log(
       `${refused.length > 0 ? "CSP " : "shot"} ${sc.name}${asked != null ? `  asked the bridge: ${asked.join(", ") || "nothing"}` : ""}${refused.length > 0 ? `  refused: ${refused.join(" | ")}` : ""}`,

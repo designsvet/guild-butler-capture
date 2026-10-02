@@ -9,7 +9,7 @@
  * mismatch is detected and explained by the AbiMismatch error path.
  */
 
-import { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, screen, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, protocol, safeStorage, screen, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import {
@@ -75,20 +75,31 @@ import {
 } from "./uploadClient.js";
 import { lootBroken, newlyBroken } from "../shared/engineHealth.js";
 import { createHeldStore, heldUploadsFilePath } from "./heldUploads.js";
-import { decoderVerdictFilePath, forgetDecoderVerdict, loadDecoderVerdict, saveDecoderVerdict } from "./decoderVerdict.js";
+import {
+  decoderVerdictFilePath,
+  forgetDecoderVerdict,
+  loadDecoderVerdict,
+  saveDecoderVerdict,
+} from "./decoderVerdict.js";
 import electronUpdater from "electron-updater";
 
 import { createUpdateController, updaterEnabled, type TUpdateController } from "./updateController.js";
 import { createUploader, type TUploader } from "./uploader.js";
 import { placeWindow, windowStateOf, type TPlacement } from "./windowBounds.js";
 import { isOwnPage, overlayFor, shellOverlayFor, windowOptions } from "./windowOptions.js";
-import {
-  createWindowStateKeeper,
-  loadWindowState,
-  saveWindowState,
-  windowStateFilePath,
-} from "./windowState.js";
+import { createWindowStateKeeper, loadWindowState, saveWindowState, windowStateFilePath } from "./windowState.js";
 import type { TEngineEvent } from "./engineAdapter.js";
+import { createSessionTracker, type TSessionTracker } from "./sessionTracker.js";
+import { listSessionFiles, readSessionBytes, saveSessionSummary } from "./sessionDisk.js";
+import { parseActivityLine, parseLootLine } from "../shared/session/events.js";
+import type { TSession } from "../shared/session/model.js";
+import { createItemArt } from "./itemArt.js";
+
+// Images have one private scheme; its handler accepts only game item IDs and serves validated PNGs.
+// This narrowly scoped scheme can serve images under the existing img-src 'self' policy.
+protocol.registerSchemesAsPrivileged([
+  { scheme: "albion-art", privileges: { standard: true, secure: true, bypassCSP: true } },
+]);
 
 const APP_ROOT = app.getAppPath();
 const SETTINGS_FILE = settingsFilePath(app.getPath("userData"));
@@ -120,6 +131,50 @@ let supervisor: TEngineSupervisor | null = null;
 let tracker: TLogFileTracker | null = null;
 let currentEngine: TResolvedEngine | null = null;
 let quitConfirmed = false;
+let sessionTracker: TSessionTracker | null = null;
+let sessionValue: TSession | null = null;
+let dataFinish: Promise<void> = Promise.resolve();
+let startingCapture = false;
+let startRevision = 0;
+let quitDrained = false;
+let quitDraining = false;
+let captureStopped: (() => void) | null = null;
+
+const finishDataSession = (): Promise<void> => {
+  const tracker = sessionTracker;
+  if (tracker != null) {
+    sessionTracker = null;
+    dataFinish = tracker.stop().catch((err: unknown) => {
+      appLog(`[session] summary failed: ${String(err)}`);
+    });
+  }
+  return dataFinish;
+};
+
+const startDataSession = (engine: TResolvedEngine, initialOffsets: Map<string, number>, at: number): void => {
+  if (!heldUploadOn()) {
+    return;
+  }
+  const replay = engine.source === "replay";
+  sessionTracker = createSessionTracker({
+    initialOffsets,
+    list: () => listSessionFiles(engine.workDir),
+    read: readSessionBytes,
+    now: replay ? () => sessionValue?.lastAt ?? at : Date.now,
+    id: randomUUID,
+    log: appLog,
+    save: (session) => saveSessionSummary(replay ? join(app.getPath("userData"), "replays") : engine.workDir, session),
+    setInterval: (fn, ms) => setInterval(fn, ms),
+    clearInterval: (timer) => clearInterval(timer as NodeJS.Timeout),
+    onSnapshot: (session) => {
+      sessionValue = session;
+      win?.webContents.send(IPC.sessionChanged, session);
+    },
+  });
+  // Replay starts at the first recorded timestamp; rates and durations never use today's clock.
+  sessionValue = sessionTracker.snapshot();
+  win?.webContents.send(IPC.sessionChanged, sessionValue);
+};
 
 /** Small on-disk breadcrumb trail for supporting members remotely. Best-effort. */
 const appLog = (line: string): void => {
@@ -183,6 +238,9 @@ const dispatch = (ev: TSessionEvent): void => {
   }
   if (state.status === ECaptureStatus.Idle || state.status === ECaptureStatus.Error) {
     stopTracker();
+    void finishDataSession();
+    captureStopped?.();
+    captureStopped = null;
     // Same condition as the tracker on purpose: the uploader's lifetime is the
     // capture session's, and two separate end-detections would drift.
     stopUploadLoop();
@@ -481,6 +539,11 @@ const probeAccess = async (): Promise<ECaptureAccess> => {
 };
 
 const resolveCurrentEngine = (): TResolvedEngine | null => {
+  if (process.env.GBC_REPLAY_DIR != null) {
+    const folder = process.env.GBC_REPLAY_DIR;
+    currentEngine = { entry: "", root: folder, workDir: folder, source: "replay" };
+    return currentEngine;
+  }
   // Dev/demo escape hatch: GBC_MOCK_ENGINE=1 runs the bundled mock engine so
   // the whole app loop can be exercised with no game, no libpcap, no engine.
   if (process.env.GBC_MOCK_ENGINE === "1") {
@@ -515,7 +578,7 @@ const getSetup = async (): Promise<TSetupStatus> => {
     engineRoot: engine?.root ?? null,
     engineSource: engine?.source ?? null,
     captureDir: engine?.workDir ?? null,
-    access: await probeAccess(),
+    access: engine?.source === "replay" ? ECaptureAccess.Ok : await probeAccess(),
     appVersion: app.getVersion(),
     builtAt: BUILT_AT,
   };
@@ -524,94 +587,172 @@ const getSetup = async (): Promise<TSetupStatus> => {
 // --- capture control ---------------------------------------------------------
 
 const engineEnv = (): NodeJS.ProcessEnv => {
-  const env: NodeJS.ProcessEnv = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    ELECTRON_RUN_AS_NODE: "1",
+    ...(heldUploadOn() ? { ACTIVITY_EVENTS: "1" } : {}),
+  };
   if (process.platform === "win32") {
     env.PATH = npcapChildPathEnv(process.env.SystemRoot ?? "C:\\Windows", process.env.PATH);
   }
   return env;
 };
 
-const startCapture = (): void => {
-  if (supervisor?.isActive() === true) {
+const startCapture = async (): Promise<void> => {
+  if (
+    startingCapture ||
+    quitDraining ||
+    supervisor?.isActive() === true ||
+    (currentEngine?.source === "replay" && sessionTracker != null)
+  ) {
     return;
   }
-  const engine = resolveCurrentEngine();
-  if (engine == null) {
-    // No process to supervise — synthesize the session so the UI tells the
-    // one story: started, failed for a reason, here is the fix.
-    dispatch({ type: "user-start", at: Date.now() });
+  startingCapture = true;
+  const revision = ++startRevision;
+  try {
+    await dataFinish;
+    if (quitDraining || revision !== startRevision) {
+      return;
+    }
+    sessionValue = null;
+    const engine = resolveCurrentEngine();
+    if (engine == null) {
+      // No process to supervise — synthesize the session so the UI tells the
+      // one story: started, failed for a reason, here is the fix.
+      dispatch({ type: "user-start", at: Date.now() });
+      dispatch({
+        type: "engine-exit",
+        at: Date.now(),
+        fatal: EEngineErrorKind.EngineMissing,
+        detail: `No ao-loot-logger found next to ${APP_ROOT}`,
+        willRestart: false,
+        delayMs: 0,
+        attempt: 0,
+      });
+      return;
+    }
+    if (engine.source === "replay") {
+      const files = await listSessionFiles(engine.workDir);
+      const events = (
+        await Promise.all(
+          files.map(async (file) =>
+            (await fsp.readFile(file.path, "utf8")).split(/\r?\n/).flatMap((line) => {
+              const event = file.path.endsWith(".jsonl") ? parseActivityLine(line) : parseLootLine(line);
+              return event == null ? [] : [event];
+            }),
+          ),
+        )
+      ).flat();
+      const first = events.reduce((at, event) => Math.min(at, event.at), Infinity);
+      if (!Number.isFinite(first)) {
+        throw new Error("No readable session events in replay folder");
+      }
+      if (quitDraining || revision !== startRevision) {
+        return;
+      }
+      dispatch({ type: "user-start", at: first });
+      startDataSession(engine, new Map(), first);
+      const data = sessionTracker;
+      if (data != null) {
+        await data.poll();
+      }
+      dispatch({ type: "engine-line", at: first, event: { kind: "albion-detected" } });
+      const character = data?.snapshot().character;
+      if (character != null) {
+        dispatch({ type: "engine-line", at: first, event: { kind: "character", name: character } });
+      }
+      appLog(`session: replay ${engine.workDir}; bot traffic disabled`);
+      return;
+    }
+    const initialOffsets = new Map(
+      (await listSessionFiles(engine.workDir).catch(() => [])).map((file) => [file.path, file.size]),
+    );
+    if (quitDraining || revision !== startRevision) {
+      return;
+    }
+    startDataSession(engine, initialOffsets, Date.now());
+    appLog(`start capture engine=${engine.entry} (${engine.source}) workDir=${engine.workDir}`);
+    // The engine writes its log to cwd; a bundled engine's workDir is a per-user
+    // captures folder that may not exist yet.
+    mkdirSync(engine.workDir, { recursive: true });
+
+    const nodeBin = process.env.GBC_NODE_BIN ?? process.execPath;
+    supervisor = createEngineSupervisor({
+      spawn: () =>
+        spawn(nodeBin, [engine.entry], {
+          cwd: engine.workDir,
+          env: engineEnv(),
+          stdio: ["ignore", "pipe", "pipe"],
+          windowsHide: true,
+        }),
+      now: Date.now,
+      emit: dispatch,
+      setTimer: (fn, ms) => setTimeout(fn, ms),
+      clearTimer: (h) => clearTimeout(h as NodeJS.Timeout),
+      resolveLogPath: (name) => (isAbsolute(name) ? name : join(engine.workDir, name)),
+    });
+    supervisor.startSession();
+    if (talksToBot(engine.source)) {
+      startUploadLoop();
+    } else {
+      appLog("upload: off — the mock engine's lines never leave this computer");
+    }
+
+    stopTracker();
+    if (!supervisor.isActive()) {
+      // the spawn failed synchronously — the state is already Error, and a
+      // poller with nothing to watch would just tick until the next session
+      return;
+    }
+    tracker = createLogFileTracker({
+      dirs: [engine.workDir],
+      sinceMs: Date.now(),
+      listDir: async (dir) => {
+        const names = await fsp.readdir(dir);
+        const out: TLogCandidate[] = [];
+        for (const name of names) {
+          if (!isLootLogName(name)) {
+            continue;
+          }
+          try {
+            const st = await fsp.stat(join(dir, name));
+            out.push({ path: join(dir, name), mtimeMs: st.mtimeMs });
+          } catch {
+            // deleted between readdir and stat
+          }
+        }
+        return out;
+      },
+      readFile: (path) => fsp.readFile(path, "utf8"),
+      onUpdate: (file, lines) => dispatch({ type: "file-lines", at: Date.now(), file, lines }),
+      setInterval: (fn, ms) => setInterval(fn, ms),
+      clearInterval: (h) => clearInterval(h as NodeJS.Timeout),
+    });
+  } catch (err) {
+    appLog(`[session] start failed: ${String(err)}`);
+    await finishDataSession();
+    throw err;
+  } finally {
+    startingCapture = false;
+  }
+};
+
+const stopCapture = (): void => {
+  startRevision += 1;
+  if (currentEngine?.source === "replay") {
+    dispatch({ type: "user-stop", at: Date.now() });
     dispatch({
       type: "engine-exit",
       at: Date.now(),
-      fatal: EEngineErrorKind.EngineMissing,
-      detail: `No ao-loot-logger found next to ${APP_ROOT}`,
+      fatal: null,
+      detail: null,
       willRestart: false,
       delayMs: 0,
       attempt: 0,
     });
-    return;
-  }
-  appLog(`start capture engine=${engine.entry} (${engine.source}) workDir=${engine.workDir}`);
-  // The engine writes its log to cwd; a bundled engine's workDir is a per-user
-  // captures folder that may not exist yet.
-  mkdirSync(engine.workDir, { recursive: true });
-
-  const nodeBin = process.env.GBC_NODE_BIN ?? process.execPath;
-  supervisor = createEngineSupervisor({
-    spawn: () =>
-      spawn(nodeBin, [engine.entry], {
-        cwd: engine.workDir,
-        env: engineEnv(),
-        stdio: ["ignore", "pipe", "pipe"],
-        windowsHide: true,
-      }),
-    now: Date.now,
-    emit: dispatch,
-    setTimer: (fn, ms) => setTimeout(fn, ms),
-    clearTimer: (h) => clearTimeout(h as NodeJS.Timeout),
-    resolveLogPath: (name) => (isAbsolute(name) ? name : join(engine.workDir, name)),
-  });
-  supervisor.startSession();
-  if (talksToBot(engine.source)) {
-    startUploadLoop();
   } else {
-    appLog("upload: off — the mock engine's lines never leave this computer");
+    supervisor?.stopSession();
   }
-
-  stopTracker();
-  if (!supervisor.isActive()) {
-    // the spawn failed synchronously — the state is already Error, and a
-    // poller with nothing to watch would just tick until the next session
-    return;
-  }
-  tracker = createLogFileTracker({
-    dirs: [engine.workDir],
-    sinceMs: Date.now(),
-    listDir: async (dir) => {
-      const names = await fsp.readdir(dir);
-      const out: TLogCandidate[] = [];
-      for (const name of names) {
-        if (!isLootLogName(name)) {
-          continue;
-        }
-        try {
-          const st = await fsp.stat(join(dir, name));
-          out.push({ path: join(dir, name), mtimeMs: st.mtimeMs });
-        } catch {
-          // deleted between readdir and stat
-        }
-      }
-      return out;
-    },
-    readFile: (path) => fsp.readFile(path, "utf8"),
-    onUpdate: (file, lines) => dispatch({ type: "file-lines", at: Date.now(), file, lines }),
-    setInterval: (fn, ms) => setInterval(fn, ms),
-    clearInterval: (h) => clearInterval(h as NodeJS.Timeout),
-  });
-};
-
-const stopCapture = (): void => {
-  supervisor?.stopSession();
 };
 
 // --- window ------------------------------------------------------------------
@@ -787,8 +928,13 @@ const createWindow = (): void => {
 // --- IPC ---------------------------------------------------------------------
 
 const registerIpc = (): void => {
-  ipcMain.handle(IPC.captureStart, () => {
-    startCapture();
+  ipcMain.handle(IPC.captureStart, () => startCapture());
+  ipcMain.handle(IPC.sessionGet, () => sessionValue);
+  ipcMain.handle(IPC.sessionNew, async () => {
+    if (sessionTracker == null) {
+      throw new Error("No active session");
+    }
+    return await sessionTracker.newSession();
   });
   ipcMain.handle(IPC.captureStop, () => {
     stopCapture();
@@ -918,7 +1064,9 @@ const registerIpc = (): void => {
               const text = `${err.message} ${stderr ?? ""}`;
               const declined = /canceled by the user|cancelled by the user|0x800704C7|1223/i.test(text);
               const failure: Error & { gbcUacDeclined?: boolean } = new Error(
-                declined ? "UAC prompt declined" : `installer failed to start: ${String(stderr || err.message).slice(0, 200)}`,
+                declined
+                  ? "UAC prompt declined"
+                  : `installer failed to start: ${String(stderr || err.message).slice(0, 200)}`,
               );
               failure.gbcUacDeclined = declined;
               reject(failure);
@@ -1085,6 +1233,57 @@ const registerIpc = (): void => {
   });
 };
 
+const registerItemArt = (): void => {
+  const cache = join(app.getPath("userData"), "item-art");
+  const load = createItemArt({
+    read: async (key) => {
+      try {
+        return await fsp.readFile(join(cache, `${key}.png`));
+      } catch {
+        return null;
+      }
+    },
+    write: async (key, bytes) => {
+      await fsp.mkdir(cache, { recursive: true });
+      const path = join(cache, `${key}.png`);
+      await fsp.writeFile(`${path}.tmp`, bytes);
+      await fsp.rename(`${path}.tmp`, path);
+    },
+    fetch: async (url) => {
+      const response = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(8_000) });
+      const chunks: Uint8Array[] = [];
+      let length = 0;
+      if (response.body != null) {
+        const reader = response.body.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
+            length += value.byteLength;
+            if (length > 1024 * 1024) {
+              await reader.cancel();
+              throw new Error("Item art response too large");
+            }
+            chunks.push(value);
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      }
+      return { ok: response.ok, bytes: Buffer.concat(chunks), contentType: response.headers.get("content-type") };
+    },
+    log: (message, error) => appLog(`[art] ${message}${error == null ? "" : `: ${String(error)}`}`),
+  });
+  protocol.handle("albion-art", async (request) => {
+    const bytes = await load(request.url);
+    return bytes == null
+      ? new Response(null, { status: 404 })
+      : new Response(bytes as Uint8Array<ArrayBuffer>, { headers: { "Content-Type": "image/png" } });
+  });
+};
+
 // --- lifecycle ---------------------------------------------------------------
 
 // Packaged: single instance — an extra launch fronts the existing window.
@@ -1125,6 +1324,7 @@ if (!gotLock) {
       state = { ...state, engineBroken: remembered.broken };
       appLog(`decoder: broken before on v${app.getVersion()} — the upload is held from the start`);
     }
+    registerItemArt();
     registerIpc();
     createWindow();
     updates.start();
@@ -1143,8 +1343,33 @@ if (!gotLock) {
     }
   });
 
-  app.on("before-quit", () => {
-    stopTracker();
-    supervisor?.dispose();
+  app.on("before-quit", (event) => {
+    if (quitDrained || !heldUploadOn()) {
+      stopTracker();
+      supervisor?.dispose();
+      return;
+    }
+    event.preventDefault();
+    if (quitDraining) {
+      return;
+    }
+    quitDraining = true;
+    void (async () => {
+      if (supervisor?.isActive()) {
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 4_000);
+          captureStopped = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+          stopCapture();
+        });
+      }
+      await finishDataSession();
+      stopTracker();
+      supervisor?.dispose();
+      quitDrained = true;
+      app.quit();
+    })();
   });
 }
