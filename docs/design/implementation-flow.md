@@ -99,7 +99,8 @@ in that PR. A documentation-only PR may mark renderer checks not applicable with
 - [PvE F3](pve-proof.md): retained approved export and source hash, counts/visits/chests supported,
   per-mob fame and individual chest value/loot unavailable.
 - [Packaged native art provenance](../../resources/albion/PROVENANCE.md): the owner's current
-  private implementation choice supersedes the older outline-only drawing note for this subset.
+  private implementation choice covers approved sprites and exact matching mob portraits,
+  superseding the older outline-only drawing note; remaining avatar gaps are listed explicitly.
 - [Slice 2 scope](../slice2.md): approved PvE first; Gathering/Fishing await a layout choice.
 
 The 2026-10-03 owner test found missing supported UI despite passing counter/layout checks.

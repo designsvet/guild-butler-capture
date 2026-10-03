@@ -20,7 +20,7 @@
  *   the files (a bundler emits the fonts and leaves the licences behind). Whole, not by list:
  *   each file name carries a hash that changes when a face is reissued.
  * - The crest is resources/icons/crest-mark.png, the same mark the old window's title bar uses.
- * - Approved F1/F3 Albion sprites and their provenance travel as resources/albion/. Dynamic
+ * - Approved native Albion sprites, matched mob portraits and provenance travel as resources/albion/. Dynamic
  *   item art still goes through the main process's restricted official-service handler.
  *
  * GBC_DIST_DIR points the output somewhere else, as it does for build-static:

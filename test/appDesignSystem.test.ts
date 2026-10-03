@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -7,6 +8,8 @@ import { fileURLToPath } from "node:url";
 
 import postcss, { type ChildNode, type Rule } from "postcss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { FULL_FRAME_MOB_AVATARS, MOB_PORTRAIT_AVATARS } from "../src/app/mobPortraits.js";
+import { MOBS } from "../src/shared/session/nameTables.js";
 
 /**
  * The v5 shell (src/app) reads the design system (@guild-butler/design-system, ADR 0145) through
@@ -74,7 +77,7 @@ const runStart = (haystack: string[], needle: string[]): number => {
 };
 
 describe("the v5 shell's build", () => {
-  it("ships only the page, bundle, stylesheet, crest, Albion subset and faces", () => {
+  it("ships only the page, bundle, stylesheet, crest, Albion artwork and faces", () => {
     expect(readdirSync(APP).sort()).toEqual(["albion", "app.css", "crest.png", "fonts", "index.html", "main.js"]);
     expect(readFileSync(join(APP, "index.html"), "utf8")).toBe(
       readFileSync(join(ROOT, "src", "app", "index.html"), "utf8"),
@@ -95,7 +98,74 @@ describe("the v5 shell's build", () => {
     for (const [, file] of bundle.matchAll(/"([ui]-[A-Za-z0-9_]+\.png)"/g)) {
       expect(files, `Missing icon in built app: ${file}`).toContain(file);
     }
-    expect(files.filter((file) => file.endsWith(".png"))).toHaveLength(20);
+    expect(files.filter((file) => file.startsWith("mob-") && file.endsWith(".png")).sort()).toEqual(
+      MOB_PORTRAIT_AVATARS.map((avatar) => `mob-${avatar}.png`).sort(),
+    );
+    expect(files.filter((file) => /^[ui]-/.test(file))).toHaveLength(12);
+  });
+
+  it("ships hashed, exact avatar matches and accounts for every portrait gap in the pinned mob table", () => {
+    const manifest = JSON.parse(readFileSync(join(APP, "albion/mob-portraits.json"), "utf8")) as {
+      nameTableSha256: string;
+      missingAvatars: string[];
+      coverage: {
+        mobEntries: number;
+        avatarIdentities: number;
+        portraits: number;
+        coveredMobEntries: number;
+        mobEntriesWithoutAvatar: number;
+      };
+      portraits: {
+        avatar: string;
+        file: string;
+        origin: string;
+        frame: string;
+        sha256: string;
+        width: number;
+        height: number;
+        upstream: { sha256: string; blobSha1: string } | null;
+      }[];
+    };
+    const sha256 = (bytes: Buffer): string => createHash("sha256").update(bytes).digest("hex");
+    expect(manifest.nameTableSha256).toBe(sha256(readFileSync(join(ROOT, "src/shared/session/nameTables.ts"))));
+    expect(manifest.portraits.map((row) => row.avatar)).toEqual([...MOB_PORTRAIT_AVATARS]);
+    const selected = new Set<string>(MOB_PORTRAIT_AVATARS);
+    expect(selected.size).toBe(manifest.portraits.length);
+    const mobs = Object.values(MOBS);
+    const avatars = [
+      ...new Set(mobs.map((mob) => mob.avatar).filter((avatar): avatar is string => avatar != null)),
+    ].sort();
+    expect(manifest.missingAvatars).toEqual(avatars.filter((avatar) => !selected.has(avatar)));
+    expect(manifest.coverage).toEqual({
+      mobEntries: mobs.length,
+      avatarIdentities: avatars.length,
+      portraits: selected.size,
+      coveredMobEntries: mobs.filter((mob) => mob.avatar != null && selected.has(mob.avatar)).length,
+      mobEntriesWithoutAvatar: mobs.filter((mob) => mob.avatar == null).length,
+    });
+    expect(manifest.portraits.filter((row) => row.origin === "approved-f3")).toHaveLength(8);
+    expect(manifest.portraits.filter((row) => row.frame === "full").map((row) => row.avatar)).toEqual([
+      ...FULL_FRAME_MOB_AVATARS,
+    ]);
+    for (const row of manifest.portraits) {
+      expect(row.avatar).toMatch(/^[A-Z0-9_]+$/);
+      expect(avatars).toContain(row.avatar);
+      expect(row.file).toBe(`mob-${row.avatar}.png`);
+      const bytes = readFileSync(join(APP, "albion", row.file));
+      expect(sha256(bytes), row.file).toBe(row.sha256);
+      expect(bytes.subarray(0, 8).toString("hex"), row.file).toBe("89504e470d0a1a0a");
+      expect(bytes.toString("ascii", 12, 16), row.file).toBe("IHDR");
+      expect(bytes.readUInt32BE(16), row.file).toBe(row.width);
+      expect(bytes.readUInt32BE(20), row.file).toBe(row.height);
+      if (row.origin === "statistics-analysis") {
+        expect(row.frame).toBe("central-medallion");
+        expect([row.width, row.height]).toEqual([256, 256]);
+        expect(row.sha256, row.file).toBe(row.upstream?.sha256);
+        expect(createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex"), row.file).toBe(
+          row.upstream?.blobSha1,
+        );
+      }
+    }
   });
 
   it("keeps the old window's content-security policy, word for word", () => {

@@ -192,6 +192,8 @@ const scenarios = () => {
       add({ state: "capturing", theme, platform: "darwin", width, height, session: recorded, route: "pve", scroll: ".lb-pve-aside", name: `pve-chests-${theme}-${width}` });
       add({ state: "capturing", theme, platform: "darwin", width, height, session: journalSession(), name: `journal-completions-${theme}-${width}` });
       add({ state: "capturing", theme, platform: "darwin", width, height, session: favorOnlySession(), name: `favor-only-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: favorOnlySession(), route: "pve", scroll: ".lb-pve-columns", name: `pve-imp-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: favorOnlySession(), scroll: '[data-session-event="kill"]', name: `session-imp-feed-${theme}-${width}` });
     }
     add({
       state: "idle",

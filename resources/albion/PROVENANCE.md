@@ -1,12 +1,21 @@
 # Approved Albion artwork
 
-The owner supplied the F1 HTML export on 2026-10-03 and explicitly requested these native sprites in Session/PvE. Currency, activity and available chest sprites are copied byte-for-byte from that export. The eight mob portraits are copied from the approved F3 export supplied on 2026-10-02. These are Albion Online game assets; no ownership or new asset licence is claimed.
+The owner supplied the F1 HTML export on 2026-10-03 and explicitly requested these native sprites in Session/PvE. Currency, activity and available chest sprites are copied byte-for-byte from that export. Eight mob portraits retain their original bytes from the approved F3 export supplied on 2026-10-02. On 2026-10-03 the owner requested broader mob portrait coverage; 498 additional exact matches were imported from the source below. These are Albion Online game assets; no ownership or new asset licence is claimed.
 
-Only the images used by the app are bundled. Exported HTML, JavaScript, vendor code, example equipment and example player data are not executed or packaged. The icon lookup is a static allowlist, including exact avatar keys from the pinned mob dump; unavailable portraits/rarities retain a decorative outline fallback. Dynamic item art still uses the existing restricted official image service.
+Only portraits referenced by the pinned mob table and the approved sprites are bundled. Exported HTML, JavaScript, vendor code, example equipment and example player data are not executed or packaged. The icon lookup is a generated static allowlist of exact avatar keys; unavailable or failed mob images use the native skull, and unavailable chest rarities retain the outline fallback. No lookalike family aliases are guessed. Dynamic item art still uses the existing restricted official image service.
 
 This records the owner's private implementation choice; the wider public redistribution question in raid-bot Q58 remains unresolved. No release or merge is part of this correction.
 
-## Source hashes
+## Mob portrait source and coverage
+
+- Source: [Statistics Analysis Tool's MobAvatars](https://github.com/Triky313/AlbionOnline-StatisticsAnalysis/tree/3c90f930f742118ee6ffc8977f2f7f376af97016/src/StatisticsAnalysisTool/Assets/MobAvatars), pinned at `3c90f930f742118ee6ffc8977f2f7f376af97016`.
+- The source contains 552 PNGs; 506 match exact avatar identities in our pinned ao-bin-dumps table. The 46 unreferenced source images are excluded. Eight approved F3 files are preserved; the other 498 are copied byte-for-byte. All downloaded source files were verified against their Git blob hashes.
+- The 506 portraits cover 5,255 of 5,479 mob entries. Tiers/variants share the game's avatar identity. The remaining 80 identities (224 entries) are listed in [mob-portraits.json](mob-portraits.json); the skull remains until exact artwork is available. Summoned Imp (`1833`, `MORGANADEMONIMP1`) is covered.
+- [mob-portraits.json](mob-portraits.json) records the source revision, name-table hash, coverage, exact filename, packaged SHA-256, source SHA-256/Git blob hash and dimensions for every portrait. [MOB-ASSET-SOURCE-LICENSE.txt](MOB-ASSET-SOURCE-LICENSE.txt) retains the source repository's GPL-3.0 licence text; the game artwork remains Sandbox Interactive's.
+- The supplied F3 files are 128px portraits without the upstream 256px canvas padding. Imported files retain their bytes; the renderer displays their central 128px medallion using a clipped CSS viewport. This gives both sources the same visual weight at F3's 56px mob / 44px standout sizes. The manifest records each file's full/central-medallion frame; unknown source dimensions fail the importer for review.
+- Re-import from that revision's `Assets/MobAvatars` folder with `node tools/mob-portraits.mjs <folder> <revision>`. It preserves approved F3 bytes and generates the renderer's allowlist. Build and run `pnpm check:portraits` to decode every packaged PNG in Chromium and check the recorded PvE/feed sinks, failed-image skull and recovery. Builds and runtime never fetch mob art from the network.
+
+## Original approved export hashes
 
 - `i-T5_FISH_FRESHWATER_STEPPE_RARE.png` — `6ba3f3c7444f2d00f659e00d4120474b234ea86b65f816f46e303d820343a084`
 - `i-T8_2H_TOOL_SICKLE.png` — `d24784c47ac941ee7d774144e303b10b1037257404e08ded069d99b5e6d6c978`

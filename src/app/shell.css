@@ -2148,15 +2148,16 @@ body {
 }
 .lb-pve-mobs li {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 40px 138px 50px;
+  grid-template-columns: 56px minmax(0, 1fr) 40px 138px 50px;
   gap: 12px;
   align-items: center;
-  padding: 12px 0;
+  min-height: 64px;
+  padding: 4px 8px;
   border-top: 1px solid var(--gb-card-rule);
 }
 .lb-pve-mob-well {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
 }
 .lb-pve-mob-name {
   display: flex;
@@ -2192,6 +2193,16 @@ body {
 .lb-pve-chests li + li {
   border-top: 1px solid var(--gb-card-rule);
 }
+.lb-pve-standouts li {
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: 52px;
+  padding: 4px 0;
+}
+.lb-pve-standout-portrait {
+  width: 44px;
+  height: 44px;
+}
 .lb-pve-standouts li > span:nth-child(2),
 .lb-pve-chests li > span:nth-child(2) {
   display: flex;
@@ -2225,12 +2236,8 @@ body {
     margin-top: 4px;
   }
   .lb-pve-mobs li {
-    grid-template-columns: 44px minmax(0, 1fr) 36px 50px;
+    grid-template-columns: 56px minmax(0, 1fr) 36px 50px;
     gap: 10px;
-  }
-  .lb-pve-mob-well {
-    width: 44px;
-    height: 44px;
   }
   .lb-pve-mob-location {
     display: none;
@@ -2253,7 +2260,7 @@ body {
     margin-top: 4px;
   }
   .lb-pve-mobs li {
-    grid-template-columns: 48px minmax(0, 1fr) 40px 50px;
+    grid-template-columns: 56px minmax(0, 1fr) 40px 50px;
   }
   .lb-pve-aside {
     display: flex;
@@ -2302,6 +2309,14 @@ body {
   display: block;
   flex: none;
   object-fit: contain;
+}
+.lb-mob-portrait {
+  display: block;
+  flex: none;
+  overflow: hidden;
+}
+.lb-mob-portrait .lb-albion-icon {
+  max-width: none;
 }
 .lb-stat-readout {
   display: flex;

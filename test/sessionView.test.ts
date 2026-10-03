@@ -11,7 +11,11 @@ import { resourceName } from "../src/shared/session/names.js";
 // Assert the rendered sink, including locale formatting and unknown-data warnings.
 const require = createRequire(import.meta.url);
 const { outputFiles } = buildSync({
-  entryPoints: [resolve("src/app/SessionData.tsx")],
+  stdin: {
+    contents:
+      'export { SessionData } from "./src/app/SessionData.tsx"; export { PvePage } from "./src/app/PvePage.tsx";',
+    resolveDir: resolve("."),
+  },
   bundle: true,
   jsx: "automatic",
   write: false,
@@ -22,6 +26,7 @@ const { outputFiles } = buildSync({
 const loaded = {
   exports: {} as {
     SessionData: (props: { session: TSession; lang: TLang; now: number; onReveal: () => void }) => ReactNode;
+    PvePage: (props: { session: TSession; lang: TLang; now: number }) => ReactNode;
   },
 };
 new Function("require", "module", "exports", outputFiles[0]!.text)(require, loaded, loaded.exports);
@@ -30,7 +35,7 @@ const render = (session: TSession, lang: TLang, now = 100) =>
     createElement(loaded.exports.SessionData, { session, lang, now, onReveal: () => {} }),
   ) as string;
 describe("Session's rendered values", () => {
-  it("uses the dump's avatar identity for supplied mob portraits and keeps unsupported mobs safe", () => {
+  it("uses the dump's avatar identity for mob portraits and keeps unknown mobs safe", () => {
     let session = reduceSession(newSession("portraits", 100), {
       v: 1,
       t: "kill",
@@ -46,6 +51,38 @@ describe("Session's rendered values", () => {
     expect(html).toContain('src="./albion/u-skull_gold.png"');
     expect(html).not.toContain("mob-undefined");
     expect(html).not.toContain("mob-999999");
+  });
+  it("renders Summoned Imp's exact native portrait in the feed, mob list and both standout rows", () => {
+    const session = reduceSession(newSession("summoned-imp", 100), {
+      v: 1,
+      t: "kill",
+      at: 110,
+      char: "Me",
+      zone: null,
+      mob: 1833,
+      hp: null,
+    });
+    expect(render(session, "en")).toContain('src="./albion/mob-MORGANADEMONIMP1.png"');
+    const pve = require("react-dom/server").renderToStaticMarkup(
+      createElement(loaded.exports.PvePage, { session, lang: "en", now: 120 }),
+    ) as string;
+    expect(pve.match(/src="\.\/albion\/mob-MORGANADEMONIMP1\.png"/g)).toHaveLength(3);
+    expect(pve).toContain("Summoned Imp");
+  });
+  it("keeps a skull for known mobs whose exact avatar artwork is unavailable", () => {
+    const session = reduceSession(newSession("training-dummy", 100), {
+      v: 1,
+      t: "kill",
+      at: 110,
+      char: "Me",
+      zone: null,
+      mob: 175,
+      hp: null,
+    });
+    const html = render(session, "en");
+    expect(html).toContain("Training Dummy");
+    expect(html).toContain('src="./albion/u-skull_gold.png"');
+    expect(html).not.toContain("mob-DUMMY.png");
   });
   it("renders a localized hourly rate and source share, freezing the rate at Stop", () => {
     const session = reduceSession(newSession("half-hour", 100), {

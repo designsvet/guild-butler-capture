@@ -20,7 +20,7 @@ PvE's approved board is F3 on the [v5 canvas](https://claude.ai/artifact/FbLQ85V
 Its HTML export was recovered from the signed-in canvas on 2026-10-02 and saved at
 `~/albion/loot-butler-build/boards/F3.dc.html`, with the original ZIP under `source-exports/`. The
 [PvE proof](design/pve-proof.md) records the source hash, implemented sections and data-dependent
-gaps. The exported runtime is not executed or packaged. Following the owner’s native-icon correction on 2026-10-03, only the approved sprite/portrait subset is copied into the app, with provenance recorded in `resources/albion/PROVENANCE.md`.
+gaps. The exported runtime is not executed or packaged. The owner's native-icon correction and subsequent broader portrait request on 2026-10-03 authorize the private native asset implementation: approved sprites/eight F3 portraits plus exact matching mob portraits from a pinned source. Provenance and coverage are recorded in `resources/albion/PROVENANCE.md` and `mob-portraits.json`.
 
 Gathering/Fishing have two proposals drawn with the existing `lb.py` vocabulary: Fgf1 in the local
 `~/albion/loot-butler-canvas` project ([rendered proposals](design/slice2-proposals.png)). A shares
@@ -50,7 +50,7 @@ latest timestamps; complete counts and per-visit rarities stay in the model.
 
 Unknown dungeon UUIDs remain Dungeon: solo/group size, parent zone, party, camps and bosses are not
 guessed. Per-mob fame, the Fame sort and Biggest kill have no proven linkage and are omitted. No
-item count/value is attributed to a chest. Mob imagery uses matching supplied F3 portraits or the native skull; the three supplied chest rarities use their native sprites. Filters derive from observed content only.
+item count/value is attributed to a chest. Mob imagery uses 506 exact native avatar portraits or the native skull for unavailable/failed images; the three supplied chest rarities use their native sprites. Filters derive from observed content only.
 History ranges, Export and Share are still unbuilt and are not offered.
 
 At 1440 the six metrics share a row; narrower windows use three columns so all six languages fit.
@@ -144,6 +144,12 @@ capture/flush and VoiceOver/NVDA checks. R5 pricing, partial journal progress, H
 beta release remain outside this increment. Package identity/version and the opt-in v5 flag are
 unchanged.
 
+Full available mob portrait coverage is part of this slice's PvE visual work. The 506 packaged
+identities cover 5,255 of 5,479 entries in the pinned mob table; exact artwork for the remaining
+80 identities (224 entries) is unavailable in the pinned source and remains a named asset gap,
+not a decoder dependency. The manifest lists every missing key so a future source refresh can
+close the gap without guessed portraits.
+
 ## PvE increment validation — 2026-10-02
 
 Passed: typecheck, 588 unit tests, build, 86 default-renderer layout cases,
@@ -184,3 +190,33 @@ matrix remains CI's default; this focused rerun covers the affected Session/PvE 
 Both-theme three-width regression/evening proofs were regenerated and inspected against the
 retained F1/responsive composition. The journal-only empty-wrapper alignment also remains covered.
 The complete F1 and fresh real faction/Windows/accessibility verification remain partial.
+
+## Mob portrait expansion — 2026-10-03
+
+The owner requested broader portraits after the Summoned Imp screenshot exposed the eight-image
+subset. Import exact matches from Statistics Analysis Tool revision
+`3c90f930f742118ee6ffc8977f2f7f376af97016`; retain the eight approved F3 files byte-for-byte and add
+498 portraits. A reproducible importer generates the static allowlist and a hashed coverage/gap
+manifest. The same identity resolves in PvE rows, both standouts and Session's feed. Failed image
+requests fall back to the native skull without loops or remote requests. All known current-source
+matches are packaged; this does not claim 100% of the game's artwork.
+
+The built-portrait gate joins CI and exercises actual Chromium decoding, recorded mob mapping,
+Summoned Imp's three PvE sinks/feed and the forced-failure/recovery path. Three-width, both-theme
+recorded Imp proofs extend the [PvE proof](design/pve-proof.md). No tracking/schema/count changes,
+new tabs, version bump, merge or release are included.
+
+The F3 comparison also corrected portrait presentation: 56px frameless images in the mob list,
+44px in standouts, and 64px/52px minimum row heights. A clipped CSS viewport removes the imported
+256px canvas padding around the central medallion; original PNG bytes remain intact. This avoids
+making newly sourced portraits look half the size of the supplied F3 artwork.
+
+Final validation: typecheck, 597 app tests, build, all 506 PNGs decoded in Chromium, every recorded
+mob kind mapped, forced image failure/recovery, real main/preload replay, 86 legacy layouts and
+1,152 affected v5 data-state scenarios pass. The latter covers all six locales, both platform
+layouts/themes and four widths; the full shell/morph matrix remains CI's default. Recorded PvE
+and Session proofs were refreshed and inspected at 1440/1024/768 in both themes against the
+retained sources. The running native Mac preview was reloaded without stopping/resetting capture;
+its existing real Imp kill displays correctly in Mobs killed, Most killed and Last kill. Fresh
+packet ingestion and the outstanding native platform/accessibility checks are not established
+by that observation. Whole-screen readiness remains partial in the proofs.

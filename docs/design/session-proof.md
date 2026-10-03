@@ -17,7 +17,7 @@ Responsive/state boards remain in that project's `boards/`; native asset hashes 
 | --- | --- |
 | Data correctness | Recorded totals, the Favor-only regression, assembled engine writer and real tracker/IPC/summary/reset/Stop/quit checks pass for supported fields; R5 and other unobserved fields remain unavailable |
 | Visual fidelity | Partial: supported icon/rate/bar/link/Fr corrections are built and pictured below; a comprehensive comparison against every approved state is still pending, so the whole screen is not certified complete |
-| Live-game verification | Partial: owner confirmed tracking in the earlier Mac preview; final native-art build awaits fresh game traffic, full Mac/Windows flush and assistive-technology evidence |
+| Live-game verification | Partial: owner confirmed earlier Mac tracking; the final native renderer was reloaded while capture continued and its existing Imp kill renders correctly in PvE. Fresh game traffic, full Mac/Windows flush and assistive-technology evidence remain outstanding |
 
 | Approved board   | Built status                                                                                                                                                                                                       | Remaining gaps                                                                                                             |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
@@ -32,7 +32,7 @@ A dynamic dungeon is called Dungeon: its UUID cannot tell solo from group. The
 recorded elapsed evening includes time between the two engine runs. The page
 scrolls to retain every observed place; the screenshots below show its different
 positions. Item art is a deterministic one-pixel PNG stub in these proofs;
-the official protocol/cache has independent tests. Native sprites come from the owner’s F1/F3 exports and render as real packaged bytes; [provenance](../../resources/albion/PROVENANCE.md) records the subset and hashes. OS caption controls are marked
+the official protocol/cache has independent tests. Native sprites retain the owner’s F1/F3 export bytes; the broader portrait request adds 498 exact native matches from a pinned source. All 506 portraits render as real packaged bytes; [provenance](../../resources/albion/PROVENANCE.md) records source hashes and the 80 unavailable avatar identities. OS caption controls are marked
 stand-ins and the stub's version says v0.0.0.
 
 Slice 2 adds an independent September 16 [journal-feed proof](journals-proof.md).
@@ -68,6 +68,22 @@ shared shell skin; the supplied F1/responsive exports are the Obsidian layout re
 | Parchment | [Favor-only](session/favor-only-parchment-1440.png) | [Favor-only](session/favor-only-parchment-1024.png) | [Favor-only](session/favor-only-parchment-768.png) |
 
 Regenerate the regression with `ONLY=favor-only` and the command below.
+
+## Broader mob portraits
+
+The owner's broader portrait request adds exact native artwork for every mob kind in the evening
+recording, including Summoned Imp in the independent Favor-only excerpt. The feed retains F1's
+compact image well; original export bytes are preserved and imported canvas padding is clipped
+to keep the same visible scale. The built three-width, both-theme feed comparisons were inspected
+and saved below. Mapping, failed-image fallback and all 506 packaged PNGs are checked in Chromium
+by `pnpm check:portraits`; overall readiness remains partial as stated above.
+
+| Theme | 1440 × 900 | 1024 × 768 | 768 × 620 |
+| --- | --- | --- | --- |
+| Obsidian — Imp feed | [Proof](session/imp-feed-obsidian-1440.png) | [Proof](session/imp-feed-obsidian-1024.png) | [Proof](session/imp-feed-obsidian-768.png) |
+| Parchment — Imp feed | [Proof](session/imp-feed-parchment-1440.png) | [Proof](session/imp-feed-parchment-1024.png) | [Proof](session/imp-feed-parchment-768.png) |
+
+Regenerate these with `ONLY=session-imp-feed`.
 
 Regenerate with a build, then:
 

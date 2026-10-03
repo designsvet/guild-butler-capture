@@ -207,8 +207,8 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
                 const info = mobInfo(mob.id);
                 return (
                   <li key={mob.id} data-pve-mob={mob.id} data-kills={mob.kills} data-last={mob.last.at}>
-                    <span className="lb-tile lb-pve-mob-well">
-                      <MobIcon mob={mob.id} />
+                    <span className="lb-pve-mob-well">
+                      <MobIcon mob={mob.id} size={56} />
                     </span>
                     <span className="lb-pve-mob-name">
                       <b>{name(mob.id)}</b>
@@ -235,8 +235,8 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
                   { label: words.lastKill, mob: last },
                 ].map(({ label, mob }) => (
                   <li key={label}>
-                    <span className="lb-tile">
-                      <MobIcon mob={mob.id} />
+                    <span className="lb-pve-standout-portrait">
+                      <MobIcon mob={mob.id} size={44} />
                     </span>
                     <span>
                       <span className="lb-pve-secondary">{label}</span>

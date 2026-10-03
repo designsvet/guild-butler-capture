@@ -278,7 +278,11 @@ evidence and assembled-bundle gates are described in [docs/slice2.md](docs/slice
 The currency gate also checks the packaged engine excludes Favor updates from faction gains;
 legacy recordings receive the same guard in the app model.
 The approved F3 PvE view now shows visits, sortable mobs, standouts and chests
-from the same snapshot. Its navigation appears after a kill or chest; New session
+from the same snapshot, with 506 native portraits matched to exact game avatar IDs
+(5,255 of 5,479 pinned mob entries). Unavailable/failed images use the native skull;
+[provenance and the coverage manifest](resources/albion/PROVENANCE.md) list the remaining gaps.
+`pnpm check:portraits` builds and decodes every packaged portrait in Chromium and checks
+the recorded PvE/feed mapping and failed-image fallback. Its navigation appears after a kill or chest; New session
 returns to Session and Stop freezes its clocks. [Built PvE proofs](docs/design/pve-proof.md)
 cover both themes at 1440, 1024 and 768. Gathering/Fishing await the layout choice
 between the drawn proposals.
@@ -309,6 +313,8 @@ a language keeps the stored flag (`test/settings.test.ts`).
   The build fails if an `@import` survives or is skipped;
 - the package's `fonts/` directory is copied whole, its four OFL licence texts with it, and the
   crest is `resources/icons/crest-mark.png`.
+- approved native sprites and exact matching mob portraits travel with their static allowlist,
+  source licence and hashed provenance; the renderer fetches no mob art from the network.
 
 The page keeps the old window's content-security policy word for word. `pnpm typecheck` covers it
 (`tsconfig.app.json`). `test/appDesignSystem.test.ts` builds it into a temp dir and checks that no
