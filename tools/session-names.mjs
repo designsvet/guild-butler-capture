@@ -85,6 +85,7 @@ export const generateNames = ({ clusters, mobs, localization, settings }) => {
       names: namesFor(tag),
       tier: row["@tier"] == null ? null : Number(row["@tier"]),
       faction: row["@faction"] ?? null,
+      avatar: row["@avatar"] ?? null,
     };
   });
   const items = Object.fromEntries(

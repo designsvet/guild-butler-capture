@@ -619,6 +619,14 @@ const run = async () => {
         ["header", ".lb-head"],
         ["activity", ".lb-activity-cards > section"],
       ]) {
+        if (name === "activity") {
+          // Extra observed KPI rows may push the card below the viewport. Show its complete
+          // counters before cropping; the full-window and header proofs are already saved.
+          await win.webContents.executeJavaScript(`new Promise((done) => {
+            document.querySelector(${JSON.stringify(selector)}).scrollIntoView({ block: 'center' });
+            requestAnimationFrame(() => requestAnimationFrame(done));
+          })`);
+        }
         const crop = await win.webContents.executeJavaScript(
           `(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.floor(r.x - 8), y: Math.floor(r.y - 8), width: Math.ceil(r.width + 16), height: Math.ceil(r.height + 16) }; })()`,
         );

@@ -20,6 +20,8 @@
  *   the files (a bundler emits the fonts and leaves the licences behind). Whole, not by list:
  *   each file name carries a hash that changes when a face is reissued.
  * - The crest is resources/icons/crest-mark.png, the same mark the old window's title bar uses.
+ * - Approved F1/F3 Albion sprites and their provenance travel as resources/albion/. Dynamic
+ *   item art still goes through the main process's restricted official-service handler.
  *
  * GBC_DIST_DIR points the output somewhere else, as it does for build-static:
  * test/appDesignSystem.test.ts builds into a temp dir and checks what comes out.
@@ -82,6 +84,7 @@ writeFileSync(join(dest, "app.css"), css.css);
 
 cpSync(join(src, "index.html"), join(dest, "index.html"));
 cpSync(join(root, "resources", "icons", "crest-mark.png"), join(dest, "crest.png"));
+cpSync(join(root, "resources", "albion"), join(dest, "albion"), { recursive: true });
 
 const require = createRequire(import.meta.url);
 const fonts = dirname(require.resolve("@guild-butler/design-system/fonts/fonts.css"));

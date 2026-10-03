@@ -54,7 +54,10 @@ const run = async () => {
     () => call("document.querySelector('[data-session-count=resources]')?.textContent"),
     (value) => value === "19",
   );
-  await call("document.querySelector('nav a[href=\"#/pve\"]').click()");
+  // Exercise the approved card link through the keyboard in the real sandboxed renderer.
+  await call("document.querySelector('.lb-activity-cards a[href=\"#/pve\"]').focus()");
+  win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Enter" });
+  win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Enter" });
   await waitFor(() => call("document.querySelector('[data-pve-data]')?.dataset.sessionId"), (id) => id === session.id);
   const visitKills = await call("[...document.querySelectorAll('[data-pve-visit]')].reduce((n,el) => n+Number(el.dataset.kills),0)");
   assert(visitKills === 40, "Real IPC lost PvE visit kills");

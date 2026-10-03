@@ -18,6 +18,7 @@ export type TMobName = {
   names: Partial<Record<TLang, string>>;
   tier: number | null;
   faction: string | null;
+  avatar: string | null;
 };
 export const worldName = (id: string | null): TWorldName | null => {
   if (id == null) {

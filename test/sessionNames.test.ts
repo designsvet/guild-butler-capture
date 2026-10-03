@@ -18,6 +18,8 @@ describe("generated world and mob names", () => {
     expect(MOBS[16]?.unique).toBe("T5_MOB_ROAMING_KEEPER_FANATIC_SPEAR_CHAMPION");
     expect(MOBS[2732]?.unique).toBe("MOB_CASTLE_ELITE_GUARD_KNIGHT");
     expect(mobName(2732, "en")).toBeTruthy();
+    expect(MOBS[2571]?.unique).toBe("T5_MOB_KEEPER_DRUID");
+    expect(MOBS[2571]?.avatar).toBe("KEEPERDRUID1");
   });
   it("resolves recorded zones and leaves instance names and dungeon size unknown", () => {
     expect(worldName("1354")).toEqual({ name: "Timberslope Bridge", tier: 8, colour: "black", content: "openWorld" });

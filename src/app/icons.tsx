@@ -1,6 +1,6 @@
 /**
- * The shell's icons: Tabler Icons, outline (MIT), the set the boards draw with, inline so the page
- * loads nothing (Q58: the crest is the only image). Each is decorative — what it stands for is
+ * The shell's controls: Tabler Icons, outline (MIT), inline so controls need no image load.
+ * Session/PvE game sprites are separate in AlbionIcon.tsx. Each is decorative — what it stands for is
  * always in the words beside it — so every one is aria-hidden.
  */
 
@@ -47,7 +47,10 @@ export const PLAY = ["M7 4v16l13 -8z"] as const;
 export const CHEVRON = ["M9 6l6 6l-6 6"] as const;
 
 /** "circle-dot" — Session in the sidebar. */
-export const SESSION = ["M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"] as const;
+export const SESSION = [
+  "M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0",
+  "M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0",
+] as const;
 
 /** The hero card's icon for each state (src/app/model.ts `THeroIcon`). */
 export const HERO = {
@@ -160,3 +163,56 @@ export const COPY = [
   "M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z",
   "M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1",
 ] as const;
+
+/** Distinct outline fallbacks while Q58 holds the client-extracted currency art. */
+export const DATA_ICONS = {
+  fame: [
+    "M8 21l8 0",
+    "M12 17l0 4",
+    "M7 4l10 0",
+    "M17 4v8a5 5 0 0 1 -10 0v-8",
+    "M5 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
+    "M19 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
+  ],
+  silver: [
+    "M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0",
+    "M14.8 9a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1",
+    "M12 7v10",
+  ],
+  might: ["M20 4v5l-9 7l-4 4l-3 -3l4 -4l7 -9z", "M6.5 11.5l6 6"],
+  favor: ["M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z"],
+  faction: ["M12 6l4 6l5 -4l-2 10h-14l-2 -10l5 4z"],
+  journal: [
+    "M14 3v4a1 1 0 0 0 1 1h4",
+    "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z",
+    "M9 9l1 0",
+    "M9 13l6 0",
+    "M9 17l6 0",
+  ],
+  respec: HERO.refresh,
+  kills: APPEARS[2],
+  loot: APPEARS[1],
+  feed: APPEARS[3],
+  gathering: [
+    "M5 21c.5 -4.5 2.5 -8 7 -10",
+    "M9 18c6.218 0 10.5 -3.288 11 -12v-2h-4.014c-9 0 -11.986 4 -12 9c0 1 0 3 2 5h3z",
+  ],
+  fishing: [
+    "M2.5 12c3 -4.2 6.3 -6.3 9.8 -6.3c3.5 0 6.6 2.1 9.2 6.3c-2.6 4.2 -5.7 6.3 -9.2 6.3c-3.5 0 -6.8 -2.1 -9.8 -6.3z",
+    "M2.5 12l3.6 -4.4",
+    "M2.5 12l3.6 4.4",
+    "M16.5 11h.01",
+  ],
+  place: [
+    "M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0",
+    "M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z",
+  ],
+  // Tabler treasure-chest (MIT): tabler/tabler-icons, icons/outline/treasure-chest.svg.
+  chest: [
+    "M4 19h16a1 1 0 0 0 1 -1v-9a4 4 0 0 0 -4 -4h-10a4 4 0 0 0 -4 4v9a1 1 0 0 0 1 1",
+    "M3 11h18",
+    "M16 5v14",
+    "M8 5v14",
+    "M12 11v2",
+  ],
+} as const;

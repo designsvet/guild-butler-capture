@@ -34,6 +34,11 @@
   /* Fh2: the corner of the 24px copy button inside the `/capture pair` well, a step inside the
      tiles' — no token is that small */
   --lb-r-mini: 6px;
+  /* F1/F3 content markers: category colours, independent of zone risk or currency. */
+  --lb-content-dungeon: #9085e9;
+  --lb-content-ancient: #e0823a;
+  --lb-content-world: #d9a53a;
+  --lb-content-roads: #3a3a40;
 
   /* The title bar's Start/Stop changing face (StartStop.tsx) — the old window's motion, kept: its
      `--gb-t-*` timings (src/renderer/styles.css, from the 2026-08-29 transition study,
@@ -2265,53 +2270,74 @@ body {
   gap: 12px;
 }
 .lb-stat {
-  flex: 1 1 178px;
+  flex: 1 1 calc((100% - 48px) / 5);
   min-width: 0;
-  padding: 14px 16px;
-  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 13px 15px 12px;
+  border-radius: 10px;
 }
 .lb-stat .lb-eyebrow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: var(--gb-text-label);
+  gap: 10px;
+  font-family: var(--gb-font-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  color: var(--gb-ink);
+  overflow-wrap: anywhere;
+}
+.lb-stat .lb-tile--head,
+.lb-data-card .lb-tile--head {
+  width: 30px;
+  height: 30px;
+}
+.lb-albion-icon {
+  display: block;
+  flex: none;
+  object-fit: contain;
+}
+.lb-stat-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 7px;
+  min-width: 0;
 }
 .lb-stat-value {
-  margin-top: 8px;
   font-family: var(--gb-font-mono);
-  font-size: 26px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
   color: var(--gb-ink);
 }
 .lb-stat-detail {
-  margin-top: 6px;
+  overflow-wrap: anywhere;
   font-size: var(--gb-text-caption);
   color: var(--gb-ink-2);
 }
-/* Quantity has no price yet. Keep its shorter readout on one row rather than leave a
-   seventh currency-sized tile alone above the activity cards. */
-.lb-stat[data-session-metric="loot"] {
-  display: flex;
-  flex-basis: 100%;
-  align-items: center;
-  gap: 16px;
-}
-.lb-stat[data-session-metric="loot"] .lb-stat-value {
-  margin: 0 0 0 auto;
-}
-.lb-stat[data-session-metric="loot"] .lb-stat-detail {
-  margin: 0;
+.lb-stat-rate {
+  font-family: var(--gb-font-mono);
+  font-size: var(--gb-text-caption);
+  color: var(--gb-ink-2);
 }
 .lb-activity-cards {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 14px;
+}
+.lb-activity-cards > .lb-data-card {
+  flex: 1 1 calc((100% - 42px) / 4);
 }
 .lb-data-card {
   min-width: 0;
 }
 .lb-data-card .lb-card-head {
   gap: 8px;
+  flex-wrap: wrap;
 }
 .lb-data-card .lb-card-title {
   overflow-wrap: anywhere;
@@ -2321,6 +2347,15 @@ body {
   font-size: var(--gb-text-caption);
   color: var(--gb-ink-2);
   min-width: 0;
+}
+.lb-panel-link {
+  margin-left: auto;
+  padding: 2px 0;
+  flex: none;
+  text-decoration: none;
+}
+.lb-card-head .lb-panel-link + .lb-fold {
+  margin-left: 0;
 }
 .lb-fold {
   display: inline-flex;
@@ -2395,6 +2430,43 @@ body {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.lb-source-amount,
+.lb-place-time {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px 7px;
+}
+.lb-source-amount small,
+.lb-place-time small {
+  font-size: 10.5px;
+  color: var(--gb-ink-2);
+}
+.lb-content-mark {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: none;
+  margin-right: 7px;
+  vertical-align: 2px;
+  border-radius: 1px;
+  background: var(--gb-ink-2);
+}
+.lb-content-mark[data-content="dungeon"],
+.lb-content-mark[data-content="groupDungeon"],
+.lb-content-mark[data-content="soloDungeon"] {
+  background: var(--lb-content-dungeon);
+}
+.lb-content-mark[data-content="ancientLands"] {
+  background: var(--lb-content-ancient);
+}
+.lb-content-mark[data-content="openWorld"] {
+  background: var(--lb-content-world);
+}
+.lb-content-mark[data-content="roads"] {
+  background: var(--lb-content-roads);
+  box-shadow: 0 0 0 1px var(--gb-card-rule);
+}
 .lb-source-line .lb-number {
   flex: none;
 }
@@ -2406,7 +2478,7 @@ body {
 .lb-source-track span {
   display: block;
   height: 3px;
-  background: var(--gb-ink-2);
+  background: var(--gb-ink);
 }
 .lb-total {
   border-top: 1px solid var(--gb-card-rule);
@@ -2457,35 +2529,18 @@ body {
   color: var(--gb-ink-2);
   font-size: var(--gb-text-caption);
 }
-.lb-places li {
-  position: relative;
-  padding-left: 10px;
+.lb-places .lb-content-mark {
+  margin-right: 0;
 }
-.lb-places li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 16px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--gb-ink-2);
-}
-.lb-places li[data-zone-colour="black"]::before,
-.lb-places li[data-zone-colour="red"]::before {
-  background: var(--gb-red-text);
-}
-.lb-places li[data-zone-colour="yellow"]::before {
-  background: var(--gb-amber);
-}
-.lb-places li[data-zone-colour="green"]::before {
-  background: var(--gb-green);
+.lb-places .lb-data-copy {
+  flex: 1;
 }
 .lb-feed li {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 12px;
-  padding: 9px 0;
+  grid-template-columns: 34px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
   border-bottom: 1px solid var(--gb-card-rule);
   font-size: var(--gb-text-caption);
 }
@@ -2499,6 +2554,74 @@ body {
 }
 .lb-feed li > span {
   overflow-wrap: anywhere;
+}
+.lb-feed-icon {
+  width: 34px;
+  height: 34px;
+}
+.lb-feed-tail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.lb-feed-tail b {
+  font-weight: 500;
+  font-size: 13px;
+}
+.lb-feed-tail time {
+  font-size: 10.5px;
+}
+.lb-data-list .lb-tile + .lb-data-copy {
+  flex: 1;
+}
+.lb-chest-summary {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 12px 0 4px;
+  padding: 10px 0 14px;
+  border-bottom: 1px solid var(--gb-card-rule);
+  gap: 12px 8px;
+}
+.lb-chest-summary li {
+  flex: 1 1 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+  font-size: var(--gb-text-caption);
+}
+.lb-chest-summary b {
+  font-size: 16px;
+}
+.lb-chest-summary li > span {
+  color: var(--gb-ink-2);
+}
+.lb-chest-summary [data-rarity="2"],
+.lb-feed [data-rarity="2"],
+.lb-data-list [data-rarity="2"] {
+  color: var(--gb-green);
+}
+.lb-chest-summary [data-rarity="3"],
+.lb-feed [data-rarity="3"],
+.lb-data-list [data-rarity="3"] {
+  color: var(--gb-blue);
+}
+.lb-chest-summary [data-rarity="4"],
+.lb-feed [data-rarity="4"],
+.lb-data-list [data-rarity="4"] {
+  color: var(--gb-gold);
+}
+.lb-pve-filters button {
+  display: inline-flex;
+  align-items: center;
+}
+.lb-pve-filters button[aria-pressed="true"] {
+  color: var(--gb-gold-text);
+  background: var(--gb-chosen-wash);
+  box-shadow: none;
 }
 .lb-session-info {
   margin: 12px 0;
@@ -2524,7 +2647,7 @@ body {
   align-items: center;
   gap: 6px;
   background: transparent;
-  color: var(--gb-gold);
+  color: var(--gb-gold-text);
   border: 0;
   font-size: var(--gb-text-caption);
 }
@@ -2540,25 +2663,17 @@ body {
   gap: 8px;
   flex: none;
 }
-@media (min-width: 1024px) and (max-width: 1439px) {
-  .lb-stat {
-    flex-basis: calc((100% - 36px) / 4);
-  }
-}
-@media (min-width: 1024px) and (max-width: 1279px) {
-  .lb-sources {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 1279px) {
+  .lb-activity-cards > .lb-data-card {
+    flex-basis: calc((100% - 14px) / 2);
   }
 }
 @media (max-width: 1023px) {
   .lb-stat {
     flex-basis: calc((100% - 24px) / 3);
   }
-  .lb-activity-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .lb-activity-cards > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
+  .lb-activity-cards > .lb-data-card {
+    flex-basis: calc((100% - 14px) / 2);
   }
   .lb-head {
     flex-wrap: wrap;

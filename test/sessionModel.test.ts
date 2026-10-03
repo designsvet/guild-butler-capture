@@ -11,7 +11,7 @@ import {
   reduceSession,
   restartSession,
 } from "../src/shared/session/model.js";
-import { hasPve, pveMobs, pveVisits } from "../src/shared/session/pve.js";
+import { chestRarities, hasPve, pveMobs, pveVisits } from "../src/shared/session/pve.js";
 const DIR = join(__dirname, "fixtures", "session");
 const evening = () => {
   const events = readdirSync(DIR)
@@ -128,6 +128,13 @@ describe("session invariants", () => {
     expect(session.chests[0]?.at).toBe(209);
     expect(session.visits[0]?.chests).toBe(71);
     expect(session.visits[0]?.rarities).toEqual({ 2: 70, null: 1 });
+    expect(chestRarities(session)).toEqual([
+      { rarity: 1, count: 0 },
+      { rarity: 2, count: 70 },
+      { rarity: 3, count: 0 },
+      { rarity: 4, count: 0 },
+      { rarity: null, count: 1 },
+    ]);
   });
   it("keeps repeated visits separate, puts late lines in their original interval, and closes once", () => {
     let session = reduceSession(newSession("one", 100), zone);

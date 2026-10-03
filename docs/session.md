@@ -67,8 +67,7 @@ only Albion's official HTTPS render service, refuses redirects, limits requests 
 one MiB PNGs, coalesces concurrent loads, and atomically caches under the app's `item-art/` folder.
 Cached art works offline; an unavailable image uses a neutral icon. Electron exempts this tightly
 handled secure custom scheme from CSP; the page's CSP text stays unchanged and no arbitrary remote
-URL can enter the handler. There is no extracted client art (Q58 remains open). Layout proofs stub
-the protocol locally for deterministic offline checks.
+URL can enter the handler. The owner supplied the approved F1 export on 2026-10-03 and requested its native sprites. A static local allowlist now bundles the approved currency/activity icons, three available chest sprites and eight F3 mob portraits; the dump's `avatar` field resolves portrait identity rather than guessing from a name or numeric ID. Unsupported mob portraits use the native skull, and unsupported chest rarities/faction points retain outlines. Asset bytes and source hashes are recorded in [art provenance](../resources/albion/PROVENANCE.md) and verified in the built app. No exported HTML/vendor script is executed. The public redistribution question in raid-bot Q58 remains open; this correction does not merge or release the app. Layout proofs stub only dynamic item art for deterministic offline checks; bundled game sprites render unchanged.
 
 ## The F1 page
 
@@ -77,16 +76,20 @@ labels/tooltips), own loot quantity, PvE/Gathering/Fishing summaries, fame and s
 recent loot by actual looter, visited zones and elapsed time, chest openings, the event feed and the
 session's file action. Missing metrics are omitted. Fish quantity excludes seaweed; both remain in
 the model. Instance IDs count known dungeon visits without guessing dungeon size. Sources use the
-same totals as their tiles. Cards can fold from the keyboard. Six locales use the existing plural
+same totals as their tiles, with visible percentages and neutral bars dimmed by rank. Observed currencies
+use their approved native Albion sprites and session-average hourly rates; the duration is the same as Length and
+freezes at Stop. Zero-duration sessions have no rate. Content markers follow F1/F3 category colours.
+The PvE and chest cards link to the implemented PvE page. The complete chest rarity strip derives
+from every visit, including unplaced events, and does not lose openings when the recent list is capped.
+Feed rows include item art, matching bundled mob/chest/currency sprites or event-specific outline wells, actual currency gains, places and times. Cards can fold from the keyboard. Six locales use the existing plural
 rules, including Ukrainian/Russian few and many.
 
-At 768 × 620, currency tiles wrap in three columns and the unpriced loot quantity uses a compact
-full-width row. Activity summaries use two columns, with an odd last card filling its row. Fame and
+The Fr/F1 responsive rule is five KPI tiles across from 1024px and three across at 768 × 620, with every partial row dividing the available width evenly (five observed tiles become 3 + 2). Values are 24px, with hourly rates beside them; a rate/sub-line may wrap, while the number remains intact. Own loot remains a quantity tile in the same strip while R5 pricing is unavailable. A capture with additional observed silver/faction/loot fields may have more than the example's five tiles; missing metrics are omitted. Activity summaries use up to two columns below 1280px, with an odd last card filling its row. At wider sizes they use up to four columns; a capture with only one or two activities fills the row instead of reserving blank card slots. Fame and
 silver sources remain side by side after the main columns stack. Each activity card divides its
 counters into equal-width columns. New session stays at the right of the header, aligned with its
 title. Below 1280, the metadata has its own 20px line with 8px of clear space below the glowing tab
 underline; a negative margin must not pull it into the glow. Feed timestamps take their natural
-width so the OS's 12-hour format stays on one line.
+width beside their event, so the OS's 12-hour format stays on one line.
 
 R5's public price endpoint does not exist yet. Loot/resource/catch item values, value rates,
 comparisons, party, journal progress, PvP and other pages wait for their own slices. Recent loot

@@ -6,10 +6,20 @@ import { sessionStrings } from "../shared/sessionStrings.js";
 import { FIXED_SCALE, mobTotal, type TSession } from "../shared/session/model.js";
 import { mobInfo, mobName } from "../shared/session/names.js";
 import { pveMobs, pveVisits } from "../shared/session/pve.js";
-import { APPEARS, Icon, INFO } from "./icons.js";
-import { chestLabel, compact, duration, Panel, precise, Stat, zoneLabel } from "./SessionParts.js";
-
-const MOB_ICON = APPEARS[2] ?? INFO;
+import { ChestIcon, MobIcon } from "./AlbionIcon.js";
+import { DATA_ICONS, Icon, INFO } from "./icons.js";
+import {
+  chestLabel,
+  ChestSummary,
+  compact,
+  ContentMark,
+  duration,
+  hourly,
+  Panel,
+  precise,
+  Stat,
+  zoneLabel,
+} from "./SessionParts.js";
 
 export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang; now: number }) => {
   const text = sessionStrings(lang);
@@ -30,6 +40,7 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
     visit.startedAt == null ? null : Math.max(0, (visit.endedAt ?? session.endedAt ?? now) - visit.startedAt);
   const name = (id: number) => mobName(id, lang) ?? `${text.unknownMob} (${id})`;
   const broken = session.refused > 0 || Object.values(session.audits).some((audit) => audit.mismatches > 0);
+  const sessionElapsed = Math.max(0, (session.endedAt ?? now) - session.startedAt);
   return (
     <div className="lb-pve" data-pve-data="" data-session-id={session.id}>
       {broken ? (
@@ -52,6 +63,8 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
               raw={raw}
               value={metric === "kills" ? formatCount(lang, raw) : currency(raw)}
               exact={metric === "kills" ? formatCount(lang, raw) : precise(lang, raw)}
+              rate={metric === "kills" ? undefined : hourly(raw, sessionElapsed)}
+              rateText={text.perHour(compact(lang, hourly(raw, sessionElapsed) ?? 0))}
             />,
           ];
         })}
@@ -60,7 +73,7 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
       <Panel
         title={words.whereHappened}
         subtitle={visits.every((visit) => visit.startedAt != null) ? words.visits(visits.length) : undefined}
-        icon={APPEARS[0]}
+        icon={DATA_ICONS.place}
       >
         <div className="lb-pve-toolbar">
           <span>{words.byContent}</span>
@@ -73,6 +86,7 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
                 data-pve-filter={content}
                 onClick={() => setFilter(content)}
               >
+                {content !== "all" ? <ContentMark content={content} /> : null}
                 {content === "all" ? words.all : text[content as (typeof contents)[number]]}
               </button>
             ))}
@@ -112,10 +126,16 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
                       {timing}
                     </span>
                   </td>
-                  <td className="lb-pve-content">{text[visit.content]}</td>
+                  <td className="lb-pve-content">
+                    <ContentMark content={visit.content} />
+                    {text[visit.content]}
+                  </td>
                   <td className="lb-pve-place">
                     <span>{zoneLabel(visit.zone, text)}</span>
-                    <span className="lb-pve-inline-content lb-pve-secondary">{text[visit.content]}</span>
+                    <span className="lb-pve-inline-content lb-pve-secondary">
+                      <ContentMark content={visit.content} />
+                      {text[visit.content]}
+                    </span>
                     <span className="lb-pve-inline-currency lb-pve-secondary">
                       {text.fame} {currency(visit.fame)} · {text.silver} {currency(visit.silver)}
                     </span>
@@ -164,7 +184,7 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
           <Panel
             title={words.mobsKilled}
             subtitle={`${text.killCount(mobTotal(session))} · ${words.kinds(mobs.length)}`}
-            icon={MOB_ICON}
+            nativeIcon="kills"
           >
             <div className="lb-pve-toolbar">
               <span>{words.sort}</span>
@@ -188,7 +208,7 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
                 return (
                   <li key={mob.id} data-pve-mob={mob.id} data-kills={mob.kills} data-last={mob.last.at}>
                     <span className="lb-tile lb-pve-mob-well">
-                      <Icon paths={MOB_ICON} size={22} />
+                      <MobIcon mob={mob.id} />
                     </span>
                     <span className="lb-pve-mob-name">
                       <b>{name(mob.id)}</b>
@@ -208,7 +228,7 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
         ) : null}
         <div className="lb-pve-aside">
           {most != null && last != null ? (
-            <Panel title={words.standingOut} icon={MOB_ICON}>
+            <Panel title={words.standingOut} nativeIcon="kills">
               <ul className="lb-pve-standouts">
                 {[
                   { label: words.mostKilled, mob: most },
@@ -216,7 +236,7 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
                 ].map(({ label, mob }) => (
                   <li key={label}>
                     <span className="lb-tile">
-                      <Icon paths={MOB_ICON} size={18} />
+                      <MobIcon mob={mob.id} />
                     </span>
                     <span>
                       <span className="lb-pve-secondary">{label}</span>
@@ -232,7 +252,8 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
             </Panel>
           ) : null}
           {session.chestCount > 0 ? (
-            <Panel title={text.chestsOpened} subtitle={text.chestCount(session.chestCount)} icon={APPEARS[1]}>
+            <Panel title={text.chestsOpened} subtitle={text.chestCount(session.chestCount)} icon={DATA_ICONS.chest}>
+              <ChestSummary session={session} text={text} lang={lang} />
               {session.chestCount > session.chests.length ? (
                 <p className="lb-pve-caption">{words.recentChests}</p>
               ) : null}
@@ -242,7 +263,7 @@ export const PvePage = ({ session, lang, now }: { session: TSession; lang: TLang
                   .map((chest, index) => (
                     <li key={index}>
                       <span className="lb-tile" data-rarity={chest.rarity ?? "unknown"}>
-                        <Icon paths={APPEARS[1] ?? INFO} size={18} />
+                        <ChestIcon rarity={chest.rarity} />
                       </span>
                       <span>
                         <b>{chestLabel(chest.rarity, text)}</b>

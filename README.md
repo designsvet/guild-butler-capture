@@ -261,7 +261,8 @@ logging" card (below).
 September 21's recorded evening through the real model; `pnpm check:replay` verifies
 IPC, totals, New session, summaries and Stop. Live v5 capture enables
 `ACTIVITY_EVENTS=1`. The page shows observed currencies and quantities, sources,
-places, chests and the feed; missing values wait for R5. New session resets counters
+places, chests and the feed, with the approved native Albion sprites, responsive KPI rows, hourly currency rates, source percentages,
+content markers, complete chest rarity strips and links into PvE. Missing item values wait for R5. New session resets counters
 without stopping capture, and Stop/quit save summaries beside the raw files.
 Architecture, name/art provenance, byte ranges and rebuild rules are in
 [docs/session.md](docs/session.md); [built F1 proofs](docs/design/session-proof.md) show both themes and the narrow window.

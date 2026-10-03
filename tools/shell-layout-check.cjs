@@ -86,6 +86,8 @@ const stubItemArt = require("./item-art-stub.cjs");
 const ROOT = resolve(__dirname, "..");
 const PAGE = join(ROOT, "dist", "web", "app", "index.html");
 const OUT = process.env.OUT ? resolve(process.env.OUT) : null;
+// Focused reruns after a Session/PvE-only edit; the default CI matrix stays exhaustive.
+const DATA_ONLY = process.env.ONLY === "data";
 
 app.commandLine.appendSwitch("force-prefers-reduced-motion");
 app.commandLine.appendSwitch("disable-gpu");
@@ -1500,6 +1502,94 @@ const connectionKeys = async (win, load) => {
   }
 };
 
+const detailProof = async (win, session) =>
+  win.webContents.executeJavaScript(`(() => {
+  const data = document.querySelector('[data-session-data], [data-pve-data]');
+  if (data == null) { return []; }
+  const errors = [];
+  const duration = ${Math.max(0, (session.endedAt ?? session.lastAt) - session.startedAt)};
+  const icons = [];
+  for (const stat of data.querySelectorAll('[data-session-metric]')) {
+    const metric = stat.dataset.sessionMetric;
+    if (['loot', 'kills'].includes(metric)) { continue; }
+    icons.push(stat.querySelector('img')?.getAttribute('src') ?? stat.querySelector('svg')?.innerHTML);
+    if (['fame', 'respec', 'silver', 'might', 'favor'].includes(metric) && stat.querySelector('img')?.getAttribute('src') !== './albion/u-'+metric+'.png') {
+      errors.push('Currency lost its approved Albion sprite: '+metric);
+    }
+    const rate = stat.querySelector('[data-hourly]');
+    const expected = duration > 0 ? Number(stat.dataset.raw) / 10000 * 3600000 / duration : null;
+    if (expected == null ? rate != null : rate == null || !Number.isFinite(Number(rate.dataset.hourly)) || Math.abs(Number(rate.dataset.hourly) - expected) > 0.001) {
+      errors.push('Session-average rate changed or was invented: '+metric);
+    }
+  }
+  if (new Set(icons).size !== icons.length) { errors.push('Different currencies use the same icon'); }
+  for (const source of data.querySelectorAll('[data-source-amount]')) {
+    const expected = Number(source.dataset.sourceAmount) / Number(source.dataset.sourceTotal) * 100;
+    const width = parseFloat(source.querySelector('.lb-source-track span').style.width);
+    if (!Number.isFinite(width) || Math.abs(width-expected)>0.001 || !source.querySelector('.lb-source-amount small')?.textContent.includes('%')) {
+      errors.push('Source bar and visible percentage do not describe the same total');
+    }
+  }
+  const chests = [...data.querySelectorAll('[data-chest-count]')].reduce((n, el) => n + Number(el.dataset.chestCount), 0);
+  if (chests !== ${session.chestCount}) { errors.push('Chest rarity strip lost complete openings'); }
+  if (data.matches('[data-session-data]') && ${hasPve(session)} && data.querySelectorAll('a[href="#/pve"]').length < 1) {
+    errors.push('Session has no working link into PvE');
+  }
+  for (const event of data.querySelectorAll('.lb-feed li')) {
+    if (event.querySelector('svg, img') == null) { errors.push('Activity feed has no event art'); }
+  }
+  const strip = data.matches('[data-session-data]') ? data.querySelector('.lb-stats') : null;
+  if (strip != null && strip.children.length >= 5) {
+    const tiles = [...strip.children];
+    tiles.forEach((tile, index) => { tile.style.display = index < 5 ? '' : 'none'; });
+    const rows = new Map();
+    for (const tile of tiles.slice(0, 5)) {
+      const box = tile.getBoundingClientRect();
+      const top = Math.round(box.top);
+      rows.set(top, [...(rows.get(top) ?? []), box]);
+      if (tile.querySelector('.lb-stat-value').getBoundingClientRect().right > box.right) {
+        errors.push('A KPI number is cut');
+      }
+    }
+    const counts = [...rows.values()].map((row) => row.length);
+    if (JSON.stringify(counts) !== JSON.stringify(innerWidth >= 1024 ? [5] : [3,2])) {
+      errors.push('KPI strip differs from Fr: '+JSON.stringify(counts));
+    }
+    for (const row of rows.values()) {
+      if (Math.abs(row.at(-1).right-strip.getBoundingClientRect().right)>1 || Math.max(...row.map((x)=>x.width))-Math.min(...row.map((x)=>x.width))>1) {
+        errors.push('KPI row does not divide its width evenly');
+      }
+    }
+    tiles.forEach((tile) => { tile.style.removeProperty('display'); });
+  }
+  for (const image of data.querySelectorAll('.lb-albion-icon')) {
+    if (!image.complete || image.naturalWidth === 0) { errors.push('Approved native asset did not load: '+image.getAttribute('src')); }
+    const box = image.getBoundingClientRect();
+    if (Math.abs(box.width-Number(image.getAttribute('width')))>1 || Math.abs(box.height-Number(image.getAttribute('height')))>1) {
+      errors.push('Base image styles stretched an Albion sprite: '+image.getAttribute('src'));
+    }
+  }
+  const activity = data.querySelector('.lb-activity-cards');
+  if (activity != null) {
+    const cards = [...activity.children];
+    // Real captures may contain only PvE. Exercise one/two/three visible cards, without
+    // inserting invented counts or depending on the fixture containing every activity.
+    for (let visible = 1; visible <= cards.length; visible += 1) {
+      cards.forEach((card, index) => { card.style.display = index < visible ? '' : 'none'; });
+      const rows = new Map();
+      for (const card of cards.slice(0, visible)) {
+        const box = card.getBoundingClientRect();
+        rows.set(Math.round(box.top), Math.max(rows.get(Math.round(box.top)) ?? 0, box.right));
+      }
+      if ([...rows.values()].some((right) => Math.abs(right - activity.getBoundingClientRect().right) > 1)) {
+        errors.push('A partial activity row leaves empty card slots');
+      }
+    }
+    cards.forEach((card) => { card.style.removeProperty('display'); });
+  }
+  return errors;
+})()`);
+
 const pveProof = async (win, session) => win.webContents.executeJavaScript(`(async () => {
   const errors = [];
   const data = document.querySelector('[data-pve-data]');
@@ -1563,8 +1653,8 @@ const run = async () => {
     console.log(`Nothing to check: no ${none.join(", no ")}. A run that measures nothing does not pass.`);
     return 1;
   }
-  const stillLoads = loads({ ROUTES, SUPPORTED_LANGS }).sort((a,b) => Number(b.route === "pve") - Number(a.route === "pve"));
-  const animatedLoads = morphLoads({ ROUTES, SUPPORTED_LANGS });
+  const stillLoads = loads({ ROUTES, SUPPORTED_LANGS }).filter((load) => !DATA_ONLY || load.sc.session != null).sort((a,b) => Number(b.route === "pve") - Number(a.route === "pve"));
+  const animatedLoads = DATA_ONLY ? [] : morphLoads({ ROUTES, SUPPORTED_LANGS });
   const expectedStill = stillLoads.length * WIDTHS.length;
   const expectedMorph = animatedLoads.length * WIDTHS.length * MORPHS.length * MORPH_FRAMES.length;
   const expected = expectedStill + expectedMorph;
@@ -1715,7 +1805,9 @@ const run = async () => {
       })()`)
           : [];
       const pveErrors = showingPve ? await pveProof(win, load.sc.session) : [];
+      const detailErrors = load.sc.session != null && load.stateName !== "session-next" ? await detailProof(win, load.sc.session) : [];
       const all = [
+        ...detailErrors,
         ...pveErrors,
         ...replayProof,
         ...pressFailed,

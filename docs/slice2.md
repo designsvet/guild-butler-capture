@@ -17,8 +17,7 @@ PvE's approved board is F3 on the [v5 canvas](https://claude.ai/artifact/FbLQ85V
 Its HTML export was recovered from the signed-in canvas on 2026-10-02 and saved at
 `~/albion/loot-butler-build/boards/F3.dc.html`, with the original ZIP under `source-exports/`. The
 [PvE proof](design/pve-proof.md) records the source hash, implemented sections and data-dependent
-gaps. The export is a visual reference; none of its runtime, game sprites or mob portraits is copied
-into the app.
+gaps. The exported runtime is not executed or packaged. Following the owner’s native-icon correction on 2026-10-03, only the approved sprite/portrait subset is copied into the app, with provenance recorded in `resources/albion/PROVENANCE.md`.
 
 Gathering/Fishing have two proposals drawn with the existing `lb.py` vocabulary: Fgf1 in the local
 `~/albion/loot-butler-canvas` project ([rendered proposals](design/slice2-proposals.png)). A shares
@@ -48,8 +47,7 @@ latest timestamps; complete counts and per-visit rarities stay in the model.
 
 Unknown dungeon UUIDs remain Dungeon: solo/group size, parent zone, party, camps and bosses are not
 guessed. Per-mob fame, the Fame sort and Biggest kill have no proven linkage and are omitted. No
-item count/value is attributed to a chest. Mob/chest imagery uses the existing Tabler wells (Q58),
-rather than the reference's game portraits/sprites. Filters derive from observed content only.
+item count/value is attributed to a chest. Mob imagery uses matching supplied F3 portraits or the native skull; the three supplied chest rarities use their native sprites. Filters derive from observed content only.
 History ranges, Export and Share are still unbuilt and are not offered.
 
 At 1440 the six metrics share a row; narrower windows use three columns so all six languages fit.
@@ -139,3 +137,18 @@ all 6,336 v5 renderer scenarios, and the real main/preload replay gate. The full
 matrix includes 4,608 still layouts and 1,728 Start/Stop morph frames. Screenshot
 proofs include both themes at all three requested sizes, with scrolled content.
 Native capture and assistive-technology checks remain outstanding as listed above.
+
+## Visual correction — 2026-10-03
+
+The owner confirmed live tracking but found Session/PvE visually incomplete against F1/F3. Restore
+the supported approved details before starting PvP: native currency/activity/chest sprites,
+hourly currency rates, source shares and ranked neutral bars, category markers, keyboard-reachable
+PvE card/chest links, complete rarity strips, feed art/gains/place/time and recent-loot times. The
+previous proof incorrectly deferred all rates; captured currencies already support session averages.
+These changes leave the recorder and session storage unchanged. The model still cannot associate
+fame with individual mobs or items/value with individual chests; their charts remain a documented gap.
+On 2026-10-03 the owner supplied the F1 ZIP and explicitly corrected the outline substitution. The approved native sprite subset is bundled locally with provenance and byte-parity checks. Eight supplied F3 mob portraits resolve through the pinned dump's avatar keys; unsupported portraits/rarities have honest fallbacks. This implementation choice supersedes the earlier outline-only drawing rule, while Q58's wider public redistribution question remains open. Fr defines five KPI tiles across at 1024 and 3 + 2 for five tiles at 768; rates share the value baseline and wrap if needed. Captures with more observed fields add equally filled rows. Activity cards use two columns below 1280 and up to four above it; the two source cards remain side by side. Built proofs and renderer checks cover
+this correction. The native preview was reloaded through View → Reload without restarting the
+engine: it retained the session while new live kills/currencies arrived. A single active activity
+card exposed blank reserved slots; partial rows now fill the width and the renderer gate checks
+one/two/three visible cards. Native captures themselves remain private in the ignored preview folder.

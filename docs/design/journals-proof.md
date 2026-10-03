@@ -5,6 +5,7 @@ three genuine completion packets (`1, 4, 1`), six full books. Item names come fr
 the pinned localization source. It is not combined with the September 21 evening.
 No fame, progress, price or unseen journal count is inferred. Empty metric/source
 wrappers do not reserve space; the first cards align across both columns.
+Completion rows now use item-art wells, a place and a timestamp alongside the full-book name and recorded quantity. Item art is stubbed locally in these proofs; the production handler uses the official render service with an outline fallback.
 OS controls are marked stand-ins; the stub version says 0.0.0.
 
 | Theme | 1440 × 900 | 1024 × 768 | 768 × 620 |
