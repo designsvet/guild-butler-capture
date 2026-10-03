@@ -2,6 +2,12 @@
 
 Acceptance follows the [approved design implementation flow](implementation-flow.md).
 
+The [complete remaining-work inventory](session-pve-gaps.md) expands this proof's earlier summary.
+Existing data already supports several omitted F3 details: visit ranges/totals/visible rarities,
+mob headings/faction labels, kills/hour, standout captions and native chest heading. Complete
+rolling/chest context aggregates and proven fame/loot attribution remain separate work. The
+sections below are partial implementations, not a claim that only data-dependent gaps remain.
+
 | Readiness | Current evidence / limits |
 | --- | --- |
 | Data correctness | Recorded counts/visits, real tracker/IPC and summary/reset/Stop checks pass for supported fields; per-mob fame and individual chest value/loot remain unavailable |

@@ -6,6 +6,11 @@ Architecture and verification: [Session](../session.md).
 
 Acceptance follows the [approved design implementation flow](implementation-flow.md).
 
+The [complete remaining-work inventory](session-pve-gaps.md) records the 2026-10-03 audit of every
+designed card and its data. The summary below does not certify the sections as fully reproduced;
+supported omissions, including header context, trend captions, content grouping and journal
+counters, remain open alongside pricing/party/attribution dependencies.
+
 Approved source: F1/variants and Fr on the [v5 canvas](https://claude.ai/artifact/FbLQ85VeKLddohadcMNqYT).
 The owner's 2026-10-03 F1 ZIP is retained at
 `~/albion/loot-butler-build/source-exports/F1-approved-2026-10-03.zip`; its `F1.dc.html` SHA-256 is

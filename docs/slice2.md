@@ -9,6 +9,12 @@ kill or chest is recorded.
 Gathering and Fishing remain unbuilt and absent from navigation. This branch is stacked on slice 1;
 neither slice is merged or released by this work.
 
+Current priority after the owner's missing-card question: close the
+[Session/PvE remaining-work inventory](design/session-pve-gaps.md) before moving to another full
+page. The source audit found additional supported omissions beyond the earlier proof summaries;
+pricing, party and event attribution need concrete data work rather than an unspecified deferral.
+PvP remains paused. Approved summary cards need no new design choice.
+
 ## Design state
 
 Build the already approved PvE page first. The owner corrected the order on 2026-10-02: work on the
