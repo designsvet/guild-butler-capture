@@ -1,5 +1,13 @@
 # PvE — approved F3, built proof
 
+Acceptance follows the [approved design implementation flow](implementation-flow.md).
+
+| Readiness | Current evidence / limits |
+| --- | --- |
+| Data correctness | Recorded counts/visits, real tracker/IPC and summary/reset/Stop checks pass for supported fields; per-mob fame and individual chest value/loot remain unavailable |
+| Visual fidelity | Partial: supported F3 sections/native art are built and pictured below; a comprehensive comparison against every approved state is pending, and data-dependent omissions remain explicit |
+| Live-game verification | Pending for the final native-art revision: fresh game traffic, full Mac/Windows capture/flush and assistive-technology evidence remain outstanding |
+
 The opt-in v5 PvE page consumes the main-process September 21 session: 40 kills, 29 mob kinds, one
 chest and eight visits with PvE events. Full-session currencies retain their original fixed-point
 totals. Visit currency amounts include all activities in that interval. No per-mob fame, biggest

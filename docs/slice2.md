@@ -2,7 +2,10 @@
 
 Scope: PvE, Gathering and Fishing, with journal completions in the engine. Acceptance remains all
 three pages on recorded data at 1440, 1024 and 768, in both themes, with the shell's
-locale/keyboard/CSP checks. PvE is offered under This session after a kill or chest is recorded.
+locale/keyboard/CSP checks and inspection against their approved references. Follow the
+[data-first design implementation flow](design/implementation-flow.md); report data correctness,
+visual fidelity and live-game verification separately. PvE is offered under This session after a
+kill or chest is recorded.
 Gathering and Fishing remain unbuilt and absent from navigation. This branch is stacked on slice 1;
 neither slice is merged or released by this work.
 

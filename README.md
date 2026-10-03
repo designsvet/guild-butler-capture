@@ -4,6 +4,10 @@ Desktop app (macOS + Windows) that runs the Albion Online loot logger for
 ordinary guild members: a window with Start/Stop, live status, and the log
 file one click away — no terminal, no `sudo`, no Node install.
 
+Contributors and agents: read [AGENTS.md](AGENTS.md) and the
+[approved design implementation flow](docs/design/implementation-flow.md). Tracking comes first;
+data correctness, visual fidelity and live-game verification have separate acceptance evidence.
+
 This is the companion client to the Guild Butler Discord bot. The bot ingests
 the `loot-events-*.txt` files this app produces (raid-bot ADR 0092); a later
 phase uploads them automatically (pairing codes, ADR 0092 P2).

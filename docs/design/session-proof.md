@@ -4,6 +4,21 @@ Built `dist/web/app` at 0.8.8, from the scrubbed 2026-09-21 evening through the
 real reducer. Counter acceptance and provenance: [recording](../../test/fixtures/session/README.md).
 Architecture and verification: [Session](../session.md).
 
+Acceptance follows the [approved design implementation flow](implementation-flow.md).
+
+Approved source: F1/variants and Fr on the [v5 canvas](https://claude.ai/artifact/FbLQ85VeKLddohadcMNqYT).
+The owner's 2026-10-03 F1 ZIP is retained at
+`~/albion/loot-butler-build/source-exports/F1-approved-2026-10-03.zip`; its `F1.dc.html` SHA-256 is
+`d02ff8143da934b4170ddfa43d74359ee86cf2fbf86a35224314caee66d7bd0f`.
+Responsive/state boards remain in that project's `boards/`; native asset hashes are recorded in
+[provenance](../../resources/albion/PROVENANCE.md).
+
+| Readiness | Current evidence / limits |
+| --- | --- |
+| Data correctness | Recorded totals, real tracker/IPC and summary/reset/Stop/quit checks pass for supported fields; R5 and other unobserved fields remain unavailable |
+| Visual fidelity | Partial: supported icon/rate/bar/link/Fr corrections are built and pictured below; a comprehensive comparison against every approved state is still pending, so the whole screen is not certified complete |
+| Live-game verification | Partial: owner confirmed tracking in the earlier Mac preview; final native-art build awaits fresh game traffic, full Mac/Windows flush and assistive-technology evidence |
+
 | Approved board   | Built status                                                                                                                                                                                                       | Remaining gaps                                                                                                             |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | F1               | Approved native currency/activity icons, session-average hourly rates, ranked source bars and percentages, content markers, PvE links, loot, chest rarity strip and illustrated feed; New session and journal completions | R5 item values and comparisons; party, journal progress and unbuilt page links; unsupported native portraits/rarities retain fallbacks |

@@ -101,6 +101,10 @@ limits.
 
 ## Proof and checks
 
+Follow the [approved design implementation flow](design/implementation-flow.md): verify tracking
+first, then the supported UI against its actual source. The [Session proof](design/session-proof.md)
+records data, visual and live-game readiness separately.
+
 `pnpm dev:replay <folder>` runs recorded files through the real tracker/model, preload and renderer,
 without packet capture. It uses `.dev-replay-data/`, disables auto-update and bypasses capture
 permissions. Replay summaries go under that isolated data folder's `replays/sessions/`, leaving
@@ -117,9 +121,10 @@ well as geometry, row packing, narrow activity/source composition, timestamp wra
 
 `ONLY=session OUT=<folder> pnpm exec electron --no-sandbox tools/shell-shots.cjs` produces
 built-page screenshots at 1440, 1024 and 768 in both themes, plus stopped and reset states. The
-screenshots use scrubbed real data and stub art. Put these beside the approved local
-F1/F1r1024/F1r768 boards before release. OS caption controls are marked stand-ins, not proof of
-native chrome.
+screenshots use scrubbed real data, packaged native sprites and stub dynamic item art. Inspect them
+beside the approved local F1/F1r1024/F1r768 and Fr boards before declaring visual readiness or
+handing over a completed screen, and record the comparison/gaps in the proof. OS caption controls
+are marked stand-ins, not proof of native chrome.
 
 Hardware verification remains: real Mac/Windows capture, engine activity flag, Stop/quit file
 flushing, item art cached then offline, and VoiceOver/NVDA. None of these is asserted by an
