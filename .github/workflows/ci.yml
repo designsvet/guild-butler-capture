@@ -21,6 +21,8 @@ jobs:
       - run: pnpm test
       # Real main/preload/renderer replay, summary boundaries and no bot traffic.
       - run: xvfb-run -a pnpm check:replay
+      # Decode every packaged portrait and exercise the built renderer's exact mapping/fallback.
+      - run: xvfb-run -a pnpm check:portraits
       # Every state at the fixed 660x620, in the built renderer (tools/layout-check.cjs).
       - run: xvfb-run -a pnpm check:layout
       # The v5 shell: every route at 768/1024/1280/1440, both themes, six languages, every state

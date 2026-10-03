@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -7,6 +8,8 @@ import { fileURLToPath } from "node:url";
 
 import postcss, { type ChildNode, type Rule } from "postcss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { FULL_FRAME_MOB_AVATARS, MOB_PORTRAIT_AVATARS } from "../src/app/mobPortraits.js";
+import { MOBS } from "../src/shared/session/nameTables.js";
 
 /**
  * The v5 shell (src/app) reads the design system (@guild-butler/design-system, ADR 0145) through
@@ -47,7 +50,11 @@ const stripCssComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//
 const RAW_COLOUR = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?)\(/i;
 
 /** One spelling per colour, so `rgba(244, 241, 234, 0.06)` and the package's `rgba(244,241,234,.06)` compare equal. */
-const normalColour = (value: string): string => value.toLowerCase().replace(/\s+/g, "").replace(/([(,])0\./g, "$1.");
+const normalColour = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/([(,])0\./g, "$1.");
 
 /** How many times each custom property is DECLARED (`--name:`), as opposed to read. */
 const declarations = (css: string): Map<string, number> => {
@@ -70,12 +77,95 @@ const runStart = (haystack: string[], needle: string[]): number => {
 };
 
 describe("the v5 shell's build", () => {
-  it("ships the page, its bundle, its stylesheet, the crest and the faces — nothing else", () => {
-    expect(readdirSync(APP).sort()).toEqual(["app.css", "crest.png", "fonts", "index.html", "main.js"]);
-    expect(readFileSync(join(APP, "index.html"), "utf8")).toBe(readFileSync(join(ROOT, "src", "app", "index.html"), "utf8"));
-    expect(readFileSync(join(APP, "crest.png")).equals(readFileSync(join(ROOT, "resources", "icons", "crest-mark.png")))).toBe(
-      true,
+  it("ships only the page, bundle, stylesheet, crest, Albion artwork and faces", () => {
+    expect(readdirSync(APP).sort()).toEqual(["albion", "app.css", "crest.png", "fonts", "index.html", "main.js"]);
+    expect(readFileSync(join(APP, "index.html"), "utf8")).toBe(
+      readFileSync(join(ROOT, "src", "app", "index.html"), "utf8"),
     );
+    expect(
+      readFileSync(join(APP, "crest.png")).equals(readFileSync(join(ROOT, "resources", "icons", "crest-mark.png"))),
+    ).toBe(true);
+  });
+
+  it("ships the approved Albion sprites byte-for-byte and resolves every bundled icon reference", () => {
+    const assets = join(ROOT, "resources", "albion");
+    const files = readdirSync(assets).sort();
+    expect(readdirSync(join(APP, "albion")).sort()).toEqual(files);
+    for (const file of files) {
+      expect(readFileSync(join(APP, "albion", file)).equals(readFileSync(join(assets, file))), file).toBe(true);
+    }
+    const bundle = readFileSync(join(APP, "main.js"), "utf8");
+    for (const [, file] of bundle.matchAll(/"([ui]-[A-Za-z0-9_]+\.png)"/g)) {
+      expect(files, `Missing icon in built app: ${file}`).toContain(file);
+    }
+    expect(files.filter((file) => file.startsWith("mob-") && file.endsWith(".png")).sort()).toEqual(
+      MOB_PORTRAIT_AVATARS.map((avatar) => `mob-${avatar}.png`).sort(),
+    );
+    expect(files.filter((file) => /^[ui]-/.test(file))).toHaveLength(12);
+  });
+
+  it("ships hashed, exact avatar matches and accounts for every portrait gap in the pinned mob table", () => {
+    const manifest = JSON.parse(readFileSync(join(APP, "albion/mob-portraits.json"), "utf8")) as {
+      nameTableSha256: string;
+      missingAvatars: string[];
+      coverage: {
+        mobEntries: number;
+        avatarIdentities: number;
+        portraits: number;
+        coveredMobEntries: number;
+        mobEntriesWithoutAvatar: number;
+      };
+      portraits: {
+        avatar: string;
+        file: string;
+        origin: string;
+        frame: string;
+        sha256: string;
+        width: number;
+        height: number;
+        upstream: { sha256: string; blobSha1: string } | null;
+      }[];
+    };
+    const sha256 = (bytes: Buffer): string => createHash("sha256").update(bytes).digest("hex");
+    expect(manifest.nameTableSha256).toBe(sha256(readFileSync(join(ROOT, "src/shared/session/nameTables.ts"))));
+    expect(manifest.portraits.map((row) => row.avatar)).toEqual([...MOB_PORTRAIT_AVATARS]);
+    const selected = new Set<string>(MOB_PORTRAIT_AVATARS);
+    expect(selected.size).toBe(manifest.portraits.length);
+    const mobs = Object.values(MOBS);
+    const avatars = [
+      ...new Set(mobs.map((mob) => mob.avatar).filter((avatar): avatar is string => avatar != null)),
+    ].sort();
+    expect(manifest.missingAvatars).toEqual(avatars.filter((avatar) => !selected.has(avatar)));
+    expect(manifest.coverage).toEqual({
+      mobEntries: mobs.length,
+      avatarIdentities: avatars.length,
+      portraits: selected.size,
+      coveredMobEntries: mobs.filter((mob) => mob.avatar != null && selected.has(mob.avatar)).length,
+      mobEntriesWithoutAvatar: mobs.filter((mob) => mob.avatar == null).length,
+    });
+    expect(manifest.portraits.filter((row) => row.origin === "approved-f3")).toHaveLength(8);
+    expect(manifest.portraits.filter((row) => row.frame === "full").map((row) => row.avatar)).toEqual([
+      ...FULL_FRAME_MOB_AVATARS,
+    ]);
+    for (const row of manifest.portraits) {
+      expect(row.avatar).toMatch(/^[A-Z0-9_]+$/);
+      expect(avatars).toContain(row.avatar);
+      expect(row.file).toBe(`mob-${row.avatar}.png`);
+      const bytes = readFileSync(join(APP, "albion", row.file));
+      expect(sha256(bytes), row.file).toBe(row.sha256);
+      expect(bytes.subarray(0, 8).toString("hex"), row.file).toBe("89504e470d0a1a0a");
+      expect(bytes.toString("ascii", 12, 16), row.file).toBe("IHDR");
+      expect(bytes.readUInt32BE(16), row.file).toBe(row.width);
+      expect(bytes.readUInt32BE(20), row.file).toBe(row.height);
+      if (row.origin === "statistics-analysis") {
+        expect(row.frame).toBe("central-medallion");
+        expect([row.width, row.height]).toEqual([256, 256]);
+        expect(row.sha256, row.file).toBe(row.upstream?.sha256);
+        expect(createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex"), row.file).toBe(
+          row.upstream?.blobSha1,
+        );
+      }
+    }
   });
 
   it("keeps the old window's content-security policy, word for word", () => {
@@ -101,7 +191,9 @@ describe("the v5 shell's stylesheet", () => {
     const parsed = postcss.parse(built).nodes;
     const nodes = parsed.map((node: ChildNode) => node.toString());
     const starts = SHEETS.map((sheet) => {
-      const own = postcss.parse(readFileSync(packageFile(sheet), "utf8")).nodes.map((node: ChildNode) => node.toString());
+      const own = postcss
+        .parse(readFileSync(packageFile(sheet), "utf8"))
+        .nodes.map((node: ChildNode) => node.toString());
       expect(own.length, `${sheet} parsed to nothing`).toBeGreaterThan(0);
       const at = runStart(nodes, own);
       expect(at, `${sheet} is not in the built CSS as one unbroken run`).toBeGreaterThan(-1);
@@ -173,9 +265,10 @@ describe("the v5 shell's stylesheet", () => {
         if (!RAW_COLOUR.test(decl.value)) {
           return;
         }
-        expect(decl.prop, `src/app/${file}: ${decl.prop}: ${decl.value} — a raw colour outside an --lb-* value`).toMatch(
-          /^--lb-/,
-        );
+        expect(
+          decl.prop,
+          `src/app/${file}: ${decl.prop}: ${decl.value} — a raw colour outside an --lb-* value`,
+        ).toMatch(/^--lb-/);
         const rule = decl.parent;
         const onLight = rule?.type === "rule" && (rule as Rule).selector.includes('data-theme="light"');
         const theme = onLight ? lightAll : dark;
@@ -199,9 +292,10 @@ describe("the v5 shell's faces", () => {
     expect(files.filter((file) => file.endsWith(".woff2")).length).toBeGreaterThan(0);
     expect(readdirSync(join(APP, "fonts")).sort()).toEqual(files);
     for (const file of files) {
-      expect(readFileSync(join(APP, "fonts", file)).equals(readFileSync(join(PACKAGE_FONTS, file))), `${file} differs`).toBe(
-        true,
-      );
+      expect(
+        readFileSync(join(APP, "fonts", file)).equals(readFileSync(join(PACKAGE_FONTS, file))),
+        `${file} differs`,
+      ).toBe(true);
     }
     // every face the stylesheet names is beside it
     const css = readFileSync(join(APP, "fonts", "fonts.css"), "utf8");
@@ -214,7 +308,9 @@ describe("the v5 shell's faces", () => {
 
   it("travel with each family's licence", () => {
     const shipped = readdirSync(join(APP, "fonts"));
-    const families = new Set(shipped.filter((file) => file.endsWith(".woff2")).map((file) => file.replace(/-[0-9a-f]+\.woff2$/, "")));
+    const families = new Set(
+      shipped.filter((file) => file.endsWith(".woff2")).map((file) => file.replace(/-[0-9a-f]+\.woff2$/, "")),
+    );
     expect(families.size).toBe(4); // Rubik, Onest, IBM Plex Mono, Cormorant Garamond
     for (const family of families) {
       expect(shipped, `${family} ships without its licence`).toContain(`LICENSE-${family}.txt`);

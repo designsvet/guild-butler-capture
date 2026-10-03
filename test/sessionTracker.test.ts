@@ -55,6 +55,38 @@ const tracker = (folder: string) => {
   };
 };
 describe("real file tails and session boundaries", () => {
+  it("saves journal completions once and resets their raw-file boundary", async () => {
+    const folder = dir();
+    const file = join(folder, "activity-events-journals.jsonl");
+    const book = (at: number, qty: number) =>
+      JSON.stringify({
+        v: 1,
+        t: "journal",
+        at,
+        char: "Me",
+        zone: null,
+        item: "T8_JOURNAL_WARRIOR_FULL",
+        index: 12055,
+        qty,
+      }) + "\n";
+    const first = [book(110, 1), book(111, 4), book(112, 1)].join("");
+    writeFileSync(file, first);
+    const h = tracker(folder);
+    await h.session.poll();
+    await h.session.poll();
+    expect(h.session.snapshot().journals.T8_JOURNAL_WARRIOR_FULL?.qty).toBe(6);
+    h.clock(200);
+    await h.session.newSession();
+    expect(h.session.snapshot().journals).toEqual({});
+    writeFileSync(file, first + book(210, 2));
+    await h.session.poll();
+    await h.session.stop();
+    const old = JSON.parse(readFileSync(join(folder, "sessions/session-1/session.json"), "utf8")) as TSession;
+    const next = JSON.parse(readFileSync(join(folder, "sessions/session-2/session.json"), "utf8")) as TSession;
+    expect(old.journals.T8_JOURNAL_WARRIOR_FULL?.qty).toBe(6);
+    expect(next.journals.T8_JOURNAL_WARRIOR_FULL?.qty).toBe(2);
+    expect(next.files[0]?.fromByte).toBe(Buffer.byteLength(first));
+  });
   it("tails partial UTF-8/JSON once, across both streams and file rotations", async () => {
     const folder = dir();
     const file = join(folder, "activity-events-one.jsonl");

@@ -8,10 +8,11 @@
  * the browser, which scrolls to and focuses its target, and the page stays where it was. An
  * unknown route falls back to Session rather than to a blank page.
  *
- * In slice 0 Session is the only page there is (a page with no data yet is not listed — SPEC).
+ * Session is always offered. Shell gates PvE on observed kills/chests and sends an unavailable
+ * PvE hash back to Session (a page with no data yet is not listed — SPEC).
  */
 
-export const ROUTES = ["session"] as const;
+export const ROUTES = ["session", "pve"] as const;
 
 export type TRoute = (typeof ROUTES)[number];
 
@@ -36,10 +37,7 @@ export type THashSource = {
   addEventListener: (type: "hashchange", listener: () => void) => void;
 };
 
-export type TRouter = {
-  getSnapshot: () => TRoute;
-  subscribe: (listener: () => void) => () => void;
-};
+export type TRouter = { getSnapshot: () => TRoute; subscribe: (listener: () => void) => () => void };
 
 /** The current route as an external store, for React's `useSyncExternalStore`. */
 export const createRouter = (source: THashSource): TRouter => {

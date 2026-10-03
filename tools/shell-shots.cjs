@@ -169,7 +169,7 @@ const scenarios = () => {
       add({ state: "capturing", theme: "obsidian", platform, width, height, paired: true, sentAgoMs: 60_000 });
     }
   }
-  const { replayedSession } = require("./session-fixture.cjs");
+  const { replayedSession, journalSession, favorOnlySession } = require("./session-fixture.cjs");
   const { closeSession } = require("./session-fixture.cjs").fromSource("src/shared/session/model.ts");
   const recorded = replayedSession();
   for (const theme of ["obsidian", "parchment"]) {
@@ -187,6 +187,13 @@ const scenarios = () => {
         session: recorded,
         name: `session-replay-${theme}-${width}`,
       });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: recorded, route: "pve", name: `pve-replay-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: recorded, route: "pve", scroll: ".lb-pve-columns", name: `pve-mobs-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: recorded, route: "pve", scroll: ".lb-pve-aside", name: `pve-chests-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: journalSession(), name: `journal-completions-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: favorOnlySession(), name: `favor-only-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: favorOnlySession(), route: "pve", scroll: ".lb-pve-columns", name: `pve-imp-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: favorOnlySession(), scroll: '[data-session-event="kill"]', name: `session-imp-feed-${theme}-${width}` });
     }
     add({
       state: "idle",
@@ -508,7 +515,7 @@ const run = async () => {
       }
     };
     win.webContents.on("console-message", onConsole);
-    await win.loadFile(PAGE);
+    await win.loadFile(PAGE, { hash: `/${sc.route ?? "session"}` });
     // the boot promises settle, the stored language and theme land, the faces arrive; anything the
     // page's policy refused meanwhile is counted (the stand-ins below go in after)
     const refused = await win.webContents.executeJavaScript(
@@ -615,6 +622,14 @@ const run = async () => {
         ["header", ".lb-head"],
         ["activity", ".lb-activity-cards > section"],
       ]) {
+        if (name === "activity") {
+          // Extra observed KPI rows may push the card below the viewport. Show its complete
+          // counters before cropping; the full-window and header proofs are already saved.
+          await win.webContents.executeJavaScript(`new Promise((done) => {
+            document.querySelector(${JSON.stringify(selector)}).scrollIntoView({ block: 'center' });
+            requestAnimationFrame(() => requestAnimationFrame(done));
+          })`);
+        }
         const crop = await win.webContents.executeJavaScript(
           `(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.floor(r.x - 8), y: Math.floor(r.y - 8), width: Math.ceil(r.width + 16), height: Math.ceil(r.height + 16) }; })()`,
         );

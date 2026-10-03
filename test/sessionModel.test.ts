@@ -9,8 +9,59 @@ import {
   ownLoot,
   quantityTotal,
   reduceSession,
+  restartSession,
 } from "../src/shared/session/model.js";
+import { chestRarities, hasPve, pveMobs, pveVisits } from "../src/shared/session/pve.js";
 const DIR = join(__dirname, "fixtures", "session");
+describe("earned faction currency", () => {
+  it("does not count the live Favor-only excerpt's legacy faction labels as city gains", () => {
+    const rows = readFileSync(join(__dirname, "fixtures", "currencies", "favor-only-2026-10-03.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => parseActivityLine(line)!);
+    expect(rows).not.toContain(null);
+    const session = rows.reduce((state, event) => reduceSession(state, event), newSession("favor-only", rows[0]!.at));
+    expect(session.totals.faction).toBeNull();
+    expect(session.feed.some((event) => event.t === "faction")).toBe(false);
+    expect(session.activityLines).toBe(18);
+    expect(session.totals.favor).toBe(303320);
+    expect(session.totals.might).toBe(1362567);
+    expect(mobTotal(session)).toBe(1);
+    expect(session.refused).toBe(0);
+  });
+
+  it("counts positive city gains only and clears them at a new session", () => {
+    let session = newSession("faction", 1);
+    const base = {
+      v: 1 as const,
+      t: "faction" as const,
+      at: 2,
+      char: "Recorder",
+      zone: "1354",
+    };
+    for (const [city, gained] of [
+      [7, 10000],
+      [0, 10000],
+      [8, 10000],
+      [4, 0],
+      [4, -10000],
+    ]) {
+      session = reduceSession(session, {
+        ...base,
+        city: city!,
+        gained: gained!,
+      });
+    }
+    expect(session.totals.faction).toBeNull();
+    expect(session.feed).toEqual([]);
+    for (const city of [1, 2, 3, 4, 5, 6]) {
+      session = reduceSession(session, { ...base, city, gained: 10000 });
+    }
+    expect(session.totals.faction).toBe(60000);
+    expect(session.feed).toHaveLength(6);
+    expect(restartSession(session, "next", 3).totals.faction).toBeNull();
+  });
+});
 const evening = () => {
   const events = readdirSync(DIR)
     .filter((file) => /\.(jsonl|txt)$/.test(file))
@@ -34,6 +85,20 @@ const evening = () => {
   );
 };
 describe("September 21 evening through the session model", () => {
+  it("keeps every PvE count after the bounded feed has discarded the original events", () => {
+    const session = evening();
+    const visits = pveVisits(session);
+    expect(visits.reduce((n, visit) => n + visit.kills, 0)).toBe(40);
+    expect(visits.reduce((n, visit) => n + visit.chests, 0)).toBe(1);
+    expect(pveMobs(session, "kills").reduce((n, mob) => n + mob.kills, 0)).toBe(40);
+    expect(pveMobs(session, "recent").map((mob) => mob.last.at)).toEqual(
+      Object.values(session.mobLast)
+        .map((last) => last.at)
+        .sort((a, b) => b - a),
+    );
+    expect(session.visits.reduce((n, visit) => n + (visit.fame ?? 0), 0)).toBe(session.totals.fame);
+    expect(session.visits.reduce((n, visit) => n + (visit.silver ?? 0), 0)).toBe(session.totals.silver);
+  });
   it("matches every raw currency total without rounding individual gains", () => {
     const session = evening();
     expect(session.activityLines).toBe(361);
@@ -46,7 +111,7 @@ describe("September 21 evening through the session model", () => {
       silver: 142162640,
       might: 159966314,
       favor: 70156519,
-      faction: 113949404,
+      faction: 64553475,
     });
     const raw = readdirSync(DIR)
       .filter((f) => f.endsWith("jsonl"))
@@ -57,6 +122,9 @@ describe("September 21 evening through the session model", () => {
           .map((line) => JSON.parse(line)),
       );
     expect(session.totals.fame).toBe(raw.filter((e) => e.t === "fame").reduce((n, e) => n + e.gain, 0));
+    expect(session.totals.faction).toBe(
+      raw.filter((e) => e.t === "faction" && e.city >= 1 && e.city <= 6 && e.gained > 0).reduce((n, e) => n + e.gained, 0),
+    );
     expect(Object.values(session.zones).reduce((n, z) => n + z.fame, 0)).toBe(session.totals.fame);
     expect(Object.values(session.zones).reduce((n, z) => n + z.silver, 0)).toBe(session.totals.silver);
   });
@@ -92,6 +160,120 @@ describe("September 21 evening through the session model", () => {
 describe("session invariants", () => {
   const zone = { v: 1, t: "zone", at: 100, char: "Me", zone: "1354", items: "live", fame_total: 1000 } as const;
   const fame = { v: 1, t: "fame", at: 110, char: "Me", zone: "1354", gain: 101, premium: false } as const;
+  const kill = { v: 1, t: "kill", at: 110, char: "Me", zone: "1354", mob: 123, hp: null } as const;
+  it("keeps complete chest totals and genuinely recent details when older files recover", () => {
+    let session = reduceSession(newSession("one", 100), zone);
+    for (let n = 0; n < 70; n += 1) {
+      session = reduceSession(session, {
+        v: 1,
+        t: "chest",
+        at: 200 + n,
+        char: "Me",
+        zone: "1354",
+        name: null,
+        rarity: 2,
+      });
+    }
+    session = reduceSession(session, { v: 1, t: "chest", at: 120, char: "Me", zone: "1354", name: null, rarity: null });
+    expect(session.chestCount).toBe(71);
+    expect(session.chests).toHaveLength(61);
+    expect(session.chests[0]?.at).toBe(209);
+    expect(session.visits[0]?.chests).toBe(71);
+    expect(session.visits[0]?.rarities).toEqual({ 2: 70, null: 1 });
+    expect(chestRarities(session)).toEqual([
+      { rarity: 1, count: 0 },
+      { rarity: 2, count: 70 },
+      { rarity: 3, count: 0 },
+      { rarity: 4, count: 0 },
+      { rarity: null, count: 1 },
+    ]);
+  });
+  it("keeps repeated visits separate, puts late lines in their original interval, and closes once", () => {
+    let session = reduceSession(newSession("one", 100), zone);
+    session = reduceSession(session, kill);
+    session = reduceSession(session, { ...zone, at: 200, zone: "1339" });
+    session = reduceSession(session, { ...zone, at: 300 });
+    session = reduceSession(session, { ...kill, at: 310 });
+    session = reduceSession(session, { ...kill, at: 120 });
+    expect(session.visits.map((visit) => visit.kills)).toEqual([2, 0, 1]);
+    expect(session.mobLast["123"]).toEqual({ at: 310, zone: "1354" });
+    expect(session.visits.map((visit) => visit.fame)).toEqual([null, null, null]);
+    const closed = closeSession(session, 400);
+    expect(closed.visits.map((visit) => [visit.startedAt, visit.endedAt])).toEqual([
+      [100, 200],
+      [200, 300],
+      [300, 400],
+    ]);
+    expect(closed.activeVisit).toBeNull();
+    expect(reduceSession(closed, kill)).toBe(closed);
+    const next = restartSession(closed, "two", 500);
+    expect(hasPve(next)).toBe(false);
+    expect(next.visits).toHaveLength(1);
+    expect(next.visits[0]?.startedAt).toBe(500);
+    expect(next.mobLast).toEqual({});
+  });
+  it("does not invent visit clocks or locations for unplaced or recovered events", () => {
+    const empty = newSession("one", 100);
+    let session = reduceSession(empty, { ...kill, zone: null });
+    session = reduceSession(session, { ...zone, at: 200, zone: "1339" });
+    session = reduceSession(session, { ...zone, at: 50 }, "old");
+    session = reduceSession(session, { ...kill, at: 60 });
+    expect(session.currentZone).toBe("1339");
+    expect(session.visits.filter((visit) => visit.startedAt != null)).toHaveLength(1);
+    expect(pveVisits(session).map((visit) => [visit.zone, visit.startedAt, visit.kills])).toEqual([
+      [null, null, 1],
+      ["1354", null, 1],
+    ]);
+    expect(empty.visits).toEqual([]);
+    expect(empty.mobLast).toEqual({});
+    expect(hasPve(reduceSession(empty, fame))).toBe(false);
+    const chests = reduceSession(empty, {
+      v: 1,
+      t: "chest",
+      at: 120,
+      char: "Me",
+      zone: null,
+      name: null,
+      rarity: null,
+    });
+    expect(hasPve(chests)).toBe(true);
+    expect(chests.visits[0]?.rarities).toEqual({ null: 1 });
+  });
+  it("keeps completed journals by item/index without inventing progress or counting a new session twice", () => {
+    const book = {
+      v: 1,
+      t: "journal",
+      at: 110,
+      char: "Me",
+      zone: "1354",
+      item: "T8_JOURNAL_WARRIOR_FULL",
+      index: 12055,
+      qty: 1,
+    } as const;
+    const empty = newSession("one", 100);
+    let session = reduceSession(empty, zone);
+    for (const qty of [1, 4, 1]) {
+      session = reduceSession(session, { ...book, qty });
+    }
+    session = reduceSession(session, { ...book, item: null, index: 99999, qty: 2 });
+    expect(session.journals.T8_JOURNAL_WARRIOR_FULL?.qty).toBe(6);
+    expect(session.journals["index:99999"]).toEqual({ item: null, index: 99999, qty: 2 });
+    expect(empty.journals).toEqual({});
+    expect(session.totals.fame).toBeNull();
+    expect(restartSession(session, "two", 120).journals).toEqual({});
+    const closed = closeSession(session, 120);
+    expect(reduceSession(closed, book)).toBe(closed);
+  });
+  it("refuses malformed journal counts and preserves unknown names", () => {
+    const book = { v: 1, t: "journal", at: 110, char: "Me", zone: null, item: null, index: 12055, qty: 1 };
+    expect(parseActivityLine(JSON.stringify(book))).toEqual(book);
+    for (const qty of [undefined, null, "1", 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(parseActivityLine(JSON.stringify({ ...book, qty }))).toBeNull();
+    }
+    for (const index of [undefined, null, "12055", 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(parseActivityLine(JSON.stringify({ ...book, index }))).toBeNull();
+    }
+  });
   it("keeps unknown totals null and leaves the input immutable", () => {
     const empty = newSession("one", 100);
     const next = reduceSession(empty, zone);
@@ -137,7 +319,9 @@ describe("session invariants", () => {
       expect(parseActivityLine(JSON.stringify(row))).toBeNull();
     }
     expect(parseActivityLine("{")).toBeNull();
-    expect(parseActivityLine(JSON.stringify({ ...fame, t: "fish", outcome: "escaped", catch: "malformed" }))).toBeNull();
+    expect(
+      parseActivityLine(JSON.stringify({ ...fame, t: "fish", outcome: "escaped", catch: "malformed" })),
+    ).toBeNull();
     expect(parseLootLine("timestamp_utc;header")).toBeNull();
   });
 });

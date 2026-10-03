@@ -556,6 +556,12 @@ describe("the shell's router: the page lives in the hash", () => {
     expect(hrefOf("session")).toBe("#/session");
     expect(nextRoute("#/session", DEFAULT_ROUTE)).toBe("session");
   });
+  it("reads PvE without navigating outside the app and preserves it for the skip link", () => {
+    expect(hrefOf("pve")).toBe("#/pve");
+    expect(nextRoute("#/pve", "session")).toBe("pve");
+    expect(nextRoute("#main", "pve")).toBe("pve");
+    expect(nextRoute("#/missing", "pve")).toBe("session");
+  });
 
   it("ignores a hash that is not a route, so the skip link's #main leaves the page where it was", () => {
     expect(nextRoute("#main", "session")).toBe("session");

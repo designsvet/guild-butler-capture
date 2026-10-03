@@ -29,7 +29,8 @@
     "package:win": "pnpm build && electron-builder --win",
     "dev:replay": "pnpm build && node tools/dev-replay.mjs",
     "session:names": "node tools/session-names.mjs",
-    "check:replay": "pnpm build && electron --no-sandbox tools/session-replay-check.cjs"
+    "check:replay": "pnpm build && electron --no-sandbox tools/session-replay-check.cjs",
+    "check:portraits": "pnpm build && electron --no-sandbox tools/mob-portraits-check.cjs"
   },
   "devDependencies": {
     "@guild-butler/design-system": "0.11.0",

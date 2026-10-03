@@ -85,11 +85,14 @@ export const generateNames = ({ clusters, mobs, localization, settings }) => {
       names: namesFor(tag),
       tier: row["@tier"] == null ? null : Number(row["@tier"]),
       faction: row["@faction"] ?? null,
+      avatar: row["@avatar"] ?? null,
     };
   });
   const items = Object.fromEntries(
     [...translations.keys()]
-      .filter((tag) => /^@ITEMS_T[1-8]_(?:ORE|WOOD|HIDE|FIBER|ROCK|FISH|SEAWEED)(?:_|$)/.test(tag))
+      .filter((tag) => /^@ITEMS_T[1-8]_(?:ORE|WOOD|HIDE|FIBER|ROCK|FISH|SEAWEED|JOURNAL)(?:_|$)/.test(tag))
+      // This slice observes completed books; descriptions/empty/partial books have no consumer.
+      .filter((tag) => !tag.includes("_JOURNAL_") || tag.endsWith("_FULL"))
       .map((tag) => [tag.slice(7), namesFor(tag)]),
   );
   return { world, mobs: mobTable, items };

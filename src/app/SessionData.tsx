@@ -1,73 +1,31 @@
 /** F1 assembled from one main-process snapshot. No local tally, inferred prices or inferred party. */
-import { useId, useState, type ReactNode } from "react";
+import { useState } from "react";
 import type { TLang } from "../shared/i18n.js";
-import { LOCALE_OF, formatCount } from "../shared/plural.js";
+import { formatCount } from "../shared/plural.js";
 import { sessionStrings, type TSessionStrings } from "../shared/sessionStrings.js";
 import { FIXED_SCALE, mobTotal, ownLoot, quantityTotal, type TMetric, type TSession } from "../shared/session/model.js";
 import { mobName, resourceName, worldName, type TContent } from "../shared/session/names.js";
 import type { TSessionEvent } from "../shared/session/events.js";
+import {
+  Panel,
+  Stat,
+  precise,
+  compact,
+  duration,
+  zoneLabel,
+  chestLabel,
+  hourly,
+  percent,
+  PveLink,
+  ContentMark,
+  ChestSummary,
+} from "./SessionParts.js";
+import { AlbionIcon, ChestIcon, MobIcon } from "./AlbionIcon.js";
 import { formatClock } from "./format.js";
-import { APPEARS, CHEVRON, FOLDER, Icon, INFO, SESSION } from "./icons.js";
+import { APPEARS, CHEVRON, DATA_ICONS, FOLDER, Icon, INFO, SESSION } from "./icons.js";
 
-const precise = (lang: TLang, raw: number): string =>
-  new Intl.NumberFormat(LOCALE_OF[lang], { maximumFractionDigits: 4 }).format(raw / FIXED_SCALE);
-const compact = (lang: TLang, value: number): string =>
-  new Intl.NumberFormat(LOCALE_OF[lang], { notation: "compact", maximumFractionDigits: 1 }).format(value);
-const duration = (lang: TLang, ms: number): string => {
-  const minutes = Math.max(0, Math.floor(ms / 60_000));
-  return `${formatCount(lang, Math.floor(minutes / 60))}:${String(minutes % 60).padStart(2, "0")}`;
-};
-const zoneLabel = (id: string | null, text: TSessionStrings): string => {
-  const zone = worldName(id);
-  return zone?.name ?? (zone != null ? text[zone.content] : text.unknownZone);
-};
 const itemLabel = (item: string | null, text: TSessionStrings, lang: TLang): string =>
   resourceName(item, lang) ?? (item == null ? text.unknownItem : item);
-const Panel = ({
-  title,
-  icon = INFO,
-  children,
-  subtitle,
-}: {
-  title: string;
-  icon?: readonly string[];
-  children: ReactNode;
-  subtitle?: string;
-}) => {
-  const id = useId();
-  const bodyId = useId();
-  const [folded, setFolded] = useState(false);
-  return (
-    <section className="gb-card lb-card lb-data-card" aria-labelledby={id}>
-      <div className="lb-card-head">
-        <span className="lb-tile lb-tile--head" aria-hidden="true">
-          <Icon paths={icon} size={13} />
-        </span>
-        <h2 className="lb-card-title" id={id}>
-          {title}
-        </h2>
-        {subtitle != null ? <span className="lb-data-sub">{subtitle}</span> : null}
-        <button
-          type="button"
-          className="lb-fold"
-          aria-label={title}
-          aria-expanded={!folded}
-          aria-controls={bodyId}
-          onClick={() => {
-            setFolded(!folded);
-          }}
-        >
-          <Icon paths={CHEVRON} size={14} />
-        </button>
-      </div>
-      {!folded ? (
-        <div className="lb-data-content" id={bodyId}>
-          {children}
-        </div>
-      ) : null}
-    </section>
-  );
-};
 const ItemArt = ({ item }: { item: string }) => {
   const [failed, setFailed] = useState(false);
   return (
@@ -86,40 +44,6 @@ const ItemArt = ({ item }: { item: string }) => {
     </span>
   );
 };
-const Stat = ({
-  label,
-  value,
-  exact,
-  metric,
-  detail,
-  raw,
-}: {
-  label: string;
-  value: string;
-  exact: string;
-  metric: string;
-  raw: number;
-  detail?: string;
-}) => (
-  <section
-    className="gb-card lb-stat"
-    aria-label={`${label}: ${exact}`}
-    data-session-metric={metric}
-    data-exact={exact}
-    data-raw={raw}
-  >
-    <div className="lb-eyebrow">
-      <span className="lb-tile lb-tile--head">
-        <Icon paths={APPEARS[0] ?? INFO} size={13} />
-      </span>
-      {label}
-    </div>
-    <div className="lb-stat-value" title={exact}>
-      {value}
-    </div>
-    {detail != null ? <div className="lb-stat-detail">{detail}</div> : null}
-  </section>
-);
 const Sources = ({
   session,
   metric,
@@ -143,16 +67,20 @@ const Sources = ({
   }
   const total = session.totals[metric];
   return (
-    <Panel title={metric === "fame" ? text.fameSources : text.silverSources}>
+    <Panel title={metric === "fame" ? text.fameSources : text.silverSources} nativeIcon={metric}>
       <ul className="lb-source-list">
         {[...sources]
           .sort((a, b) => b[1] - a[1])
-          .map(([source, amount]) => (
-            <li key={source}>
+          .map(([source, amount], rank) => (
+            <li key={source} data-source-amount={amount} data-source-total={total}>
               <div className="lb-source-line">
-                <span>{text[source]}</span>
-                <span className="lb-number" title={precise(lang, amount)}>
+                <span>
+                  <ContentMark content={source} />
+                  {text[source]}
+                </span>
+                <span className="lb-source-amount lb-number" title={precise(lang, amount)}>
                   {compact(lang, amount / FIXED_SCALE)}
+                  <small>({percent(lang, total == null || total <= 0 ? 0 : amount / total)})</small>
                 </span>
               </div>
               <div className="lb-source-track" aria-hidden="true">
@@ -160,6 +88,7 @@ const Sources = ({
                   ref={(el) => {
                     if (el != null) {
                       el.style.width = `${total == null || total <= 0 ? 0 : Math.min(100, (amount / total) * 100)}%`;
+                      el.style.opacity = String(Math.max(0.4, 1 - rank * 0.16));
                     }
                   }}
                 />
@@ -184,19 +113,19 @@ const feedText = (event: TSessionEvent, lang: TLang, text: TSessionStrings): str
       return text.feedZone(zoneLabel(event.zone, text));
     }
     case "fame": {
-      return text.feedFame(zoneLabel(event.zone, text), precise(lang, event.gain));
+      return text.fame;
     }
     case "silver": {
-      return text.feedSilver(
-        zoneLabel(event.zone, text),
-        precise(lang, Math.max(0, event.yield - event.cluster_tax - event.guild_tax - event.alliance_tax)),
-      );
+      return text.silver;
     }
     case "kill": {
       return text.feedKill(mobName(event.mob, lang) ?? `${text.unknownMob} (${event.mob})`);
     }
     case "harvest": {
       return text.feedHarvest(itemLabel(event.item, text, lang), event.std + event.bonus + event.premium);
+    }
+    case "journal": {
+      return text.feedJournal(itemLabel(event.item, text, lang), event.qty);
     }
     case "fish": {
       return event.outcome === "escaped"
@@ -215,16 +144,34 @@ const feedText = (event: TSessionEvent, lang: TLang, text: TSessionStrings): str
     }
   }
 };
-const chestLabel = (rarity: number | null, text: TSessionStrings): string =>
-  rarity === 1
-    ? text.rarityCommon
-    : rarity === 2
-      ? text.rarityUncommon
-      : rarity === 3
-        ? text.rarityRare
-        : rarity === 4
-          ? text.rarityLegendary
-          : text.unknownChest;
+const feedIcon = (event: TSessionEvent): readonly string[] => {
+  switch (event.t) {
+    case "kill":
+      return DATA_ICONS.kills;
+    case "chest":
+      return DATA_ICONS.chest;
+    case "fame":
+      return DATA_ICONS.fame;
+    case "silver":
+      return DATA_ICONS.silver;
+    case "harvest":
+      return DATA_ICONS.gathering;
+    case "fish":
+      return DATA_ICONS.fishing;
+    case "journal":
+      return DATA_ICONS.journal;
+    case "loot":
+      return DATA_ICONS.loot;
+    default:
+      return DATA_ICONS.place;
+  }
+};
+const feedItem = (event: TSessionEvent): string | null =>
+  event.t === "loot" || event.t === "harvest" || event.t === "journal"
+    ? event.item
+    : event.t === "fish"
+      ? (event.catch?.[0]?.item ?? null)
+      : null;
 
 export const SessionData = ({
   session,
@@ -252,7 +199,7 @@ export const SessionData = ({
   const unknown =
     Object.keys(session.mobs).some((index) => mobName(Number(index), lang) == null) ||
     Object.keys(session.zones).some((id) => worldName(id) == null) ||
-    [...Object.values(session.harvests), ...Object.values(session.catches)].some(
+    [...Object.values(session.harvests), ...Object.values(session.catches), ...Object.values(session.journals)].some(
       (item) => item.item == null || item.item.startsWith("UNKNOWN_"),
     ) ||
     Object.values(session.looters).some((looter) =>
@@ -278,7 +225,7 @@ export const SessionData = ({
       <div className="lb-stats">
         {metrics.flatMap((metric) => {
           const raw = session.totals[metric];
-          if (raw == null || raw === 0) {
+          if (raw == null || raw === 0 || (metric === "faction" && raw < 0)) {
             return [];
           }
           return [
@@ -289,6 +236,8 @@ export const SessionData = ({
               raw={raw}
               value={compact(lang, raw / FIXED_SCALE)}
               exact={precise(lang, raw)}
+              rate={hourly(raw, elapsed)}
+              rateText={text.perHour(compact(lang, hourly(raw, elapsed) ?? 0))}
               detail={
                 metric === "silver" && session.totals.silverTax != null && session.totals.silverTax > 0
                   ? `${text.silverTax} · ${compact(lang, session.totals.silverTax / FIXED_SCALE)}`
@@ -310,7 +259,7 @@ export const SessionData = ({
       </div>
       <div className="lb-activity-cards">
         {kills > 0 || session.chestCount > 0 ? (
-          <Panel title={text.pve} icon={APPEARS[2] ?? INFO}>
+          <Panel title={text.pve} nativeIcon="kills" action={<PveLink text={text} />}>
             <div className="lb-mini-stats">
               {kills > 0 ? (
                 <span>
@@ -338,7 +287,7 @@ export const SessionData = ({
           </Panel>
         ) : null}
         {harvest > 0 ? (
-          <Panel title={text.gathering} icon={APPEARS[3] ?? INFO}>
+          <Panel title={text.gathering} nativeIcon="gathering">
             <div className="lb-mini-stats">
               <span>
                 <b className="lb-number" data-session-count="resources">
@@ -350,7 +299,7 @@ export const SessionData = ({
           </Panel>
         ) : null}
         {session.fishing.landed > 0 || session.fishing.escaped > 0 ? (
-          <Panel title={text.fishing} icon={APPEARS[3] ?? INFO}>
+          <Panel title={text.fishing} nativeIcon="fishing">
             <div className="lb-mini-stats">
               {fish > 0 ? (
                 <span>
@@ -376,7 +325,7 @@ export const SessionData = ({
             ) : null}
           </div>
           {session.lootLines > 0 ? (
-            <Panel title={text.recentLoot} icon={APPEARS[1] ?? INFO} subtitle={text.notPriced}>
+            <Panel title={text.recentLoot} nativeIcon="loot" subtitle={text.notPriced}>
               <div className="lb-loot-meta">
                 <span>{text.nearbyLoot}</span>
                 <span className="lb-number" data-session-count="nearbyLoot">
@@ -393,7 +342,9 @@ export const SessionData = ({
                         <ItemArt key={event.item} item={event.item} />
                         <div className="lb-data-copy lb-loot-copy">
                           <strong>{event.name}</strong>
-                          <small>{event.looter}</small>
+                          <small>
+                            {event.looter} · {formatClock(event.at)}
+                          </small>
                         </div>
                         <span className="lb-number">×{formatCount(lang, event.qty)}</span>
                       </li>
@@ -403,21 +354,68 @@ export const SessionData = ({
             </Panel>
           ) : null}
           {feed.length > 0 ? (
-            <Panel title={text.feed} subtitle={text.eventCount(session.events)}>
+            <Panel title={text.feed} icon={DATA_ICONS.feed} subtitle={text.eventCount(session.events)}>
               <ol className="lb-feed">
-                {feed.map(({ event, words, index }) => (
-                  <li key={index}>
-                    <time dateTime={new Date(event.at).toISOString()}>{formatClock(event.at)}</time>
-                    <span>{words}</span>
-                  </li>
-                ))}
+                {feed.map(({ event, words, index }) => {
+                  const item = feedItem(event);
+                  const gain =
+                    event.t === "fame"
+                      ? event.gain
+                      : event.t === "silver"
+                        ? Math.max(0, event.yield - event.cluster_tax - event.guild_tax - event.alliance_tax)
+                        : null;
+                  return (
+                    <li
+                      key={index}
+                      data-session-event={event.t}
+                      data-session-quantity={event.t === "journal" ? event.qty : undefined}
+                    >
+                      {item != null ? (
+                        <ItemArt key={item} item={item} />
+                      ) : (
+                        <span
+                          className="lb-tile lb-feed-icon"
+                          data-rarity={event.t === "chest" ? (event.rarity ?? "unknown") : undefined}
+                        >
+                          {event.t === "kill" ? (
+                            <MobIcon mob={event.mob} />
+                          ) : event.t === "chest" ? (
+                            <ChestIcon rarity={event.rarity} />
+                          ) : ["fame", "silver"].includes(event.t) ? (
+                            <AlbionIcon metric={event.t} />
+                          ) : (
+                            <Icon paths={feedIcon(event)} size={18} />
+                          )}
+                        </span>
+                      )}
+                      <span className="lb-data-copy">
+                        <strong>{words}</strong>
+                        <small>
+                          {event.t === "loot"
+                            ? event.looter
+                            : event.t !== "zone"
+                              ? zoneLabel(event.zone, text)
+                              : text.where}
+                        </small>
+                      </span>
+                      <span className="lb-feed-tail">
+                        {gain != null ? (
+                          <b className="lb-number" title={precise(lang, gain)}>
+                            +{compact(lang, gain / FIXED_SCALE)}
+                          </b>
+                        ) : null}
+                        <time dateTime={new Date(event.at).toISOString()}>{formatClock(event.at)}</time>
+                      </span>
+                    </li>
+                  );
+                })}
               </ol>
             </Panel>
           ) : null}
         </div>
         <div className="lb-col">
           {Object.keys(session.zones).length > 0 ? (
-            <Panel title={text.where} icon={SESSION}>
+            <Panel title={text.where} icon={DATA_ICONS.place}>
               <ul className="lb-data-list lb-places">
                 {Object.values(session.zones)
                   .sort((a, b) => b.ms - a.ms)
@@ -427,7 +425,8 @@ export const SessionData = ({
                       zone.ms + (current && session.zoneSince != null ? Math.max(0, now - session.zoneSince) : 0);
                     const info = worldName(zone.id);
                     return (
-                      <li key={zone.id} data-zone-colour={info?.colour ?? "unknown"}>
+                      <li key={zone.id}>
+                        <ContentMark content={info?.content ?? "unknownSource"} />
                         <div className="lb-data-copy">
                           <strong>
                             {zoneLabel(zone.id, text)}
@@ -438,7 +437,10 @@ export const SessionData = ({
                             {info?.tier != null ? ` · T${info.tier}` : ""}
                           </small>
                         </div>
-                        <span className="lb-number">{duration(lang, ms)}</span>
+                        <span className="lb-place-time lb-number">
+                          {duration(lang, ms)}
+                          {elapsed > 0 ? <small>({percent(lang, ms / elapsed)})</small> : null}
+                        </span>
                       </li>
                     );
                   })}
@@ -446,21 +448,26 @@ export const SessionData = ({
             </Panel>
           ) : null}
           {session.chestCount > 0 ? (
-            <Panel title={text.chestsOpened} subtitle={text.chestCount(session.chestCount)}>
+            <Panel title={text.chestsOpened} icon={DATA_ICONS.chest} subtitle={text.chestCount(session.chestCount)}>
+              <ChestSummary session={session} text={text} lang={lang} />
               <ul className="lb-data-list">
                 {session.chests
                   .slice(-5)
                   .reverse()
                   .map((chest, index) => (
                     <li key={index}>
+                      <span className="lb-tile" data-rarity={chest.rarity ?? "unknown"}>
+                        <ChestIcon rarity={chest.rarity} size={24} />
+                      </span>
                       <div className="lb-data-copy">
                         <strong>{chestLabel(chest.rarity, text)}</strong>
                         <small>{zoneLabel(chest.zone, text)}</small>
                       </div>
-                      <time>{formatClock(chest.at)}</time>
+                      <time dateTime={new Date(chest.at).toISOString()}>{formatClock(chest.at)}</time>
                     </li>
                   ))}
               </ul>
+              <PveLink text={text} />
             </Panel>
           ) : null}
           <Panel title={text.session} icon={SESSION}>

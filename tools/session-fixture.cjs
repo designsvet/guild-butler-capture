@@ -68,4 +68,50 @@ const replayedSession = () => {
   }
   return session;
 };
-module.exports = { replayedSession, fromSource };
+/** An independent recorded journal excerpt; it is never merged into the September 21 evening. */
+const journalSession = () => {
+  const { newSession, reduceSession } = fromSource("src/shared/session/model.ts");
+  const folder = join(ROOT, "test/fixtures/journals");
+  const packets = readFileSync(join(folder, "2026-09-16-packets.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+  const items = JSON.parse(readFileSync(join(folder, "items.json"), "utf8")).items;
+  const first = packets[0];
+  const base = { v: 1, char: first.payload[2], zone: first.payload[8] };
+  let session = newSession("september-16-journals", Date.parse(first.at));
+  session = reduceSession(session, {
+    ...base,
+    t: "zone",
+    at: Date.parse(first.at),
+    items: "live",
+    fame_total: first.payload[35],
+  });
+  for (const packet of packets.slice(1)) {
+    session = reduceSession(session, {
+      ...base,
+      t: "journal",
+      at: Date.parse(packet.at),
+      item: items[packet.payload[1]],
+      index: packet.payload[1],
+      qty: packet.payload[2],
+    });
+  }
+  return session;
+};
+/** Current live Favor-only excerpt, kept independent from the September 21 recording. */
+const favorOnlySession = () => {
+  const { parseActivityLine } = fromSource("src/shared/session/events.ts");
+  const { newSession, reduceSession } = fromSource("src/shared/session/model.ts");
+  const events = readFileSync(join(ROOT, "test/fixtures/currencies/favor-only-2026-10-03.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map(parseActivityLine);
+  if (events.some((event) => event == null)) {
+    throw new Error("Invalid Favor-only fixture");
+  }
+  return events.reduce((state, event) => reduceSession(state, event), newSession("october-3-favor-only", events[0].at));
+};
+module.exports = {
+  replayedSession,
+  journalSession,
+  favorOnlySession,
+  fromSource,
+};

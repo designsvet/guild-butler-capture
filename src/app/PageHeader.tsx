@@ -21,14 +21,17 @@ export const PageHeader = ({
   meta,
   live,
   newSession,
+  title,
 }: {
   s: TStrings;
   meta: string;
   live: boolean;
+  title?: string;
   newSession?: { label: string; disabled: boolean; onClick: () => void };
 }) => (
   <div className="lb-head">
     <div className="lb-head-titles">
+      {title != null ? <span className="lb-head-page-title">{title}</span> : null}
       <Tabs
         tabs={[{ value: "session", label: s.shell.pages.session }]}
         value="session"

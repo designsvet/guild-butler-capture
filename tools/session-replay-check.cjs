@@ -54,17 +54,34 @@ const run = async () => {
     () => call("document.querySelector('[data-session-count=resources]')?.textContent"),
     (value) => value === "19",
   );
+  // Exercise the approved card link through the keyboard in the real sandboxed renderer.
+  await call("document.querySelector('.lb-activity-cards a[href=\"#/pve\"]').focus()");
+  win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Enter" });
+  win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Enter" });
+  await waitFor(() => call("document.querySelector('[data-pve-data]')?.dataset.sessionId"), (id) => id === session.id);
+  const visitKills = await call("[...document.querySelectorAll('[data-pve-visit]')].reduce((n,el) => n+Number(el.dataset.kills),0)");
+  assert(visitKills === 40, "Real IPC lost PvE visit kills");
+  assert(await call("document.activeElement.id") === "main", "PvE navigation did not focus the page");
+  await call("document.querySelector('[data-pve-filter=\"dungeon\"]').click()");
+  await waitFor(() => call("[...document.querySelectorAll('[data-pve-visit]')].every((el) => el.dataset.content === 'dungeon')"), Boolean);
   await call("document.querySelector('[data-new-session]').click()");
   await waitFor(
     () => call("window.gbc.getSession()"),
     (s) => s?.id !== session.id && s.events === 0,
   );
+  await waitFor(() => call("document.querySelector('nav [aria-current=page]')?.getAttribute('href')"), (href) => href === "#/session");
+  assert(await call("document.querySelector('nav a[href=\"#/pve\"]') == null && document.querySelector('[data-pve-data]') == null"),
+    "New session retained the PvE page or link");
   const summaryDir = join(data, "replays", "sessions", session.id);
   const summary = JSON.parse(readFileSync(join(summaryDir, "session.json"), "utf8"));
   assert(
     summary.totals.fame === session.totals.fame && summary.endedAt === session.lastAt,
     "New session summary differs from IPC",
   );
+  assert(summary.visits.reduce((n,visit) => n+visit.kills,0) === 40 && Object.keys(summary.mobLast).length === 29,
+    "Summary lost PvE visits or mob metadata");
+  assert(summary.activeVisit == null && summary.visits.filter((visit) => visit.startedAt != null).every((visit) => visit.endedAt != null),
+    "Summary left a visit clock running");
   await call("window.gbc.stop()");
   await waitFor(
     () => call("window.gbc.getSession()"),

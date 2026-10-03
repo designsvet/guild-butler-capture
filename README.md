@@ -4,6 +4,10 @@ Desktop app (macOS + Windows) that runs the Albion Online loot logger for
 ordinary guild members: a window with Start/Stop, live status, and the log
 file one click away — no terminal, no `sudo`, no Node install.
 
+Contributors and agents: read [AGENTS.md](AGENTS.md) and the
+[approved design implementation flow](docs/design/implementation-flow.md). Tracking comes first;
+data correctness, visual fidelity and live-game verification have separate acceptance evidence.
+
 This is the companion client to the Guild Butler Discord bot. The bot ingests
 the `loot-events-*.txt` files this app produces (raid-bot ADR 0092); a later
 phase uploads them automatically (pairing codes, ADR 0092 P2).
@@ -261,11 +265,27 @@ logging" card (below).
 September 21's recorded evening through the real model; `pnpm check:replay` verifies
 IPC, totals, New session, summaries and Stop. Live v5 capture enables
 `ACTIVITY_EVENTS=1`. The page shows observed currencies and quantities, sources,
-places, chests and the feed; missing values wait for R5. New session resets counters
+places, chests and the feed, with the approved native Albion sprites, responsive KPI rows, hourly currency rates, source percentages,
+content markers, complete chest rarity strips and links into PvE. Missing item values wait for R5. New session resets counters
 without stopping capture, and Stop/quit save summaries beside the raw files.
 Architecture, name/art provenance, byte ranges and rebuild rules are in
 [docs/session.md](docs/session.md); [built F1 proofs](docs/design/session-proof.md) show both themes and the narrow window.
 The old renderer remains the default at 0.8.8.
+
+**Slice 2 is in progress.** Self-owned completed journals now enter the same
+session snapshot and localized activity feed. The engine patch, frozen packet
+evidence and assembled-bundle gates are described in [docs/slice2.md](docs/slice2.md).
+The currency gate also checks the packaged engine excludes Favor updates from faction gains;
+legacy recordings receive the same guard in the app model.
+The approved F3 PvE view now shows visits, sortable mobs, standouts and chests
+from the same snapshot, with 506 native portraits matched to exact game avatar IDs
+(5,255 of 5,479 pinned mob entries). Unavailable/failed images use the native skull;
+[provenance and the coverage manifest](resources/albion/PROVENANCE.md) list the remaining gaps.
+`pnpm check:portraits` builds and decodes every packaged portrait in Chromium and checks
+the recorded PvE/feed mapping and failed-image fallback. Its navigation appears after a kill or chest; New session
+returns to Session and Stop freezes its clocks. [Built PvE proofs](docs/design/pve-proof.md)
+cover both themes at 1440, 1024 and 768. Gathering/Fishing await the layout choice
+between the drawn proposals.
 
 **Try it:** `pnpm dev:v5`. It builds, then opens the new shell with the mock engine in a throwaway
 data folder of its own (`.dev-v5-data/`, git-ignored) — never the installed app's, so your settings,
@@ -293,6 +313,8 @@ a language keeps the stored flag (`test/settings.test.ts`).
   The build fails if an `@import` survives or is skipped;
 - the package's `fonts/` directory is copied whole, its four OFL licence texts with it, and the
   crest is `resources/icons/crest-mark.png`.
+- approved native sprites and exact matching mob portraits travel with their static allowlist,
+  source licence and hashed provenance; the renderer fetches no mob art from the network.
 
 The page keeps the old window's content-security policy word for word. `pnpm typecheck` covers it
 (`tsconfig.app.json`). `test/appDesignSystem.test.ts` builds it into a temp dir and checks that no
@@ -553,24 +575,18 @@ layout check below does.
 old window's check) drives the built page behind the same stub bridge and measures every route at
 768, 1024, 1280 and 1440 — the narrowest width of each of the shell's layouts, and the boards' width
 — all at the window's smallest height, 620, in both themes, the six languages, both platforms and
-the forty states that change the layout: every capture state the shell draws, each with a guild
-connection that gives the sidebar's foot one of its shapes, the foot's remaining states over a
-running capture, and every notice of Fh5 at its tallest — the blocked cards with their notes, the
-decoder's four steps over a held upload, the logger stopping, an update ready — the broken
-decoder's dialog itself, the settings drawer — open over a running capture, with its language
-menu open, and over an idle capture with no engine found — and the guild connection's panel: not
-connected (from the foot and from Session's button), a code refused (the board's refusal and the
-longest in every language), a code being checked, opened under the band's gold fix, connected (as
-the board draws it, and with the longest sentence the details carry): 3,840 scenarios, from 960
-windows each shrunk through the four widths. Then the title bar's button changing face, the one part of the shell
-that moves its own layout: in a window with motion back on, both directions as the logger goes
-(Start pressed, the logger stopped), at every 55ms from the change to the drain's end, at the four
-widths, in both themes, the six languages and both platforms — 1,728 more, from 24 windows, measured
-on the bar. 5,568 in all. The three new states replay the scrubbed evening while capturing,
-after Stop, and after New session, with rendered raw-total/count assertions in every locale. It fails on:
+the capture, notice, dialog, settings and connection states that change the layout.
+The gate also checks Start/Stop morph frames with motion enabled in both directions; the run
+reports the scenario/window totals instead of maintaining a second count here. Three data states
+replay the scrubbed evening while capturing, after Stop, and after New session, with rendered
+raw-total/count assertions in every locale. The independent Favor-only live excerpt checks
+that generic currency updates never create faction tiles or feed entries, while Might/Favor
+stay intact. Sparse activity cards retain the approved four/two column slots and compact headers.
+The independent journal-only excerpt asserts three completion events/six books,
+no inferred fame, and no gap reserved by empty metric/source wrappers. It fails on:
 
-- Session rows leaving unused space, a misplaced New session button, narrow activity cards,
-  stacked source cards at 768, or feed timestamps wrapping onto two lines;
+- Session KPI/activity columns departing from Fr/F1, a phantom Faction tile or feed entry,
+  a misplaced New session button, stacked source cards at 768, or wrapped feed timestamps;
 - wrapped page metadata crowding the tab underline (less than 8px clear space);
 - activity counters packing to one side instead of occupying equal-width columns;
 - sideways scroll — the window, or anything in it that scrolls, wider than it is;
