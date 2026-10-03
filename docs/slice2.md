@@ -118,6 +118,10 @@ without changing the raw files. Both jobs run `tools/check-currency-bundle.mjs e
 verify assembled writer bytes through the actual app parser/reducer, preserving Might/Favor and
 accepting a synthetic positive city probe. The [live Favor-only excerpt](../test/fixtures/currencies/README.md)
 pins the owner's regression independently of the earlier evening and journal excerpts.
+The currency patch retains nonempty trailing context and encodes blank context as unchanged
+blank removals/additions. This is necessary for Windows CRLF checkouts: a bare blank context
+line can pass on Mac and fail there. Forward and reverse application were verified in both
+LF and CRLF, producing exactly the tested engine source after normalizing line endings.
 
 ## Verification and remaining work
 
