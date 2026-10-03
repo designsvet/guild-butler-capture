@@ -13,6 +13,55 @@ import {
 } from "../src/shared/session/model.js";
 import { chestRarities, hasPve, pveMobs, pveVisits } from "../src/shared/session/pve.js";
 const DIR = join(__dirname, "fixtures", "session");
+describe("earned faction currency", () => {
+  it("does not count the live Favor-only excerpt's legacy faction labels as city gains", () => {
+    const rows = readFileSync(join(__dirname, "fixtures", "currencies", "favor-only-2026-10-03.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => parseActivityLine(line)!);
+    expect(rows).not.toContain(null);
+    const session = rows.reduce((state, event) => reduceSession(state, event), newSession("favor-only", rows[0]!.at));
+    expect(session.totals.faction).toBeNull();
+    expect(session.feed.some((event) => event.t === "faction")).toBe(false);
+    expect(session.activityLines).toBe(18);
+    expect(session.totals.favor).toBe(303320);
+    expect(session.totals.might).toBe(1362567);
+    expect(mobTotal(session)).toBe(1);
+    expect(session.refused).toBe(0);
+  });
+
+  it("counts positive city gains only and clears them at a new session", () => {
+    let session = newSession("faction", 1);
+    const base = {
+      v: 1 as const,
+      t: "faction" as const,
+      at: 2,
+      char: "Recorder",
+      zone: "1354",
+    };
+    for (const [city, gained] of [
+      [7, 10000],
+      [0, 10000],
+      [8, 10000],
+      [4, 0],
+      [4, -10000],
+    ]) {
+      session = reduceSession(session, {
+        ...base,
+        city: city!,
+        gained: gained!,
+      });
+    }
+    expect(session.totals.faction).toBeNull();
+    expect(session.feed).toEqual([]);
+    for (const city of [1, 2, 3, 4, 5, 6]) {
+      session = reduceSession(session, { ...base, city, gained: 10000 });
+    }
+    expect(session.totals.faction).toBe(60000);
+    expect(session.feed).toHaveLength(6);
+    expect(restartSession(session, "next", 3).totals.faction).toBeNull();
+  });
+});
 const evening = () => {
   const events = readdirSync(DIR)
     .filter((file) => /\.(jsonl|txt)$/.test(file))
@@ -62,7 +111,7 @@ describe("September 21 evening through the session model", () => {
       silver: 142162640,
       might: 159966314,
       favor: 70156519,
-      faction: 113949404,
+      faction: 64553475,
     });
     const raw = readdirSync(DIR)
       .filter((f) => f.endsWith("jsonl"))
@@ -73,6 +122,9 @@ describe("September 21 evening through the session model", () => {
           .map((line) => JSON.parse(line)),
       );
     expect(session.totals.fame).toBe(raw.filter((e) => e.t === "fame").reduce((n, e) => n + e.gain, 0));
+    expect(session.totals.faction).toBe(
+      raw.filter((e) => e.t === "faction" && e.city >= 1 && e.city <= 6 && e.gained > 0).reduce((n, e) => n + e.gained, 0),
+    );
     expect(Object.values(session.zones).reduce((n, z) => n + z.fame, 0)).toBe(session.totals.fame);
     expect(Object.values(session.zones).reduce((n, z) => n + z.silver, 0)).toBe(session.totals.silver);
   });

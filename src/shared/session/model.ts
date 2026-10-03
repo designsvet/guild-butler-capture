@@ -303,8 +303,14 @@ export const reduceSession = (state: TSession, ev: TSessionEvent, stream = "acti
       break;
     }
     case "faction": {
-      // The same gain can occur in a might line's favor field: these are separate currencies.
-      add("faction", ev.gained);
+      // Older engine JSONL mislabeled every currency update. Id 7 is Favor, not a city.
+      // Keep legacy raw lines readable, but only positive gains in cities 1–6 enter this tally.
+      if (ev.city >= 1 && ev.city <= 6 && ev.gained > 0) {
+        add("faction", ev.gained);
+      } else {
+        // Preserve processed-line diagnostics without presenting a false faction activity.
+        return { ...next, feed: state.feed };
+      }
       break;
     }
     case "kill": {

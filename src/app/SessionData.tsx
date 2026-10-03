@@ -225,7 +225,7 @@ export const SessionData = ({
       <div className="lb-stats">
         {metrics.flatMap((metric) => {
           const raw = session.totals[metric];
-          if (raw == null || raw === 0) {
+          if (raw == null || raw === 0 || (metric === "faction" && raw < 0)) {
             return [];
           }
           return [

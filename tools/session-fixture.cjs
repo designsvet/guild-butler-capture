@@ -96,4 +96,22 @@ const journalSession = () => {
   }
   return session;
 };
-module.exports = { replayedSession, journalSession, fromSource };
+/** Current live Favor-only excerpt, kept independent from the September 21 recording. */
+const favorOnlySession = () => {
+  const { parseActivityLine } = fromSource("src/shared/session/events.ts");
+  const { newSession, reduceSession } = fromSource("src/shared/session/model.ts");
+  const events = readFileSync(join(ROOT, "test/fixtures/currencies/favor-only-2026-10-03.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map(parseActivityLine);
+  if (events.some((event) => event == null)) {
+    throw new Error("Invalid Favor-only fixture");
+  }
+  return events.reduce((state, event) => reduceSession(state, event), newSession("october-3-favor-only", events[0].at));
+};
+module.exports = {
+  replayedSession,
+  journalSession,
+  favorOnlySession,
+  fromSource,
+};

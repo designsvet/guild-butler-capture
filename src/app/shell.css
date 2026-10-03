@@ -2269,6 +2269,10 @@ body {
   flex-wrap: wrap;
   gap: 12px;
 }
+.lb-session-data .lb-stats:not(:empty) {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
 .lb-stat {
   flex: 1 1 calc((100% - 48px) / 5);
   min-width: 0;
@@ -2325,12 +2329,24 @@ body {
   color: var(--gb-ink-2);
 }
 .lb-activity-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 .lb-activity-cards > .lb-data-card {
-  flex: 1 1 calc((100% - 42px) / 4);
+  gap: 14px;
+  padding: 13px 15px 14px;
+  border-radius: 10px;
+}
+.lb-activity-cards .lb-card-head {
+  min-height: 30px;
+  margin: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+.lb-activity-cards .lb-mini-stats {
+  gap: 10px;
+  padding: 0;
 }
 .lb-data-card {
   min-width: 0;
@@ -2664,16 +2680,16 @@ body {
   flex: none;
 }
 @media (max-width: 1279px) {
-  .lb-activity-cards > .lb-data-card {
-    flex-basis: calc((100% - 14px) / 2);
+  .lb-activity-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 1023px) {
+  .lb-session-data .lb-stats:not(:empty) {
+    display: flex;
+  }
   .lb-stat {
     flex-basis: calc((100% - 24px) / 3);
-  }
-  .lb-activity-cards > .lb-data-card {
-    flex-basis: calc((100% - 14px) / 2);
   }
   .lb-head {
     flex-wrap: wrap;

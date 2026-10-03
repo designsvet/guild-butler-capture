@@ -169,7 +169,7 @@ const scenarios = () => {
       add({ state: "capturing", theme: "obsidian", platform, width, height, paired: true, sentAgoMs: 60_000 });
     }
   }
-  const { replayedSession, journalSession } = require("./session-fixture.cjs");
+  const { replayedSession, journalSession, favorOnlySession } = require("./session-fixture.cjs");
   const { closeSession } = require("./session-fixture.cjs").fromSource("src/shared/session/model.ts");
   const recorded = replayedSession();
   for (const theme of ["obsidian", "parchment"]) {
@@ -191,6 +191,7 @@ const scenarios = () => {
       add({ state: "capturing", theme, platform: "darwin", width, height, session: recorded, route: "pve", scroll: ".lb-pve-columns", name: `pve-mobs-${theme}-${width}` });
       add({ state: "capturing", theme, platform: "darwin", width, height, session: recorded, route: "pve", scroll: ".lb-pve-aside", name: `pve-chests-${theme}-${width}` });
       add({ state: "capturing", theme, platform: "darwin", width, height, session: journalSession(), name: `journal-completions-${theme}-${width}` });
+      add({ state: "capturing", theme, platform: "darwin", width, height, session: favorOnlySession(), name: `favor-only-${theme}-${width}` });
     }
     add({
       state: "idle",

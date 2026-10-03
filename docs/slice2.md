@@ -112,6 +112,13 @@ writer, then parses those bytes through the app's actual reducer: four lines, th
 packets, six books. It also refuses malformed/foreign events and visible inventory snapshots. Both
 packaging jobs run this gate against `engine-dist` before packaging.
 
+`0003-faction-city-currency.patch` also repairs generic currency updates: only positive earned
+city IDs 1–6 establish faction activity; ID 7 is Favor. The model handles older mislabeled JSONL
+without changing the raw files. Both jobs run `tools/check-currency-bundle.mjs engine-dist` to
+verify assembled writer bytes through the actual app parser/reducer, preserving Might/Favor and
+accepting a synthetic positive city probe. The [live Favor-only excerpt](../test/fixtures/currencies/README.md)
+pins the owner's regression independently of the earlier evening and journal excerpts.
+
 ## Verification and remaining work
 
 Engine: the full Node test suite covers completions, ownership, unknown items, malformed quantities,
@@ -150,8 +157,26 @@ PvE card/chest links, complete rarity strips, feed art/gains/place/time and rece
 previous proof incorrectly deferred all rates; captured currencies already support session averages.
 These changes leave the recorder and session storage unchanged. The model still cannot associate
 fame with individual mobs or items/value with individual chests; their charts remain a documented gap.
-On 2026-10-03 the owner supplied the F1 ZIP and explicitly corrected the outline substitution. The approved native sprite subset is bundled locally with provenance and byte-parity checks. Eight supplied F3 mob portraits resolve through the pinned dump's avatar keys; unsupported portraits/rarities have honest fallbacks. This implementation choice supersedes the earlier outline-only drawing rule, while Q58's wider public redistribution question remains open. Fr defines five KPI tiles across at 1024 and 3 + 2 for five tiles at 768; rates share the value baseline and wrap if needed. Captures with more observed fields add equally filled rows. Activity cards use two columns below 1280 and up to four above it; the two source cards remain side by side. Built proofs and renderer checks cover
-this correction. The native preview was reloaded through View → Reload without restarting the
-engine: it retained the session while new live kills/currencies arrived. A single active activity
-card exposed blank reserved slots; partial rows now fill the width and the renderer gate checks
-one/two/three visible cards. Native captures themselves remain private in the ignored preview folder.
+On 2026-10-03 the owner supplied the F1 ZIP and explicitly corrected the outline substitution.
+The approved native sprite subset is bundled locally with provenance and byte-parity checks.
+Eight supplied F3 mob portraits resolve through the pinned dump's avatar keys; unsupported
+portraits/rarities have honest fallbacks. This supersedes the earlier outline-only drawing rule,
+while Q58's wider public redistribution question remains open. Fr defines five fixed KPI columns
+at 1024 and 3 + 2 for five tiles at 768; rates share the value baseline and wrap if needed.
+Activity cards retain four fixed column slots above 1280 and two below it, with F1's compact
+headers and spacing. The previous full-width sparse-card correction departed from those slots;
+the owner caught that drift alongside a phantom Faction value. The decoder had mislabeled every
+generic currency update as faction. The source and legacy replay are now guarded by city ID and
+positive gain, with an independent real Favor-only case in the renderer matrix. Built comparisons
+and remaining scope are recorded in the [Session proof](design/session-proof.md).
+Native captures themselves remain private in the ignored preview folder.
+
+## Currency/grid correction verification — 2026-10-03
+
+Passed on the final build: typecheck, 594 app tests, 177 engine tests, both assembled engine
+bundle gates, real main/preload replay, 86 default-renderer layouts and all 1,152 v5 data-state
+scenarios (themes, six locales, both platform layouts and four widths). The full shell/morph
+matrix remains CI's default; this focused rerun covers the affected Session/PvE data routes.
+Both-theme three-width regression/evening proofs were regenerated and inspected against the
+retained F1/responsive composition. The journal-only empty-wrapper alignment also remains covered.
+The complete F1 and fresh real faction/Windows/accessibility verification remain partial.

@@ -11,7 +11,10 @@ Malformed or future-version lines are refused and logged with their file and lin
 immutable snapshots, keeps fixed-point currency integers until display, and groups gains by the
 event's own zone. Gains without a zone remain in an explicit unknown source; they never disappear
 from source totals. Silver received is gross yield less cluster, guild and alliance taxes; Might and
-Favor each include their own bonus and premium fields. Faction remains a separate currency. Two
+Favor each include their own bonus and premium fields. Faction requires a positive earned gain
+from city currency IDs 1–6. Generic currency ID 7 is Favor, not faction: the engine now omits
+those events and the model excludes older mislabeled JSONL from faction totals and the feed.
+Raw files and processed-line counts are retained. Two
 equal payloads can be two genuine gains: only the tail's byte cursor prevents repeat delivery.
 
 `src/main/sessionFiles.ts` owns byte cursors for both streams and all rotations. Each read is at
@@ -84,7 +87,14 @@ from every visit, including unplaced events, and does not lose openings when the
 Feed rows include item art, matching bundled mob/chest/currency sprites or event-specific outline wells, actual currency gains, places and times. Cards can fold from the keyboard. Six locales use the existing plural
 rules, including Ukrainian/Russian few and many.
 
-The Fr/F1 responsive rule is five KPI tiles across from 1024px and three across at 768 × 620, with every partial row dividing the available width evenly (five observed tiles become 3 + 2). Values are 24px, with hourly rates beside them; a rate/sub-line may wrap, while the number remains intact. Own loot remains a quantity tile in the same strip while R5 pricing is unavailable. A capture with additional observed silver/faction/loot fields may have more than the example's five tiles; missing metrics are omitted. Activity summaries use up to two columns below 1280px, with an odd last card filling its row. At wider sizes they use up to four columns; a capture with only one or two activities fills the row instead of reserving blank card slots. Fame and
+The Fr/F1 responsive rule is a fixed five-column KPI grid from 1024px and three across at
+768 × 620, with narrow partial rows dividing the available width evenly (five observed tiles
+become 3 + 2). Values are 24px, with hourly rates beside them; a rate/sub-line may wrap, while
+the number remains intact. Own loot remains a quantity tile while R5 pricing is unavailable.
+Additional observed fields keep the wide grid's column widths; missing metrics are omitted.
+Faction stays absent without a positive city gain in the current session. Activity summaries
+retain four column slots at wide sizes and two below 1280px, including sparse sessions. They
+use F1's compact header, padding and 12px gaps, without a full-panel header divider. Fame and
 silver sources remain side by side after the main columns stack. Each activity card divides its
 counters into equal-width columns. New session stays at the right of the header, aligned with its
 title. Below 1280, the metadata has its own 20px line with 8px of clear space below the glowing tab
@@ -118,6 +128,12 @@ absence of bot traffic. `pnpm check:layout:v5` adds replay-active, stopped, and 
 to every width/theme/locale/platform combination; it checks the rendered raw totals and counts as
 well as geometry, row packing, narrow activity/source composition, timestamp wrapping and CSP.
 `pnpm check:layout` keeps the old renderer's gate intact.
+
+The independent [Favor-only live excerpt](../test/fixtures/currencies/README.md) checks the
+owner's regression: no faction tile or feed entry, unchanged Might/Favor totals, and one compact
+PvE card at the approved grid width. `0003-faction-city-currency.patch` carries the engine fix;
+both packaging jobs run `tools/check-currency-bundle.mjs engine-dist` against the assembled
+writer/parser/model. Its positive city probe is synthetic, not live faction verification.
 
 `ONLY=session OUT=<folder> pnpm exec electron --no-sandbox tools/shell-shots.cjs` produces
 built-page screenshots at 1440, 1024 and 768 in both themes, plus stopped and reset states. The

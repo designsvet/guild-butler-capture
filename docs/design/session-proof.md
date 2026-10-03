@@ -15,19 +15,19 @@ Responsive/state boards remain in that project's `boards/`; native asset hashes 
 
 | Readiness | Current evidence / limits |
 | --- | --- |
-| Data correctness | Recorded totals, real tracker/IPC and summary/reset/Stop/quit checks pass for supported fields; R5 and other unobserved fields remain unavailable |
+| Data correctness | Recorded totals, the Favor-only regression, assembled engine writer and real tracker/IPC/summary/reset/Stop/quit checks pass for supported fields; R5 and other unobserved fields remain unavailable |
 | Visual fidelity | Partial: supported icon/rate/bar/link/Fr corrections are built and pictured below; a comprehensive comparison against every approved state is still pending, so the whole screen is not certified complete |
 | Live-game verification | Partial: owner confirmed tracking in the earlier Mac preview; final native-art build awaits fresh game traffic, full Mac/Windows flush and assistive-technology evidence |
 
 | Approved board   | Built status                                                                                                                                                                                                       | Remaining gaps                                                                                                             |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | F1               | Approved native currency/activity icons, session-average hourly rates, ranked source bars and percentages, content markers, PvE links, loot, chest rarity strip and illustrated feed; New session and journal completions | R5 item values and comparisons; party, journal progress and unbuilt page links; unsupported native portraits/rarities retain fallbacks |
-| F1r1024 / F1r768 | Rail; five KPI columns at 1024, three plus two at 768 for five tiles; two activity columns below 1280 and side-by-side sources, with rows filling the width; header metadata clears the tab underline by 8px                                                   | Native Windows/assistive technology verification pending                                                                   |
+| F1r1024 / F1r768 | Rail; five KPI columns at 1024, three plus two at 768 for five tiles; four fixed activity columns at wide sizes, two below 1280 and side-by-side sources; header metadata clears the tab underline by 8px                                                   | Native Windows/assistive technology verification pending                                                                   |
 | F1n              | Before-data face retained after a successful reset                                                                                                                                                                 | History/export/share controls await their slices                                                                           |
 
 The recording contains currencies not present in the board's example: silver and
-faction points also get tiles. Loot remains a quantity tile in the same strip while values are unavailable. Partial KPI rows spread equally. Rates share the main number’s baseline and wrap when needed, as Fr specifies.
-Activity counters divide the card width evenly. A partial row of activity cards fills the available width, including captures with only PvE. Rates use the full session duration and freeze at Stop; a zero-duration session has no rate. Source percentages and bars share the same captured total; fill stays neutral and dims by rank. Content squares retain F1/F3 category colours. Chest rarity counts use all visits, including unplaced events, and remain complete beyond the 61-event preview. PvE card and chest links reach the existing page. The feed uses official item art where available, matching supplied mob/chest/currency sprites or outline event icons otherwise, actual gain amounts, places and times.
+faction points also get tiles. Loot remains a quantity tile in the same strip while values are unavailable. Wide KPI rows retain five fixed column slots; narrow partial rows spread equally. Rates share the main number’s baseline and wrap when needed, as Fr specifies.
+Activity counters divide the card width evenly. Partial activity rows retain four column slots at wide sizes and two below 1280, including captures with only PvE. Their compact headers have no panel divider and use F1’s 13px/15px/14px padding, 14px internal gap and 12px between cards. Rates use the full session duration and freeze at Stop; a zero-duration session has no rate. Source percentages and bars share the same captured total; fill stays neutral and dims by rank. Content squares retain F1/F3 category colours. Chest rarity counts use all visits, including unplaced events, and remain complete beyond the 61-event preview. PvE card and chest links reach the existing page. The feed uses official item art where available, matching supplied mob/chest/currency sprites or outline event icons otherwise, actual gain amounts, places and times.
 A dynamic dungeon is called Dungeon: its UUID cannot tell solo from group. The
 recorded elapsed evening includes time between the two engine runs. The page
 scrolls to retain every observed place; the screenshots below show its different
@@ -39,6 +39,35 @@ Slice 2 adds an independent September 16 [journal-feed proof](journals-proof.md)
 It contains no observed currency gains: empty currency/activity/source wrappers
 are omitted so the first cards align without reserved gaps. This excerpt is not
 combined with the September 21 evening below.
+
+## Favor-only regression and layout correction
+
+The owner's 2026-10-03 capture had no faction activity. Its three legacy `faction city:7`
+records are Favor currency updates; they no longer enter faction totals or the model feed.
+The raw 18-line excerpt and processed-line counters remain intact. Might is 1,362,567 raw
+units and Favor 303,320. Positive earned city IDs 1–6 still establish faction; a new session
+clears that observation. The older evening below genuinely includes city 4 gains and retains
+its corrected Faction tile (64,553,475 raw units). See the [excerpt provenance](../../test/fixtures/currencies/README.md).
+
+Built comparisons on 2026-10-03 inspected both themes at 1440 × 900, 1024 × 768 and 768 × 620,
+including the earlier evening's scrolled source/loot/feed/end sections, against the retained F1
+HTML and responsive F1r1024/F1r768/Fr rules. Five observed tiles stay on one row at 1440/1024;
+768 uses 3 + 2. One/two/three observed activities keep the reference's column widths rather
+than expanding to oversized panels, and their native sprites and compact counter/header
+composition remain aligned. The narrow source pair and header clearance are retained.
+
+This verifies the corrected grid/header scope. The reference example has priced loot, party,
+PvP and more activities than the regression excerpt; those missing data/pages remain listed
+above. The correction does not certify the entire F1 as complete, add synthetic live values,
+or establish live faction/Windows/assistive-technology coverage. Parchment uses the approved
+shared shell skin; the supplied F1/responsive exports are the Obsidian layout reference.
+
+| Theme | 1440 × 900 | 1024 × 768 | 768 × 620 |
+| --- | --- | --- | --- |
+| Obsidian | [Favor-only](session/favor-only-obsidian-1440.png) | [Favor-only](session/favor-only-obsidian-1024.png) | [Favor-only](session/favor-only-obsidian-768.png) |
+| Parchment | [Favor-only](session/favor-only-parchment-1440.png) | [Favor-only](session/favor-only-parchment-1024.png) | [Favor-only](session/favor-only-parchment-768.png) |
+
+Regenerate the regression with `ONLY=favor-only` and the command below.
 
 Regenerate with a build, then:
 

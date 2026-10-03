@@ -20,7 +20,12 @@ point or silver. Keep fractions until display; do not floor individual gains.
 | Silver received                         |    142,162,640 |
 | Might (base + bonus + premium)          |    159,966,314 |
 | Favor (base + bonus + premium)          |     70,156,519 |
-| Faction points                          |    113,949,404 |
+| Faction points (city IDs 1–6)            |     64,553,475 |
+
+The older writer also labeled 31 Favor currency updates (`city:7`) as `faction`, totaling
+49,395,929 raw units. They are excluded from faction totals and the visible feed; the original
+raw fixture and processed-line counts remain unchanged. Actual Favor is taken from each
+Might/Favor event, including its bonus/premium, rather than counted again from currency updates.
 
 There are 40 mob kills, 19 gathered resources (base + bonus + premium), one
 landed catch containing two fish and two seaweed, one escaped catch, and one

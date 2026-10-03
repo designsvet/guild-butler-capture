@@ -115,7 +115,7 @@ const fromSource = (file) => {
 let hasPve = null;
 let pveVisitsOf = null;
 const readLists = () => {
-  const { replayedSession, journalSession, fromSource: sessionSource } = require("./session-fixture.cjs");
+  const { replayedSession, journalSession, favorOnlySession, fromSource: sessionSource } = require("./session-fixture.cjs");
   const session = replayedSession();
   const { closeSession, newSession, reduceSession } = sessionSource("src/shared/session/model.ts");
   const pve = sessionSource("src/shared/session/pve.ts");
@@ -130,6 +130,7 @@ const readLists = () => {
     { name:"pve-missing-currency", routes:["pve"], state:"capturing", session:{ ...session, totals:{ ...session.totals, favor:null } }, paired:false, notice:null },
   );
   STATES.push(
+    { name: "favor-only", routes: ["session"], state: "capturing", session: favorOnlySession(), paired: false, notice: null },
     { name: "session-replay", state: "capturing", session, paired: true, notice: null },
     { name: "session-stopped", state: "idle", session: closeSession(session, session.lastAt), paired: false, notice: null },
     { name: "session-next", state: "capturing", session, paired: true, notice: null, press: { selector: "[data-new-session]", on: ["darwin", "win32"] } },
@@ -1576,13 +1577,17 @@ const detailProof = async (win, session) =>
     // inserting invented counts or depending on the fixture containing every activity.
     for (let visible = 1; visible <= cards.length; visible += 1) {
       cards.forEach((card, index) => { card.style.display = index < visible ? '' : 'none'; });
-      const rows = new Map();
+      const columns = innerWidth >= 1280 ? 4 : 2;
+      const width = (activity.getBoundingClientRect().width - (columns - 1) * 12) / columns;
       for (const card of cards.slice(0, visible)) {
         const box = card.getBoundingClientRect();
-        rows.set(Math.round(box.top), Math.max(rows.get(Math.round(box.top)) ?? 0, box.right));
-      }
-      if ([...rows.values()].some((right) => Math.abs(right - activity.getBoundingClientRect().right) > 1)) {
-        errors.push('A partial activity row leaves empty card slots');
+        if (Math.abs(box.width - width) > 1) {
+          errors.push('A partial activity row stretches beyond the approved '+columns+'-column grid');
+        }
+        const head = card.querySelector('.lb-card-head');
+        if (parseFloat(getComputedStyle(head).borderBottomWidth) !== 0) {
+          errors.push('An activity summary borrowed the larger panel header divider');
+        }
       }
     }
     cards.forEach((card) => { card.style.removeProperty('display'); });
@@ -1737,6 +1742,18 @@ const run = async () => {
         const data = document.querySelector('[data-session-data]');
         if (${JSON.stringify(load.stateName)} === 'session-next') { return data == null ? [] : ['New session kept the old counters']; }
         if (data == null) { return ['Replay did not draw the Session page']; }
+        if (${JSON.stringify(load.stateName)} === 'favor-only') {
+          const errors = [];
+          if (data.querySelector('[data-session-metric="faction"]') != null) { errors.push('Favor-only live capture invented a Faction tile'); }
+          if (data.querySelector('[data-session-event="faction"]') != null) { errors.push('Favor-only live capture invented a faction feed entry'); }
+          if (data.querySelector('[data-session-metric="favor"]')?.dataset.raw !== '303320' || data.querySelector('[data-session-metric="might"]')?.dataset.raw !== '1362567') {
+            errors.push('Filtering faction changed legitimate Favor/Might gains');
+          }
+          if (data.querySelectorAll('.lb-stats > section').length !== 5 || data.querySelectorAll('.lb-activity-cards > section').length !== 1) {
+            errors.push('The sparse live session invented metric/activity cards');
+          }
+          return errors;
+        }
         if (${JSON.stringify(load.stateName)} === 'journal-completions') {
           const quantities = [...data.querySelectorAll('[data-session-event="journal"]')].map((el) => Number(el.dataset.sessionQuantity));
           const errors = [];
@@ -1755,7 +1772,7 @@ const run = async () => {
           const actual = document.querySelector('[data-session-count="' + key + '"]')?.textContent;
           if (actual !== n) { errors.push(key + ': expected ' + n + ', got ' + actual); }
         }
-        const totals = { fame: 13307603664, respec: 2351349126, silver: 142162640, might: 159966314, favor: 70156519, faction: 113949404 };
+        const totals = { fame: 13307603664, respec: 2351349126, silver: 142162640, might: 159966314, favor: 70156519, faction: 64553475 };
         for (const [metric, raw] of Object.entries(totals)) {
           const actual = document.querySelector('[data-session-metric="' + metric + '"]')?.dataset.raw;
           if (actual !== String(raw)) { errors.push(metric + ': expected raw ' + raw + ', got ' + actual); }
@@ -1774,14 +1791,13 @@ const run = async () => {
             errors.push(selector + ': a partial row leaves unused space');
           }
         };
-        rowsFill('.lb-stats');
+        if (innerWidth < 1024) { rowsFill('.lb-stats'); }
         const header = document.querySelector('.lb-head');
         const action = header.querySelector('[data-new-session]');
         if (Math.abs(rect(action).right - rect(data).right) > 1) {
           errors.push('New session is not at the right edge of the page');
         }
         if (innerWidth < 1024) {
-          rowsFill('.lb-activity-cards');
           for (const card of data.querySelector('.lb-activity-cards').children) {
             if (rect(card).width < 300) { errors.push('An activity card is too narrow for its counters'); }
           }
