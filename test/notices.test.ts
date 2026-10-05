@@ -13,7 +13,18 @@ import {
   type TUpdateStatus,
 } from "../src/shared/captureTypes.js";
 import { HEALTHY_RUN_MS as SUPERVISOR_HEALTHY_RUN_MS } from "../src/main/engineSupervisor.js";
-import { EHealthAction, EHealthLine, feedsLoot, lootBroken, NON_LOOT_HANDLERS } from "../src/shared/engineHealth.js";
+import { parseEngineLine } from "../src/main/engineAdapter.js";
+import { reduceCaptureSession } from "../src/main/captureSession.js";
+import { createUploader, EUploaderState } from "../src/main/uploader.js";
+import type { THeldRange } from "../src/main/uploadPlan.js";
+import {
+  EHealthAction,
+  EHealthLine,
+  feedsLoot,
+  lootBroken,
+  NON_LOOT_HANDLERS,
+  TRADE_HANDLERS,
+} from "../src/shared/engineHealth.js";
 import {
   bandNotice,
   captureBlock,
@@ -49,13 +60,20 @@ const setupOf = (patch: Partial<TSetupStatus> = {}): TSetupStatus => ({
 const updateOf = (patch: Partial<TUpdateStatus> = {}): TUpdateStatus => ({ ...initialUpdateStatus, ...patch });
 
 describe("which broken handlers make loot wrong", () => {
-  it("the five that feed no loot line hold nothing; every other one does", () => {
+  it("the eleven that feed no loot line hold nothing; every other one does", () => {
+    // The five of the rotation and the guild's energy, and the six player-trade handlers below.
     expect([...NON_LOOT_HANDLERS].sort()).toEqual([
       "EvFestivitiesUpdate",
       "EvGuildState",
+      "EvInvitationPlayerTrade",
+      "EvPlayerTradeCancel",
+      "EvPlayerTradeFinished",
+      "EvPlayerTradeUpdate",
       "OpGuildEnergyDrain",
       "OpGuildLogPage",
       "OpGuildLogRequest",
+      "OpInviteToPlayerTrade",
+      "OpPlayerTradeAcceptTrade",
     ]);
     for (const handler of ["EvAttachItemContainer", "EvOtherGrabbedLoot", "EvInventoryPutItem", "EvNewCharacter", "EvCharacterStats", "OpJoin", "OpInventoryMoveItem"]) {
       expect(feedsLoot(handler)).toBe(true);
@@ -206,5 +224,103 @@ describe("the broken decoder's dialog: once when found, again when the fix has d
   it("never while the decoder is fine", () => {
     expect(decoderDialogEvent(capture({}), updateOf({ phase: EUpdatePhase.Ready, version: "0.9.1" }))).toBeNull();
     expect(decoderDialogEvent(null, null)).toBeNull();
+  });
+});
+
+describe("the trade handlers feed no loot (designsvet/ao-loot-logger#20, raid-bot ADR 0168)", () => {
+  /**
+   * PRINTED BY THE ENGINE'S OWN MODULE — `require('./src/storage/parse-health').statusLine()` on
+   * designsvet/ao-loot-logger feat/player-trades 9ae23c0, 2026-10-05 — after six trade updates that
+   * all threw, then five container attaches beside them. Not typed by hand.
+   */
+  const TRADE_ONLY = "[health] parse broken: EvPlayerTradeUpdate 6/6 (last 10 min)";
+  const TRADE_AND_ATTACH = "[health] parse broken: EvAttachItemContainer 5/5, EvPlayerTradeUpdate 6/6 (last 10 min)";
+
+  /**
+   * The handler names as the engine's six trade handlers declare them (`const name = …` in
+   * src/data-handler/{event,request,response}-data at 9ae23c0). Written out again on purpose: two
+   * programs, no shared build — if the engine renames one, this is what should fail.
+   */
+  const ENGINE_TRADE_HANDLERS = [
+    "EvInvitationPlayerTrade",
+    "EvPlayerTradeCancel",
+    "EvPlayerTradeFinished",
+    "EvPlayerTradeUpdate",
+    "OpInviteToPlayerTrade",
+    "OpPlayerTradeAcceptTrade",
+  ];
+
+  /** The session after the engine printed `raw` — main's sticky broken list. */
+  const line = (state: TCaptureState, raw: string): TCaptureState =>
+    reduceCaptureSession(state, { type: "engine-line", at: 1, event: parseEngineLine(raw) });
+
+  it("lists all six as feeding no loot", () => {
+    expect([...TRADE_HANDLERS].sort()).toEqual(ENGINE_TRADE_HANDLERS);
+    for (const handler of ENGINE_TRADE_HANDLERS) {
+      expect(feedsLoot(handler), handler).toBe(false);
+      expect(NON_LOOT_HANDLERS.has(handler), handler).toBe(true);
+    }
+  });
+
+  it("matches whole names: a trade-like handler it has never heard of still feeds loot", () => {
+    expect(feedsLoot("EvPlayerTradeSomethingNew")).toBe(true);
+    expect(feedsLoot("EvAttachItemContainer")).toBe(true);
+  });
+
+  /** One pass of an uploader with main's hold rule (`lootBroken` over the session's list): what reached the bot. */
+  const sentWith = async (raw: string): Promise<{ sent: string[]; state: EUploaderState; holds: THeldRange[] }> => {
+    const session = line(initialCaptureState, raw);
+    const sent: string[] = [];
+    const holds: THeldRange[] = [];
+    const up = createUploader({
+      fetchLike: async (_url, init) => {
+        const body = JSON.parse(init.body) as { from: number; lines: string[] };
+        sent.push(...body.lines);
+        const reply = { accepted: body.lines.length, duplicate: 0, rejected: 0, nextFrom: body.from + body.lines.length };
+        return { ok: true, status: 200, text: async () => JSON.stringify(reply) };
+      },
+      base: "https://bot",
+      token: () => "tok",
+      enabled: () => true,
+      currentFile: () => "/captures/loot-events-2026-10-05-17-43-51.txt",
+      readFile: async () => "a\nb\n",
+      newRunId: () => "run-1",
+      now: () => 1_000,
+      log: () => undefined,
+      held: () => lootBroken(session.engineBroken),
+      holds: {
+        list: () => holds,
+        add: (range) => {
+          holds.push(range);
+          return true;
+        },
+      },
+    });
+    await up.tick();
+    return { sent, state: up.status().state, holds };
+  };
+
+  it("a break in the trade decoder alone does not hold the loot upload, or put the card up", async () => {
+    expect(parseEngineLine(TRADE_ONLY)).toEqual({
+      kind: "engine-health",
+      broken: [{ handler: "EvPlayerTradeUpdate", failures: 6, calls: 6 }],
+    });
+    expect(lootBroken(line(initialCaptureState, TRADE_ONLY).engineBroken)).toBe(false);
+    expect(await sentWith(TRADE_ONLY)).toEqual({ sent: ["a", "b"], state: EUploaderState.UpToDate, holds: [] });
+    // lootBroken is also what puts the "loot is logged wrong" notice up: a trade-only break does not.
+    const session = line(capture({ status: ECaptureStatus.Capturing }), TRADE_ONLY);
+    const input = { capture: session, setup: setupOf(), update: updateOf(), now: NOW };
+    expect(noticesNow(input).map((n) => n.kind)).not.toContain(ENotice.Decoder);
+    expect(decoderDialogEvent(session, updateOf())).toBeNull();
+  });
+
+  it("a loot handler broken beside it still holds everything, and says so", async () => {
+    expect(lootBroken(line(initialCaptureState, TRADE_AND_ATTACH).engineBroken)).toBe(true);
+    const session = line(capture({ status: ECaptureStatus.Capturing }), TRADE_AND_ATTACH);
+    expect(decoderDialogEvent(session, updateOf())).toBe("broken");
+    const { sent, state, holds } = await sentWith(TRADE_AND_ATTACH);
+    expect(sent).toEqual([]);
+    expect(state).toBe(EUploaderState.Held);
+    expect(holds).toEqual([expect.objectContaining({ file: "/captures/loot-events-2026-10-05-17-43-51.txt", from: 0 })]);
   });
 });
