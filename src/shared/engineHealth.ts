@@ -30,18 +30,41 @@ export const mergeBroken = (
 };
 
 /**
+ * The engine's player-trade handlers (designsvet/ao-loot-logger#20, feat/player-trades 9ae23c0;
+ * raid-bot ADR 0168): the invitation either way (event 176, and the response to our own invite),
+ * the trade window's updates, a cancel, the finish, and our own accept. They feed the trade journal
+ * (`trade-events-<stamp>.jsonl`) and nothing the loot log writes — src/trades/ in the engine writes
+ * no pickup and reads neither the loot logger nor the loot store. They run for every member,
+ * TRADE_EVENTS or not, so their failures reach the `[health]` line on every computer.
+ */
+export const TRADE_HANDLERS: ReadonlySet<string> = new Set([
+  "EvInvitationPlayerTrade",
+  "EvPlayerTradeUpdate",
+  "EvPlayerTradeCancel",
+  "EvPlayerTradeFinished",
+  "OpInviteToPlayerTrade",
+  "OpPlayerTradeAcceptTrade",
+]);
+
+/**
  * The engine's handlers that feed nothing the loot log writes: the daily-bonus rotation, the
- * guild's energy total and its energy log. Read from the engine's own source
+ * guild's energy total and its energy log, and the player trades. Read from the engine's own source
  * (designsvet/ao-loot-logger@protocol18, ab6cc6b, 2026-09-28: src/data-handler/data-handler.js
  * counts every handler by its `name`, and these five require neither the loot logger nor the loot
- * and player stores). Every other handler reaches a loot line somehow — the pickup itself, the item
- * it names, the chest it came from, the player and guild who took it (EvCharacterStats and OpJoin
- * name them; EvAttachItemContainer is how a bank deposit was told from loot until 2026-09-23).
+ * and player stores; the six trade handlers likewise, at #20). Every other handler reaches a loot
+ * line somehow — the pickup itself, the item it names, the chest it came from, the player and guild
+ * who took it (EvCharacterStats and OpJoin name them; EvAttachItemContainer is how a bank deposit
+ * was told from loot until 2026-09-23).
  *
  * A list of the harmless ones rather than of the loot ones, on purpose: a handler this app has
  * never heard of — one a later engine adds — counts as feeding loot. Holding the guild upload for
  * nothing costs an officer a file taken by hand; sending loot decoded wrong cost 72 rows cleaned
  * out of the bot by hand (2026-09-28). The safe mistake is the first one.
+ *
+ * Which is why the six trade handlers (TRADE_HANDLERS, above) are listed BEFORE an engine that has
+ * them is bundled: the app's build takes the engine's protocol18 head unpinned, so the first build
+ * after designsvet/ao-loot-logger#20 merges carries them, and unlisted, a patch that broke only the
+ * trade decoder would hold every member's loot upload.
  */
 export const NON_LOOT_HANDLERS: ReadonlySet<string> = new Set([
   "EvFestivitiesUpdate",
@@ -49,6 +72,7 @@ export const NON_LOOT_HANDLERS: ReadonlySet<string> = new Set([
   "OpGuildLogRequest",
   "OpGuildEnergyDrain",
   "OpGuildLogPage",
+  ...TRADE_HANDLERS,
 ]);
 
 /** Does this broken handler make the loot log wrong? (Unknown handlers do — see NON_LOOT_HANDLERS.) */
