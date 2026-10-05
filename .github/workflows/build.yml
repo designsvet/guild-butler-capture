@@ -231,6 +231,17 @@ jobs:
           test -f release/latest.yml
           cat release/latest.yml
 
+      - name: The engine's commit is stamped inside the bundle
+        # tools/prepare-engine-dist.mjs writes ENGINE_REF and the app sends it as X-Capture-Engine
+        # (src/main/engineRef.ts); without it every upload says "unknown". Checked on the packed
+        # app, not on engine-dist: what ships is what counts. The sha names the engine commit, and
+        # the app version the patches applied over it (resources/engine-patches).
+        run: |
+          for ref in release/win*-unpacked/resources/engine/ENGINE_REF; do
+            test -f "$ref"
+            echo "$ref: $(cat "$ref")"
+          done
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
@@ -509,6 +520,9 @@ jobs:
           echo "checking $APP"
           test -f "$APP/Contents/Resources/engine/src/index.js"
           test -d "$APP/Contents/Resources/engine/node_modules/cap"
+          # The engine's commit, sent as X-Capture-Engine (src/main/engineRef.ts) — "unknown" without it.
+          test -f "$APP/Contents/Resources/engine/ENGINE_REF"
+          cat "$APP/Contents/Resources/engine/ENGINE_REF"
           test -f "$APP/Contents/Resources/mac/install-bpf-helper.sh"
           codesign --verify --deep --strict "$APP"
           codesign -dv "$APP" 2>&1

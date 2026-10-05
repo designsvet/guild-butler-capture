@@ -430,8 +430,9 @@ screen reader.
   outline in the system's Highlight.
 - **The held upload** (main process, `src/main/uploader.ts`; ADR 0159's amendment of 2026-10-01):
   while the decoder is broken where loot is concerned (`lootBroken` in `src/shared/engineHealth.ts`:
-  any broken handler but the five that feed no loot — an unknown one counts as feeding it, the safe
-  mistake), the uploader sends nothing, and what the engine writes meanwhile is never sent. Every
+  any broken handler but the eleven that feed no loot — the rotation and energy readers, and the six
+  player-trade handlers of designsvet/ao-loot-logger#20 — an unknown one counts as feeding it, the
+  safe mistake), the uploader sends nothing, and what the engine writes meanwhile is never sent. Every
   pass records where the hold began in the file it would read — from where the uploader stood, so
   the lines written between the break and the verdict go too — as a range (file, first line, the
   run those before it went under) in `held-uploads.json` in the data folder, written temp-then-
@@ -441,6 +442,63 @@ screen reader.
   switched off, a verdict landing mid-pass stops what that pass read, and a device that needs
   pairing again still says so. Behind the v5 flag, as everything new is: the old window has no words
   for a hold. Tested in `test/uploader.test.ts` and `test/heldUploads.test.ts`.
+- **The trade upload** (main process; raid-bot ADR 0168, Q69 — "a captured player trade moves the
+  loot debt"): the engine (designsvet/ao-loot-logger#20) writes one JSON line per FINISHED
+  player-to-player trade into `trade-events-<stamp>.jsonl` beside the loot log, when its child
+  environment has `TRADE_EVENTS=1`. The app sets that only under the v5 flag — and removes it
+  otherwise, so a shell that exports it cannot make the old window's engine write partner names
+  into a file nothing reads (`withTradeEvents`, `src/main/tradeUpload.ts`). Under the same flag, and
+  behind the same mock/replay guard as the loot loop (`src/main/botFacing.ts`), a second uploader
+  follows that file — found by the loot log's name, the engine's own rule — with the loot
+  uploader's machinery (`src/main/uploader.ts`, one `TUploadStream` each): a run per file, the
+  cursor on each line's index in the file, the batch caps, the backoff, the hold. What may leave is
+  decided line by line in `src/main/tradeLines.ts`: only lines a newline has closed (a line the
+  engine is still writing waits); only record v1 exactly — every key, top level and nested, on an
+  allow-list and in the engine's order, so a crafter, an object id, durability or any key a later
+  engine adds withholds the line, counted and logged by reason, never by content; checked on the
+  text that is sent, not only on its parse — the line must be exactly what `JSON.stringify` makes of
+  its own parse, as every engine line is, so a repeated key (whose first copy a parse drops but the
+  text still carries) or padding withholds it; never a silver-only trade (`gave` and `got` both
+  empty); the silver that comes back in an ITEM trade does go, with its line (owner, 2026-10-05);
+  and a partner the game hid stays `{name: null, guild: null, hidden: true}` — a hidden partner with
+  a name in it is withheld. A withheld line keeps its index: a batch is a run of consecutive
+  sendable lines, so the bot's `(run, line)` key never shifts and the bot never learns a withheld
+  line was there. Allowed lines go as the engine wrote them, byte for byte, to
+  `POST /control/capture/trades` with `/upload`'s body (`{run, file, from, lines}`) and the device
+  token. **Only this session's journal:** a new capture session follows nothing until its own
+  engine has named its loot log (`tradeFileThisSession`) — main still names the last session's log
+  until then, and following its journal from a fresh cursor would send its trades again under a new
+  run. **A line the bot refuses** even on its own (a 400 at one line, after the loot uploader's
+  halving) is withheld as `bot-refused` and the trades after it go on — each line is a record of its
+  own, and a stop nobody is shown would last until the app restarts; the loot log still stops
+  (`Blocked`) as before. **A bot without that route yet** (404/405 — the route comes with the bot's
+  slice A) is asked again every 30 minutes, said once in the app log and nowhere else: the member
+  sees nothing, and the loot upload, a separate uploader, never waits on it. The lines are kept in
+  the file, and sent if the route appears during the same capture session; the cursor and the wait
+  are the session's, and the next session follows its own journal, so the trades of a session that
+  ends first stay on the member's computer, never sent — acceptable while trades are behind the v5
+  flag, which goes default only after slice A is live. **The hold:** a broken trade handler holds the trade upload only (the loot goes on); a broken
+  loot handler holds both — a trade's record leans on loot handlers (OpJoin names the member and
+  the zone; EvNewCharacter and EvOtherGrabbedLoot are how the engine sees a zone hide names), and
+  what a trade moves is counted against pickups that are held themselves. Held trade lines are
+  never sent, as held loot is not: one `held-uploads.json`, one store for both uploaders (two over
+  the one file would write over each other). No UI yet: the Trades page is not drawn. Tested in
+  `test/tradeUpload.test.ts` (over the engine's real lines, `test/fixtures/realTradeLines.ts`),
+  `test/uploadPlan.test.ts`, `test/botFacing.test.ts` and `test/upstreamAllowList.test.ts`.
+- **What leaves the computer** (`test/upstreamAllowList.test.ts`, the guard raid-bot ADR 0110 §5
+  promised): the bot's routes the app calls are an allow-list — pair, upload, trades, festivities,
+  energy, energy-log, engine-health, all in `src/main/uploadClient.ts` — and so are the engine
+  lines main forwards as they arrive (festivities, energy, energy log) and the fields a trade line
+  may carry. A new route, forwarder or field fails the test until it is reviewed and listed.
+- **The engine version on every upload**: both line routes (`/upload` and `/trades`) carry the
+  header `X-Capture-Engine` — the bundled engine's git commit, or `dev` for any engine that is not
+  the bundled one (the dev layout's sibling checkout, a folder chosen in Advanced), or `unknown` for
+  a bundled engine with no readable stamp (`src/main/engineRef.ts`). A header, never a body key: a
+  bot that predates it reads the batch unchanged. The release build takes the engine's protocol18
+  head with no pin, so `tools/prepare-engine-dist.mjs` — the step both platform jobs run — stamps
+  the checkout's HEAD into the bundled engine as `ENGINE_REF`, and fails the build in CI when it
+  cannot (see Builds) — the engine's commit; the app's version names the patches applied over it. raid-bot ADR 0168's slice B reads it to keep pickups written by an engine
+  without the chest-window fixes out of a trade's count.
 - **Behind it**, `src/app/store.ts` mirrors the bridge for React (`useSyncExternalStore`): the five
   `get*` calls, then the three `on*` subscriptions — a push that lands while a get is in flight wins
   — and the setup probed again on window focus. It also keeps the little the notices' buttons need
@@ -704,6 +762,10 @@ bot, which posts them to the ops channel once per handler per day. The rules
 are the pure `src/shared/engineHealth.ts`, tested in
 `test/engineHealth.test.ts`. In the v5 shell (behind its flag) the card is the band's notice and a
 dialog, and the guild upload is held while the break reaches the loot log — see "The v5 shell".
+The six player-trade handlers (designsvet/ao-loot-logger#20) run for every member and feed no loot
+line, so a break in them alone puts up no card and holds no loot; it holds the trade upload (see
+"The trade upload"). They are listed in `NON_LOOT_HANDLERS` ahead of any build that bundles them,
+because the build takes the engine's branch head unpinned (`test/notices.test.ts`).
 
 ## Builds (CI)
 
@@ -725,7 +787,14 @@ child with ignored stdin never gets), compiles `cap` for this app's Electron
 ABI (cap vendors its own WinPcap SDK — no external download), assembles
 `engine-dist/` via `tools/prepare-engine-dist.mjs`, and ships it as
 `resources/engine` — where the locator finds it and captures into the user's
-data folder, so the install dir is never written. (Bundles built before
+data folder, so the install dir is never written. The same script writes the
+engine checkout's commit into the bundle as `engine/ENGINE_REF` — the value of
+every upload's `X-Capture-Engine` header — and fails the job in CI if it
+cannot (a local run over a folder that is not a git checkout warns and ships
+none; the app then says `unknown`); both jobs then assert the stamp is inside
+the packed app. The sha names the engine COMMIT: the patches above are applied
+on top and it does not say so — the app's version names that patch set, so read
+the two together. (Bundles built before
 designsvet/ao-loot-logger#11 did write there: the engine put its loot log
 beside itself, inside the installed app.)
 

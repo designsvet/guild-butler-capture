@@ -74,7 +74,9 @@ import {
   sendFestivities,
 } from "./uploadClient.js";
 import { lootBroken, newlyBroken } from "../shared/engineHealth.js";
-import { createHeldStore, heldUploadsFilePath } from "./heldUploads.js";
+import { createHeldStore, heldUploadsFilePath, type THeldStore } from "./heldUploads.js";
+import { DEV_ENGINE, engineRefFor } from "./engineRef.js";
+import { tradeFileThisSession, tradesBroken, TRADE_STREAM, withTradeEvents } from "./tradeUpload.js";
 import { decoderVerdictFilePath, forgetDecoderVerdict, loadDecoderVerdict, saveDecoderVerdict } from "./decoderVerdict.js";
 import electronUpdater from "electron-updater";
 
@@ -169,6 +171,16 @@ const dispatch = (ev: TSessionEvent): void => {
         appLog(`[upload] held pass failed: ${err instanceof Error ? err.message : "error"}`);
       });
   }
+  if (toBot && tradesOn && !tradesBroken(brokenBefore) && tradesBroken(state.engineBroken)) {
+    // The same for the trade journal (tradeUpload.ts tradesBroken): its hold is recorded now. Said
+    // in the app log only — the member's screen has no trades yet.
+    appLog("trades: held until the update — the decoder is broken where trades are concerned");
+    void ensureTradeUploader()
+      .tick()
+      .catch((err: unknown) => {
+        appLog(`[trades] held pass failed: ${err instanceof Error ? err.message : "error"}`);
+      });
+  }
   if (toBot && ev.type === "engine-line" && ev.event.kind === "festivities") {
     forwardFestivities(ev.event);
   }
@@ -239,6 +251,31 @@ const updates: TUpdateController = createUpdateController({
 
 let uploader: TUploader | null = null;
 let uploadTimer: NodeJS.Timeout | null = null;
+/** The trade journal's uploader (tradeUpload.ts) — its own, so it never waits on, or slows, the loot's. */
+let tradeUploader: TUploader | null = null;
+/**
+ * Whether this capture session follows and sends the trade journal: the v5 flag, read once at Start
+ * (startUploadLoop) — the engine is asked for the journal under the same flag (engineEnv).
+ */
+let tradesOn = false;
+/**
+ * The loot log `state.logFile` still named when this session's upload loop started — the LAST
+ * session's, kept for Reveal. The trade uploader follows nothing until the engine names another
+ * (tradeUpload.ts `tradeFileThisSession`), or it would send that session's trades again under a new run.
+ */
+let logFileAtStart: string | null = null;
+/** The X-Capture-Engine header for this session's engine (engineRef.ts), set at Start. */
+let engineRef: string = DEV_ENGINE;
+/**
+ * The held ranges, one store for both uploaders (uploader.ts `holds`): two stores over the one file
+ * would each write their own list over the other's.
+ */
+let heldStore: THeldStore | null = null;
+
+const heldRanges = (): THeldStore => {
+  heldStore ??= createHeldStore(HELD_UPLOADS_FILE, appLog);
+  return heldStore;
+};
 
 /**
  * Whether a broken decoder holds the guild upload (uploader.ts): the v5 shell's rule, so on where the
@@ -416,26 +453,84 @@ const ensureUploader = (): TUploader => {
     // The break first: the flag reads settings.json, and a healthy decoder (the old window's every
     // pass) need not read it at all.
     held: () => lootBroken(state.engineBroken) && heldUploadOn(),
-    holds: createHeldStore(HELD_UPLOADS_FILE, appLog),
+    holds: heldRanges(),
+    engine: () => engineRef,
   });
   return uploader;
 };
 
+/**
+ * The trade journal's uploader (tradeUpload.ts; raid-bot ADR 0168): the loot uploader's machinery
+ * over `trade-events-<stamp>.jsonl` beside the current loot log. Reached only while `tradesOn` —
+ * the v5 flag at Start, behind the same `talksToBot` guard as the loot loop (startUploadLoop). Its
+ * state is not shown anywhere: a bot without the route yet, a refusal, a retry are app-log lines.
+ */
+const ensureTradeUploader = (): TUploader => {
+  if (tradeUploader != null) {
+    return tradeUploader;
+  }
+  tradeUploader = createUploader({
+    fetchLike: async (url, init) => {
+      const res = await fetch(url, init);
+      return { ok: res.ok, status: res.status, text: () => res.text() };
+    },
+    base: apiBase(loadSettings(SETTINGS_FILE).apiBase),
+    token: storedToken,
+    // The member's one switch: "Send loot automatically" off sends no trades either.
+    enabled: () => loadSettings(SETTINGS_FILE).uploadEnabled !== false,
+    // This session's journal only — never the last session's, which main's state still names until
+    // the new engine prints its own log file (tradeFileThisSession).
+    currentFile: () => tradeFileThisSession(state.logFile, logFileAtStart),
+    readFile: (path) => fsp.readFile(path, "utf8"),
+    newRunId: () => randomUUID(),
+    now: Date.now,
+    log: appLog,
+    // A trade handler broken, or anything that holds loot (tradesBroken says why). No flag test
+    // here: this uploader exists only under it.
+    held: () => tradesBroken(state.engineBroken),
+    holds: heldRanges(),
+    stream: TRADE_STREAM,
+    engine: () => engineRef,
+  });
+  return tradeUploader;
+};
+
+/** One pass of each uploader, independently: a slow trade request never delays the loot's. */
+const tickUploads = (): void => {
+  // Fire and forget: a rejected upload must never surface as an unhandled
+  // rejection that could take the app down mid-raid.
+  void ensureUploader()
+    .tick()
+    .then(pushPairing)
+    .catch((err: unknown) => {
+      appLog(`[upload] tick failed: ${err instanceof Error ? err.message : "error"}`);
+    });
+  if (tradesOn) {
+    void ensureTradeUploader()
+      .tick()
+      .catch((err: unknown) => {
+        appLog(`[trades] tick failed: ${err instanceof Error ? err.message : "error"}`);
+      });
+  }
+};
+
 const startUploadLoop = (): void => {
   ensureUploader().resetSession();
+  // Trades only under the v5 flag, as the engine is asked for them only there (engineEnv): a 0.8.x
+  // old-window release never follows or sends a trade. Called only behind talksToBot (startCapture),
+  // so the mock and replay engines send none either.
+  tradesOn = heldUploadOn();
+  if (tradesOn) {
+    // Before the reset, and before any pass: from here until the engine names its log, there is no
+    // journal of this session to follow.
+    logFileAtStart = state.logFile;
+    ensureTradeUploader().resetSession();
+    appLog(`trades: following the trade journal (engine ${engineRef})`);
+  }
   if (uploadTimer != null) {
     return;
   }
-  uploadTimer = setInterval(() => {
-    // Fire and forget: a rejected upload must never surface as an unhandled
-    // rejection that could take the app down mid-raid.
-    void ensureUploader()
-      .tick()
-      .then(pushPairing)
-      .catch((err: unknown) => {
-        appLog(`[upload] tick failed: ${err instanceof Error ? err.message : "error"}`);
-      });
-  }, UPLOAD_TICK_MS);
+  uploadTimer = setInterval(tickUploads, UPLOAD_TICK_MS);
   uploadTimer.unref?.();
 };
 
@@ -453,6 +548,11 @@ const stopUploadLoop = (): void => {
     .tick()
     .then(pushPairing)
     .catch(() => undefined);
+  if (tradesOn) {
+    void ensureTradeUploader()
+      .tick()
+      .catch(() => undefined);
+  }
 };
 
 // --- setup probing -----------------------------------------------------------
@@ -524,7 +624,8 @@ const getSetup = async (): Promise<TSetupStatus> => {
 // --- capture control ---------------------------------------------------------
 
 const engineEnv = (): NodeJS.ProcessEnv => {
-  const env: NodeJS.ProcessEnv = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+  // The trade journal only under the v5 flag, and never inherited from the shell (tradeUpload.ts).
+  const env: NodeJS.ProcessEnv = withTradeEvents({ ...process.env, ELECTRON_RUN_AS_NODE: "1" }, heldUploadOn());
   if (process.platform === "win32") {
     env.PATH = npcapChildPathEnv(process.env.SystemRoot ?? "C:\\Windows", process.env.PATH);
   }
@@ -551,7 +652,18 @@ const startCapture = (): void => {
     });
     return;
   }
-  appLog(`start capture engine=${engine.entry} (${engine.source}) workDir=${engine.workDir}`);
+  engineRef = engineRefFor(
+    engine,
+    (path) => {
+      try {
+        return readFileSync(path, "utf8");
+      } catch {
+        return null;
+      }
+    },
+    join,
+  );
+  appLog(`start capture engine=${engine.entry} (${engine.source}) workDir=${engine.workDir} ref=${engineRef}`);
   // The engine writes its log to cwd; a bundled engine's workDir is a per-user
   // captures folder that may not exist yet.
   mkdirSync(engine.workDir, { recursive: true });
@@ -1028,6 +1140,7 @@ const registerIpc = (): void => {
     }
     saveSettings(SETTINGS_FILE, { ...settings, pairing: stored.pairing });
     uploader?.refresh();
+    tradeUploader?.refresh();
     appLog(`[pair] connected as ${stored.pairing.deviceName} (guild ${stored.pairing.guildId})`);
     const status = pairingStatus();
     pushPairing();
@@ -1042,6 +1155,7 @@ const registerIpc = (): void => {
     delete settings.pairing;
     saveSettings(SETTINGS_FILE, settings);
     uploader?.refresh();
+    tradeUploader?.refresh();
     appLog("[pair] disconnected on this computer");
     const status = pairingStatus();
     pushPairing();
@@ -1052,6 +1166,7 @@ const registerIpc = (): void => {
     const settings = loadSettings(SETTINGS_FILE);
     saveSettings(SETTINGS_FILE, { ...settings, uploadEnabled: enabled !== false });
     uploader?.refresh();
+    tradeUploader?.refresh();
     const status = pairingStatus();
     pushPairing();
     return status;

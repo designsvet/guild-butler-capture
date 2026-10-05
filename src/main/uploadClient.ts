@@ -1,9 +1,11 @@
 /**
  * Talking to the bot's control server (ADR 0092 P2 slice 4).
  *
- * Two calls: trade a pairing code for a device token, and push a batch of
- * captured lines. Both take an injected `fetch` so the whole surface is
- * testable with no network and no Electron.
+ * Trade a pairing code for a device token, push a batch of captured lines (the
+ * loot log, and the trade journal), and post the snapshots the engine reads off
+ * the game. All take an injected `fetch` so the whole surface is testable with
+ * no network and no Electron. Every route the app calls is pinned by
+ * test/upstreamAllowList.test.ts.
  *
  * Every failure is a NAMED outcome rather than a thrown error. The renderer
  * shows a different sentence per reason, and "upload failed" is precisely the
@@ -177,19 +179,38 @@ export const isRetryable = (outcome: EUploadOutcome): boolean => {
   );
 };
 
-export const uploadBatch = async (
+/**
+ * The request header naming the engine build that wrote the lines, on both line routes (`/upload`
+ * and `/trades`): the engine's git commit, stamped into the bundled engine at build time (see
+ * engineRef.ts), or `dev` for an engine that is not the bundled one. raid-bot ADR 0168's slice B
+ * reads it to keep pickups written by an engine without the chest-window fixes out of any trade's
+ * budget; nothing else does.
+ *
+ * A header rather than a body key on purpose: the bot's `/upload` validates its body field by field
+ * and ignores headers it does not read (Fastify, behind Caddy's plain `reverse_proxy`), so a bot
+ * that predates this reads today's batch unchanged.
+ */
+export const ENGINE_HEADER = "x-capture-engine";
+
+/** A batch of a file's lines to one of the bot's two line routes. One shape, one outcome vocabulary. */
+const postLines = async (
   fetchLike: TFetchLike,
-  base: string,
+  url: string,
   token: string,
   run: string,
   file: string,
   batch: TBatch,
+  engine: string | null,
 ): Promise<TUploadResult> => {
   let res: Awaited<ReturnType<TFetchLike>>;
   try {
-    res = await fetchLike(`${apiBase(base)}/control/capture/upload`, {
+    res = await fetchLike(url, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+        ...(engine != null ? { [ENGINE_HEADER]: engine } : {}),
+      },
       body: JSON.stringify({ run, file, from: batch.from, lines: batch.lines }),
     });
   } catch (err) {
@@ -222,6 +243,38 @@ export const uploadBatch = async (
       nextFrom: typeof body?.nextFrom === "number" ? body.nextFrom : null,
     },
   };
+};
+
+/** A batch of the loot log (`loot-events-*.txt`). */
+export const uploadBatch = async (
+  fetchLike: TFetchLike,
+  base: string,
+  token: string,
+  run: string,
+  file: string,
+  batch: TBatch,
+  engine: string | null = null,
+): Promise<TUploadResult> => {
+  return await postLines(fetchLike, `${apiBase(base)}/control/capture/upload`, token, run, file, batch, engine);
+};
+
+/**
+ * A batch of the trade journal (`trade-events-*.jsonl`, raid-bot ADR 0168), in `/upload`'s shape:
+ * `{run, file, from, lines}`, each line the engine's record-v1 JSON exactly as written, `from` its
+ * index in the FILE. Lines the app withholds (tradeLines.ts: silver-only, or off the allow-list) are
+ * never in a batch — a batch is a run of consecutive sendable lines, so every line keeps its file
+ * index and the bot's `(run, line)` key never shifts. The bot's reply is read as `/upload`'s.
+ */
+export const uploadTradeBatch = async (
+  fetchLike: TFetchLike,
+  base: string,
+  token: string,
+  run: string,
+  file: string,
+  batch: TBatch,
+  engine: string | null = null,
+): Promise<TUploadResult> => {
+  return await postLines(fetchLike, `${apiBase(base)}/control/capture/trades`, token, run, file, batch, engine);
 };
 
 /**

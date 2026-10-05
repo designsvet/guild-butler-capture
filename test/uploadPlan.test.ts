@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   advanceCursor,
   clampLine,
+  completeLines,
   ENewRunReason,
   MAX_BATCH_LINES,
   encodedBatchBytes,
@@ -10,7 +11,9 @@ import {
   MAX_LINE_LENGTH,
   newRunReason,
   nextBatch,
+  nextStreamBatch,
   splitLines,
+  type TStreamLine,
   type TUploadCursor,
 } from "../src/main/uploadPlan.js";
 
@@ -166,5 +169,61 @@ describe("a batch is packed by bytes, not by characters", () => {
     expect(nextBatch(0, lines, 1)?.lines).toHaveLength(1);
     // Never zero: a batch of nothing would stall the cursor for good.
     expect(nextBatch(0, lines, 0)?.lines).toHaveLength(1);
+  });
+});
+
+describe("completeLines — the trade journal's split", () => {
+  it("keeps only the lines a newline has closed", () => {
+    expect(completeLines("a\nb\n")).toEqual(["a", "b"]);
+    expect(completeLines("a\r\nb\r\n")).toEqual(["a", "b"]);
+    expect(completeLines("")).toEqual([]);
+  });
+
+  it("leaves a line the engine is still writing for a later pass", () => {
+    // Half a JSON line fails the allow-list, and a withheld line is passed over for good: reading
+    // one mid-write would lose that trade for the session.
+    expect(completeLines('a\n{"v":1,"t":"tr')).toEqual(["a"]);
+    expect(completeLines('{"v":1')).toEqual([]);
+  });
+
+  it("keeps a closed blank line, so the indices after it stay the file's", () => {
+    expect(completeLines("a\n\nb\n")).toEqual(["a", "", "b"]);
+    expect(completeLines("\n\n")).toEqual(["", ""]);
+  });
+});
+
+describe("nextStreamBatch — a stream that withholds lines", () => {
+  const W = (withheld: string): TStreamLine => ({ withheld });
+
+  it("is nextBatch exactly when nothing is withheld (the loot log)", () => {
+    const lines = Array.from({ length: 1200 }, (_, i) => `line-${i}`);
+    for (const at of [0, 7, MAX_BATCH_LINES, 1199, 1200]) {
+      expect(nextStreamBatch(at, lines)).toEqual({ skipTo: at, skipped: [], batch: nextBatch(at, lines) });
+    }
+    expect(nextStreamBatch(0, lines, 10).batch).toEqual(nextBatch(0, lines, 10));
+  });
+
+  it("steps over withheld lines at the cursor, then sends the run after them at their own indices", () => {
+    const lines: TStreamLine[] = [W("silver-only"), W("refused"), "c", "d", W("silver-only"), "f"];
+    const first = nextStreamBatch(0, lines);
+    expect(first).toEqual({ skipTo: 2, skipped: [W("silver-only"), W("refused")], batch: { from: 2, lines: ["c", "d"] } });
+    // The withheld line inside the run ended the batch; the next pass steps over it.
+    const second = nextStreamBatch(4, lines);
+    expect(second).toEqual({ skipTo: 5, skipped: [W("silver-only")], batch: { from: 5, lines: ["f"] } });
+    expect(nextStreamBatch(6, lines)).toEqual({ skipTo: 6, skipped: [], batch: null });
+  });
+
+  it("passes over a withheld tail with nothing to send", () => {
+    expect(nextStreamBatch(1, ["a", W("silver-only"), W("silver-only")])).toEqual({
+      skipTo: 3,
+      skipped: [W("silver-only"), W("silver-only")],
+      batch: null,
+    });
+  });
+
+  it("applies the stream's own line cap — a trade line is never cut at the loot route's", () => {
+    const long = "x".repeat(MAX_LINE_LENGTH + 100);
+    expect(nextStreamBatch(0, [long]).batch?.lines[0]).toHaveLength(MAX_LINE_LENGTH);
+    expect(nextStreamBatch(0, [long], MAX_BATCH_LINES, 8000).batch?.lines[0]).toBe(long);
   });
 });
