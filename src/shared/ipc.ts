@@ -4,6 +4,9 @@
  */
 
 export const IPC = {
+  sessionGet: "session:get",
+  sessionNew: "session:new",
+  sessionChanged: "session:changed",
   /** invoke → void. Resolve the engine, start the supervisor. */
   captureStart: "capture:start",
   /** invoke → void. Graceful stop (SIGINT, escalating). */

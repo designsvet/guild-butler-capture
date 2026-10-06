@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createRouter, DEFAULT_ROUTE, hrefOf, nextRoute, type TRoute } from "../src/app/router.js";
 import { createShellStore } from "../src/app/store.js";
+import { newSession, type TSession } from "../src/shared/session/model.js";
 import type { TGbc } from "../src/shared/bridge.js";
 import {
   ECaptureStatus,
@@ -55,6 +56,7 @@ const deferred = <T>(): TDeferred<T> => {
 const fakeBridge = () => {
   const calls: string[] = [];
   const answers = {
+    session: deferred<TSession | null>(),
     state: deferred<TCaptureState>(),
     setup: deferred<TSetupStatus>(),
     pairing: deferred<TPairingStatus>(),
@@ -62,11 +64,17 @@ const fakeBridge = () => {
     settings: deferred<TAppSettings>(),
   };
   const push: {
+    session?: (s: TSession | null) => void;
     state?: (s: TCaptureState) => void;
     pairing?: (s: TPairingStatus) => void;
     update?: (s: TUpdateStatus) => void;
   } = {};
-  const settings = (patch: Partial<TAppSettings>): TAppSettings => ({ autoCapture: false, language: null, theme: "obsidian", ...patch });
+  const settings = (patch: Partial<TAppSettings>): TAppSettings => ({
+    autoCapture: false,
+    language: null,
+    theme: "obsidian",
+    ...patch,
+  });
   const restartAnswer: { value: TRestartResult } = { value: { ok: true } };
   const checkAnswer = deferred<TUpdateStatus>();
   const fixAnswer = deferred<TPermissionFixResult>();
@@ -78,13 +86,23 @@ const fakeBridge = () => {
   const copyAnswer = deferred<void>();
   const bridge = {
     platform: "darwin",
+    getSession: () => answers.session.promise,
+    onSession: (listener: (s: TSession | null) => void) => ((push.session = listener), () => {}),
+    newSession: vi.fn(() => Promise.resolve(null)),
     getState: () => (calls.push("getState"), answers.state.promise),
-    getSetup: () => (calls.push("getSetup"), calls.filter((c) => c === "getSetup").length === 1 ? answers.setup.promise : Promise.resolve(SETUP)),
+    getSetup: () => (
+      calls.push("getSetup"),
+      calls.filter((c) => c === "getSetup").length === 1 ? answers.setup.promise : Promise.resolve(SETUP)
+    ),
     getPairing: () => (calls.push("getPairing"), answers.pairing.promise),
     getUpdate: () => (calls.push("getUpdate"), answers.update.promise),
     getSettings: () => (calls.push("getSettings"), answers.settings.promise),
     onState: (listener: (s: TCaptureState) => void) => (calls.push("onState"), (push.state = listener), () => {}),
-    onPairing: (listener: (s: TPairingStatus) => void) => (calls.push("onPairing"), (push.pairing = listener), () => {}),
+    onPairing: (listener: (s: TPairingStatus) => void) => (
+      calls.push("onPairing"),
+      (push.pairing = listener),
+      () => {}
+    ),
     onUpdate: (listener: (s: TUpdateStatus) => void) => (calls.push("onUpdate"), (push.update = listener), () => {}),
     start: vi.fn(() => Promise.resolve()),
     stop: vi.fn(() => Promise.resolve()),
@@ -105,6 +123,7 @@ const fakeBridge = () => {
     openLoot: vi.fn(() => Promise.resolve()),
     copyText: vi.fn(() => copyAnswer.promise),
   } as unknown as TGbc & {
+    newSession: ReturnType<typeof vi.fn>;
     start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
     setAutoCapture: ReturnType<typeof vi.fn>;
@@ -152,7 +171,11 @@ const fakeBridge = () => {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-const answerAll = (fake: ReturnType<typeof fakeBridge>, capture: Partial<TCaptureState>, settings: Partial<TAppSettings>) => {
+const answerAll = (
+  fake: ReturnType<typeof fakeBridge>,
+  capture: Partial<TCaptureState>,
+  settings: Partial<TAppSettings>,
+) => {
   fake.answers.state.resolve({ ...initialCaptureState, ...capture });
   fake.answers.setup.resolve(SETUP);
   fake.answers.pairing.resolve(initialPairingStatus);
@@ -488,16 +511,26 @@ describe("the shell's store: the notices' buttons", () => {
     expect(fake.bridge.installNpcap).toHaveBeenCalledTimes(1);
     expect(store.getSnapshot().ui.npcapBusy).toBe(true);
     const setup = { ...SETUP, platform: "win32", access: ECaptureAccess.Ok };
-    fake.npcapAnswer.resolve({ setup, install: { outcome: ENpcapInstallOutcome.Installed, version: "1.80", detail: null } });
+    fake.npcapAnswer.resolve({
+      setup,
+      install: { outcome: ENpcapInstallOutcome.Installed, version: "1.80", detail: null },
+    });
     await flush();
-    expect(store.getSnapshot().ui).toMatchObject({ npcapBusy: false, npcapAttempt: { install: { outcome: ENpcapInstallOutcome.Installed } } });
+    expect(store.getSnapshot().ui).toMatchObject({
+      npcapBusy: false,
+      npcapAttempt: { install: { outcome: ENpcapInstallOutcome.Installed } },
+    });
     expect(store.getSnapshot().setup).toEqual(setup);
   });
 
   it("the macOS fix keeps what happened and the probe that follows it; the link and the folder go to main", async () => {
     const { fake, store } = await booted({});
     store.fixMacPermissions();
-    const result = { setup: { ...SETUP, access: ECaptureAccess.NoPermission }, outcome: EPermissionFixOutcome.Cancelled, detail: null };
+    const result = {
+      setup: { ...SETUP, access: ECaptureAccess.NoPermission },
+      outcome: EPermissionFixOutcome.Cancelled,
+      detail: null,
+    };
     fake.fixAnswer.resolve(result);
     await flush();
     expect(store.getSnapshot().ui.fixAttempt).toEqual(result);
@@ -556,5 +589,35 @@ describe("the shell's router: the page lives in the hash", () => {
     onHash();
     expect(listener).not.toHaveBeenCalled();
     expect(router.getSnapshot()).toBe("session");
+  });
+});
+
+describe("Session snapshot bridge", () => {
+  it("keeps a pushed snapshot when the initial get arrives late", async () => {
+    const h = fakeBridge();
+    const store = createShellStore(h.bridge, h.focus);
+    void store.boot();
+    const latest = newSession("latest", 200);
+    h.push.session?.(latest);
+    h.answers.session.resolve(newSession("stale", 100));
+    await Promise.resolve();
+    expect(store.getSnapshot().session).toBe(latest);
+  });
+  it("refuses duplicate New session requests and preserves the pushed answer", async () => {
+    const h = fakeBridge();
+    const answer = deferred<TSession>();
+    h.bridge.newSession.mockReturnValue(answer.promise);
+    const store = createShellStore(h.bridge, h.focus);
+    void store.boot();
+    store.newSession();
+    store.newSession();
+    expect(h.bridge.newSession).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().ui.newSessionBusy).toBe(true);
+    const next = newSession("next", 200);
+    h.push.session?.(next);
+    answer.resolve(next);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(store.getSnapshot().session).toBe(next);
+    expect(store.getSnapshot().ui.newSessionBusy).toBe(false);
   });
 });

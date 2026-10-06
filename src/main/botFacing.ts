@@ -8,5 +8,5 @@
  * forwarded festivities, energy or engine health.
  */
 export const talksToBot = (source: string | null | undefined): boolean => {
-  return source !== "mock";
+  return source !== "mock" && source !== "replay";
 };

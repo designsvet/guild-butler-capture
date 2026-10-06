@@ -1,0 +1,2 @@
+timestamp_utc;looted_by__alliance;looted_by__guild;looted_by__name;item_id;item_name;quantity;looted_from__alliance;looted_from__guild;looted_from__name;server__region
+2026-09-21T10:55:39.833Z;;;Recorder;UNIQUE_GVGTOKEN_GENERIC;Siphoned Energy;10;;;MORGANA_DYNAMIC_CAMP_PERSONAL_SMALL_LC;Europe
