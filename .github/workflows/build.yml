@@ -231,15 +231,25 @@ jobs:
           test -f release/latest.yml
           cat release/latest.yml
 
-      - name: The engine's commit is stamped inside the bundle
+      - name: The engine's commit and loot-rules level are stamped inside the bundle
         # tools/prepare-engine-dist.mjs writes ENGINE_REF and the app sends it as X-Capture-Engine
         # (src/main/engineRef.ts); without it every upload says "unknown". Checked on the packed
         # app, not on engine-dist: what ships is what counts. The sha names the engine commit, and
         # the app version the patches applied over it (resources/engine-patches).
+        # ENGINE_LOOT_RULES is the engine's src/loot-rules.js level, sent as X-Capture-Loot-Rules;
+        # without it the bot counts none of this app's pickups against a trade (raid-bot ADR 0168
+        # slice B), so an engine ref older than the level fails here rather than ship.
+        # MERGE ORDER: both jobs build against the engine's protocol18 head, so this check (and the
+        # mac one) fails until src/loot-rules.js is on protocol18 — merge the engine's
+        # feat/loot-rules-level first, then re-run this PR's checks. Nothing is published before it.
         run: |
           for ref in release/win*-unpacked/resources/engine/ENGINE_REF; do
             test -f "$ref"
             echo "$ref: $(cat "$ref")"
+          done
+          for level in release/win*-unpacked/resources/engine/ENGINE_LOOT_RULES; do
+            test -f "$level"
+            echo "$level: $(cat "$level")"
           done
 
       - name: Upload installer artifact
@@ -523,6 +533,11 @@ jobs:
           # The engine's commit, sent as X-Capture-Engine (src/main/engineRef.ts) — "unknown" without it.
           test -f "$APP/Contents/Resources/engine/ENGINE_REF"
           cat "$APP/Contents/Resources/engine/ENGINE_REF"
+          # Its loot-rules level, sent as X-Capture-Loot-Rules — without it the bot counts none of
+          # this app's pickups against a trade (raid-bot ADR 0168 slice B). Fails until the engine's
+          # protocol18 carries src/loot-rules.js (merge order: see the Windows job's stamp step).
+          test -f "$APP/Contents/Resources/engine/ENGINE_LOOT_RULES"
+          cat "$APP/Contents/Resources/engine/ENGINE_LOOT_RULES"
           test -f "$APP/Contents/Resources/mac/install-bpf-helper.sh"
           codesign --verify --deep --strict "$APP"
           codesign -dv "$APP" 2>&1

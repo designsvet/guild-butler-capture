@@ -29,6 +29,7 @@
  * wait on, or slow, the other.
  */
 
+import type { TEngineStamp } from "./engineRef.js";
 import {
   EUploadOutcome,
   isRetryable,
@@ -60,7 +61,10 @@ import {
 export type TUploadStream = {
   /** The app log's tag: `[upload]` for loot, `[trades]` for trades. */
   tag: string;
-  /** Post one batch to the stream's route. `engine` is the X-Capture-Engine header (engineRef.ts). */
+  /**
+   * Post one batch to the stream's route. `engine` is what the engine says about itself — the
+   * X-Capture-Engine and X-Capture-Loot-Rules headers (engineRef.ts `TEngineStamp`).
+   */
   send: (
     fetchLike: TFetchLike,
     base: string,
@@ -68,7 +72,7 @@ export type TUploadStream = {
     run: string,
     file: string,
     batch: TBatch,
-    engine: string | null,
+    engine: TEngineStamp | null,
   ) => Promise<TUploadResult>;
   /** The file's text → its lines by index, each to send or withheld (`TStreamLine`). */
   lines: (text: string) => TStreamLine[];
@@ -193,8 +197,11 @@ export type TUploaderDeps = {
   };
   /** Which file this is. Absent: the loot log. */
   stream?: TUploadStream;
-  /** The X-Capture-Engine header's value (engineRef.ts), read per batch. Absent: no header. */
-  engine?: () => string | null;
+  /**
+   * The engine's headers' values (engineRef.ts `TEngineStamp`: X-Capture-Engine, and
+   * X-Capture-Loot-Rules when its level is known), read per batch. Absent: neither header.
+   */
+  engine?: () => TEngineStamp | null;
 };
 
 /** Backoff between retries, capped. Uploading is not urgent; the file is safe. */

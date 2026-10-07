@@ -75,7 +75,7 @@ import {
 } from "./uploadClient.js";
 import { lootBroken, newlyBroken } from "../shared/engineHealth.js";
 import { createHeldStore, heldUploadsFilePath, type THeldStore } from "./heldUploads.js";
-import { DEV_ENGINE, engineRefFor } from "./engineRef.js";
+import { DEV_STAMP, engineStampFor, stampForLootLog, type TEngineStamp } from "./engineRef.js";
 import { tradeFileThisSession, tradesBroken, TRADE_STREAM, withTradeEvents } from "./tradeUpload.js";
 import { decoderVerdictFilePath, forgetDecoderVerdict, loadDecoderVerdict, saveDecoderVerdict } from "./decoderVerdict.js";
 import electronUpdater from "electron-updater";
@@ -147,7 +147,14 @@ const stopTracker = (): void => {
 
 const dispatch = (ev: TSessionEvent): void => {
   const brokenBefore = state.engineBroken;
+  const logBefore = state.logFile;
   state = reduceCaptureSession(state, ev);
+  // A log named now was named by this session's engine (a Start keeps the old name, and the tracker
+  // reports only files written since Start): its lines carry this session's stamp, whenever they are
+  // sent (stampForLootLog). Before anything below can run an upload pass.
+  if (state.logFile != null && state.logFile !== logBefore && !lootLogStamps.has(state.logFile)) {
+    lootLogStamps.set(state.logFile, engineStamp);
+  }
   const fresh = newlyBroken(brokenBefore, state.engineBroken);
   // The mock engine's lines are invented: they never leave the machine (see botFacing.ts).
   const toBot = talksToBot(currentEngine?.source);
@@ -264,8 +271,17 @@ let tradesOn = false;
  * (tradeUpload.ts `tradeFileThisSession`), or it would send that session's trades again under a new run.
  */
 let logFileAtStart: string | null = null;
-/** The X-Capture-Engine header for this session's engine (engineRef.ts), set at Start. */
-let engineRef: string = DEV_ENGINE;
+/**
+ * What this session's engine says about itself (engineRef.ts): the X-Capture-Engine and
+ * X-Capture-Loot-Rules headers on every batch of lines it wrote, set at Start.
+ */
+let engineStamp: TEngineStamp = DEV_STAMP;
+/**
+ * Each loot log this app run has seen named → the stamp of the session whose engine named it
+ * (engineRef.ts `stampForLootLog`): the loot uploader re-sends an earlier session's log after a
+ * Start, and those lines are that engine's, not this one's. Recorded in `dispatch`.
+ */
+const lootLogStamps = new Map<string, TEngineStamp>();
 /**
  * The held ranges, one store for both uploaders (uploader.ts `holds`): two stores over the one file
  * would each write their own list over the other's.
@@ -454,7 +470,9 @@ const ensureUploader = (): TUploader => {
     // pass) need not read it at all.
     held: () => lootBroken(state.engineBroken) && heldUploadOn(),
     holds: heldRanges(),
-    engine: () => engineRef,
+    // The engine that WROTE the file being sent — an earlier session's, for the log a Start re-sends
+    // from a reset cursor until this session's engine names its own (stampForLootLog).
+    engine: () => stampForLootLog(state.logFile, lootLogStamps, engineStamp),
   });
   return uploader;
 };
@@ -490,7 +508,7 @@ const ensureTradeUploader = (): TUploader => {
     held: () => tradesBroken(state.engineBroken),
     holds: heldRanges(),
     stream: TRADE_STREAM,
-    engine: () => engineRef,
+    engine: () => engineStamp,
   });
   return tradeUploader;
 };
@@ -525,7 +543,9 @@ const startUploadLoop = (): void => {
     // journal of this session to follow.
     logFileAtStart = state.logFile;
     ensureTradeUploader().resetSession();
-    appLog(`trades: following the trade journal (engine ${engineRef})`);
+    appLog(
+      `trades: following the trade journal (engine ${engineStamp.ref}, loot rules ${engineStamp.lootRules ?? "none"})`,
+    );
   }
   if (uploadTimer != null) {
     return;
@@ -652,7 +672,7 @@ const startCapture = (): void => {
     });
     return;
   }
-  engineRef = engineRefFor(
+  engineStamp = engineStampFor(
     engine,
     (path) => {
       try {
@@ -663,7 +683,10 @@ const startCapture = (): void => {
     },
     join,
   );
-  appLog(`start capture engine=${engine.entry} (${engine.source}) workDir=${engine.workDir} ref=${engineRef}`);
+  appLog(
+    `start capture engine=${engine.entry} (${engine.source}) workDir=${engine.workDir} ref=${engineStamp.ref} ` +
+      `lootRules=${engineStamp.lootRules ?? "none"}`,
+  );
   // The engine writes its log to cwd; a bundled engine's workDir is a per-user
   // captures folder that may not exist yet.
   mkdirSync(engine.workDir, { recursive: true });

@@ -23,10 +23,23 @@
  * warns and ships no stamp (the app then says `unknown`). The commit is HEAD's:
  * the jobs apply resources/engine-patches/ before this step, and the stamp does
  * not say so — the app's version names that patch set.
+ *
+ * Beside it, the engine's LOOT-RULES LEVEL as `ENGINE_LOOT_RULES` (the integer
+ * and a newline): `LOOT_RULES` from the engine's own `src/loot-rules.js`, an
+ * integer the engine bumps with every change to WHICH pickups it writes. The app
+ * sends it as `X-Capture-Loot-Rules` (src/main/engineRef.ts), and raid-bot ADR
+ * 0168's slice B counts a run's pickups against a trade only at or above its
+ * minimum level. An engine with no `src/loot-rules.js` predates the level: no
+ * file, and the app sends no header, which the bot reads as "counts nothing" —
+ * the truth about such an engine. A file that is there but does not yield a
+ * non-negative integer is an engine bug: it fails the build in CI and warns
+ * locally, as a missing commit does. The release jobs assert the level reached
+ * the packed app (build.yml), so a release is never cut over an engine without one.
  */
 
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 
 const engineRoot = process.argv[2] != null ? resolve(process.argv[2]) : null;
@@ -70,6 +83,37 @@ if (/^[0-9a-f]{40}$/.test(sha)) {
   process.exit(2);
 } else {
   console.warn(`No engine commit under ${engineRoot} — no ENGINE_REF; the app will send X-Capture-Engine: unknown.`);
+}
+
+// The level is the engine's own: required from its checkout (after the patches, as the commit is
+// read), never parsed out of the text and never defaulted.
+const lootRulesSource = join(engineRoot, "src", "loot-rules.js");
+if (existsSync(lootRulesSource)) {
+  let level;
+  let why = "";
+  try {
+    level = createRequire(import.meta.url)(lootRulesSource).LOOT_RULES;
+  } catch (err) {
+    why = ` (${err instanceof Error ? err.message : String(err)})`;
+  }
+  if (Number.isSafeInteger(level) && level >= 0) {
+    writeFileSync(join(outDir, "ENGINE_LOOT_RULES"), `${level}\n`, "utf8");
+    console.log(`engine loot rules ${level} → ENGINE_LOOT_RULES`);
+  } else {
+    const message =
+      `${lootRulesSource} does not export LOOT_RULES as a non-negative integer${why} — no ENGINE_LOOT_RULES; ` +
+      "the app would send no X-Capture-Loot-Rules and the bot would count none of its pickups.";
+    if (process.env.GITHUB_ACTIONS === "true") {
+      console.error(message);
+      process.exit(2);
+    }
+    console.warn(message);
+  }
+} else {
+  console.warn(
+    `No src/loot-rules.js under ${engineRoot} — an engine older than the loot-rules level: no ENGINE_LOOT_RULES, ` +
+      "no X-Capture-Loot-Rules header, and the bot counts none of its pickups against a trade.",
+  );
 }
 
 console.log(`engine-dist → ${outDir}`);

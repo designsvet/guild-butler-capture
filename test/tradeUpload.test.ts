@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { stampForLootLog, type TEngineStamp } from "../src/main/engineRef.js";
 import { createHeldStore, heldUploadsFilePath, loadHeldRanges } from "../src/main/heldUploads.js";
 import {
   ETradeWithheld,
@@ -19,7 +20,13 @@ import {
   tradesBroken,
   withTradeEvents,
 } from "../src/main/tradeUpload.js";
-import { ENGINE_HEADER, EUploadOutcome, uploadBatch, uploadTradeBatch } from "../src/main/uploadClient.js";
+import {
+  ENGINE_HEADER,
+  EUploadOutcome,
+  LOOT_RULES_HEADER,
+  uploadBatch,
+  uploadTradeBatch,
+} from "../src/main/uploadClient.js";
 import { BOT_REFUSED, createUploader, EUploaderState, retryDelayMs } from "../src/main/uploader.js";
 import type { THeldRange } from "../src/main/uploadPlan.js";
 import type { TBrokenHandler } from "../src/shared/captureTypes.js";
@@ -210,7 +217,7 @@ type TWorld = {
   /** A trade line the bot answers 400 for, whatever batch carries it. */
   refuseTrade: string | null;
   broken: TBrokenHandler[] | null;
-  received: Array<{ url: string; engine: string | undefined } & TBody>;
+  received: Array<{ url: string; engine: string | undefined; lootRules: string | undefined } & TBody>;
   /** Status the bot answers on `/trades` (200 = take the batch). */
   tradeStatus: number;
   clock: { now: number };
@@ -261,13 +268,17 @@ const fetchFor = (w: TWorld): Parameters<typeof createUploader>[0]["fetchLike"] 
   if (url.endsWith("/trades") && w.refuseTrade != null && body.lines.includes(w.refuseTrade)) {
     return { ok: false, status: 400, text: async () => JSON.stringify({ error: "bad line" }) };
   }
-  w.received.push({ url, engine: init.headers[ENGINE_HEADER], ...body });
+  w.received.push({ url, engine: init.headers[ENGINE_HEADER], lootRules: init.headers[LOOT_RULES_HEADER], ...body });
   const reply = { accepted: body.lines.length, duplicate: 0, rejected: 0, nextFrom: body.from + body.lines.length };
   return { ok: true, status: 200, text: async () => JSON.stringify(reply) };
 };
 
 /** The two uploaders main builds, with main's rules: the loot hold, and the trade hold beside it. */
-const apps = (w: TWorld, holds: THolds = memoryHolds()) => {
+const apps = (
+  w: TWorld,
+  holds: THolds = memoryHolds(),
+  engine: () => TEngineStamp | null = () => ({ ref: "0123456789abcdef0123456789abcdef01234567", lootRules: 1 }),
+) => {
   const common = {
     fetchLike: fetchFor(w),
     base: "https://bot",
@@ -284,7 +295,7 @@ const apps = (w: TWorld, holds: THolds = memoryHolds()) => {
     now: () => w.clock.now,
     log: (line: string) => w.logs.push(line),
     holds,
-    engine: () => "0123456789abcdef0123456789abcdef01234567",
+    engine,
   };
   return {
     loot: createUploader({ ...common, currentFile: () => w.lootFile, held: () => lootBroken(w.broken) }),
@@ -671,7 +682,7 @@ describe("the hold: what was decoded while broken is never sent", () => {
   });
 });
 
-describe("the engine version, on both line routes", () => {
+describe("the engine version and its loot-rules level, on both line routes", () => {
   const SHA = "0123456789abcdef0123456789abcdef01234567";
   const capture = () => {
     const calls: Array<{ url: string; headers: Record<string, string>; body: Record<string, unknown> }> = [];
@@ -681,14 +692,16 @@ describe("the engine version, on both line routes", () => {
     };
     return { calls, fetchLike };
   };
+  const batch = { from: 0, lines: ["a"] };
 
   it("names it in the X-Capture-Engine header — never in the body, whose keys stay /upload's", async () => {
     const { calls, fetchLike } = capture();
-    const batch = { from: 0, lines: ["a"] };
-    expect((await uploadBatch(fetchLike, "https://bot", "tok", "run", "f.txt", batch, SHA)).outcome).toBe(
+    const bundled = { ref: SHA, lootRules: 1 };
+    expect((await uploadBatch(fetchLike, "https://bot", "tok", "run", "f.txt", batch, bundled)).outcome).toBe(
       EUploadOutcome.Accepted,
     );
-    expect((await uploadTradeBatch(fetchLike, "https://bot", "tok", "run", "t.jsonl", batch, "dev")).outcome).toBe(
+    const dev = { ref: "dev", lootRules: null };
+    expect((await uploadTradeBatch(fetchLike, "https://bot", "tok", "run", "t.jsonl", batch, dev)).outcome).toBe(
       EUploadOutcome.Accepted,
     );
     expect(calls.map((c) => [c.url, c.headers[ENGINE_HEADER], c.headers.authorization])).toEqual([
@@ -701,10 +714,43 @@ describe("the engine version, on both line routes", () => {
     expect(ENGINE_HEADER).toBe("x-capture-engine");
   });
 
-  it("sends no header when the caller names no engine", async () => {
+  it("sends the level beside it as X-Capture-Loot-Rules, in plain decimal, on both routes", async () => {
     const { calls, fetchLike } = capture();
-    await uploadBatch(fetchLike, "https://bot", "tok", "run", "f.txt", { from: 0, lines: ["a"] });
-    expect(calls[0]?.headers).not.toHaveProperty(ENGINE_HEADER);
+    await uploadBatch(fetchLike, "https://bot", "tok", "run", "f.txt", batch, { ref: SHA, lootRules: 1 });
+    await uploadTradeBatch(fetchLike, "https://bot", "tok", "run", "t.jsonl", batch, { ref: SHA, lootRules: 1 });
+    // Zero is a level like any other — sent, never mistaken for "none".
+    await uploadBatch(fetchLike, "https://bot", "tok", "run", "f.txt", batch, { ref: SHA, lootRules: 0 });
+    await uploadTradeBatch(fetchLike, "https://bot", "tok", "run", "t.jsonl", batch, { ref: SHA, lootRules: 12 });
+    expect(calls.map((c) => [c.url.split("/").at(-1), c.headers[LOOT_RULES_HEADER]])).toEqual([
+      ["upload", "1"],
+      ["trades", "1"],
+      ["upload", "0"],
+      ["trades", "12"],
+    ]);
+    for (const call of calls) {
+      expect(Object.keys(call.body)).toEqual(["run", "file", "from", "lines"]);
+    }
+    expect(LOOT_RULES_HEADER).toBe("x-capture-loot-rules");
+  });
+
+  it("leaves the level out when the app cannot vouch for one — never empty, never 0, never `unknown`", async () => {
+    const { calls, fetchLike } = capture();
+    await uploadBatch(fetchLike, "https://bot", "tok", "run", "f.txt", batch, { ref: "unknown", lootRules: null });
+    await uploadTradeBatch(fetchLike, "https://bot", "tok", "run", "t.jsonl", batch, { ref: "dev", lootRules: null });
+    for (const call of calls) {
+      expect(call.headers[ENGINE_HEADER]).toBeDefined();
+      expect(call.headers).not.toHaveProperty(LOOT_RULES_HEADER);
+    }
+  });
+
+  it("sends neither header when the caller names no engine", async () => {
+    const { calls, fetchLike } = capture();
+    await uploadBatch(fetchLike, "https://bot", "tok", "run", "f.txt", batch);
+    await uploadTradeBatch(fetchLike, "https://bot", "tok", "run", "t.jsonl", batch, null);
+    for (const call of calls) {
+      expect(call.headers).not.toHaveProperty(ENGINE_HEADER);
+      expect(call.headers).not.toHaveProperty(LOOT_RULES_HEADER);
+    }
   });
 
   it("rides every batch both uploaders send", async () => {
@@ -714,9 +760,67 @@ describe("the engine version, on both line routes", () => {
     append(w, TRADES, [L[6]!]);
     await settle(loot, w, 1);
     await settle(trades, w, 1);
-    expect(w.received.map((r) => [r.url.split("/").at(-1), r.engine])).toEqual([
-      ["upload", SHA],
-      ["trades", SHA],
+    expect(w.received.map((r) => [r.url.split("/").at(-1), r.engine, r.lootRules])).toEqual([
+      ["upload", SHA, "1"],
+      ["trades", SHA, "1"],
+    ]);
+  });
+
+  it("is read per batch, so neither uploader sends a level its engine no longer vouches for", async () => {
+    const w = world();
+    let stamp: { ref: string; lootRules: number | null } = { ref: SHA, lootRules: 1 };
+    const { loot, trades } = apps(w, undefined, () => stamp);
+    append(w, LOOT, ["loot-0"]);
+    append(w, TRADES, [L[6]!]);
+    await settle(loot, w, 1);
+    await settle(trades, w, 1);
+    // A new Start over a dev engine: the same uploaders, the next batches without a level.
+    stamp = { ref: "dev", lootRules: null };
+    append(w, LOOT, ["loot-1"]);
+    append(w, TRADES, [L[3]!]);
+    await settle(loot, w, 1);
+    await settle(trades, w, 1);
+    expect(w.received.map((r) => [r.url.split("/").at(-1), r.engine, r.lootRules])).toEqual([
+      ["upload", SHA, "1"],
+      ["trades", SHA, "1"],
+      ["upload", "dev", undefined],
+      ["trades", "dev", undefined],
+    ]);
+  });
+});
+
+describe("a re-sent log keeps the stamp of the engine that wrote it (stampForLootLog)", () => {
+  const SHA = "0123456789abcdef0123456789abcdef01234567";
+  const PREV = "/captures/loot-events-2026-09-16-12-00-00.txt";
+
+  it("a Start over the bundled engine re-sends a dev engine's log without a level — never as level 1", async () => {
+    const w = world();
+    const written = new Map<string, TEngineStamp>();
+    let session: TEngineStamp = { ref: "dev", lootRules: null };
+    // As main wires it: the stamp of the file being sent, recorded when its engine named it.
+    const { loot } = apps(w, undefined, () => stampForLootLog(w.lootFile, written, session));
+    // Session 1, a dev (or Advanced-folder) engine: it names PREV and writes to it.
+    w.lootFile = PREV;
+    written.set(PREV, session);
+    append(w, PREV, ["dev-0", "dev-1"]);
+    await settle(loot, w, 1);
+    // Session 2, the bundled engine at level 1. Start keeps PREV as the current log and resets the
+    // cursor, and the engine has not named its own log yet (item table, version check): the first
+    // pass sends PREV again from line 0, under a new run.
+    session = { ref: SHA, lootRules: 1 };
+    w.lootFileAtStart = PREV;
+    loot.resetSession();
+    await settle(loot, w, 1);
+    // Then the bundled engine names its log and writes to it.
+    w.lootFile = LOOT;
+    written.set(LOOT, session);
+    append(w, LOOT, ["bundled-0"]);
+    await settle(loot, w, 1);
+    expect(w.received.map((r) => [r.run, r.from, r.lines.join(","), r.engine, r.lootRules])).toEqual([
+      ["run-1", 0, "dev-0,dev-1", "dev", undefined],
+      // The re-send: a new run, the dev engine's lines — stamped as the dev engine's, with no level.
+      ["run-2", 0, "dev-0,dev-1", "dev", undefined],
+      ["run-3", 0, "bundled-0", SHA, "1"],
     ]);
   });
 });

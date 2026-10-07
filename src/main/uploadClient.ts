@@ -13,6 +13,7 @@
  * permission fix, once for the Npcap install.
  */
 
+import type { TEngineStamp } from "./engineRef.js";
 import type { TBatch } from "./uploadPlan.js";
 
 /**
@@ -182,15 +183,40 @@ export const isRetryable = (outcome: EUploadOutcome): boolean => {
 /**
  * The request header naming the engine build that wrote the lines, on both line routes (`/upload`
  * and `/trades`): the engine's git commit, stamped into the bundled engine at build time (see
- * engineRef.ts), or `dev` for an engine that is not the bundled one. raid-bot ADR 0168's slice B
- * reads it to keep pickups written by an engine without the chest-window fixes out of any trade's
- * budget; nothing else does.
+ * engineRef.ts), or `dev` for an engine that is not the bundled one, or `unknown` for a bundled one
+ * with no readable stamp. The bot keeps it per run to say which build wrote what. It no longer
+ * decides which pickups count against a trade (raid-bot ADR 0168 slice B): that is the loot-rules
+ * level beside it (`LOOT_RULES_HEADER`), which replaced a list of engine commits the bot kept by hand.
  *
  * A header rather than a body key on purpose: the bot's `/upload` validates its body field by field
  * and ignores headers it does not read (Fastify, behind Caddy's plain `reverse_proxy`), so a bot
  * that predates this reads today's batch unchanged.
  */
 export const ENGINE_HEADER = "x-capture-engine";
+
+/**
+ * The request header naming the engine's LOOT-RULES LEVEL (engineRef.ts `engineLootRulesFor`), on
+ * the same two routes, beside `ENGINE_HEADER`: a non-negative integer in plain decimal (`1`), read
+ * from the bundled engine's `ENGINE_LOOT_RULES`. raid-bot ADR 0168's slice B counts a run's pickups
+ * against a trade only at or above its minimum level, so this is the one number that decides it.
+ *
+ * Left out — never sent empty, never `0`, never `unknown` — when the app cannot vouch for a level:
+ * an engine older than the level, or any engine that is not the bundled one. The bot reads a missing
+ * header as "counts nothing", which is the truth about such a run. A header for the reason
+ * `ENGINE_HEADER` is one: a bot that predates it reads the batch unchanged.
+ */
+export const LOOT_RULES_HEADER = "x-capture-loot-rules";
+
+/** The engine's headers for one batch: `ENGINE_HEADER` whenever an engine is named, the level when known. */
+export const engineHeaders = (engine: TEngineStamp | null): Record<string, string> => {
+  if (engine == null) {
+    return {};
+  }
+  return {
+    [ENGINE_HEADER]: engine.ref,
+    ...(engine.lootRules != null ? { [LOOT_RULES_HEADER]: String(engine.lootRules) } : {}),
+  };
+};
 
 /** A batch of a file's lines to one of the bot's two line routes. One shape, one outcome vocabulary. */
 const postLines = async (
@@ -200,7 +226,7 @@ const postLines = async (
   run: string,
   file: string,
   batch: TBatch,
-  engine: string | null,
+  engine: TEngineStamp | null,
 ): Promise<TUploadResult> => {
   let res: Awaited<ReturnType<TFetchLike>>;
   try {
@@ -209,7 +235,7 @@ const postLines = async (
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
-        ...(engine != null ? { [ENGINE_HEADER]: engine } : {}),
+        ...engineHeaders(engine),
       },
       body: JSON.stringify({ run, file, from: batch.from, lines: batch.lines }),
     });
@@ -253,7 +279,7 @@ export const uploadBatch = async (
   run: string,
   file: string,
   batch: TBatch,
-  engine: string | null = null,
+  engine: TEngineStamp | null = null,
 ): Promise<TUploadResult> => {
   return await postLines(fetchLike, `${apiBase(base)}/control/capture/upload`, token, run, file, batch, engine);
 };
@@ -272,7 +298,7 @@ export const uploadTradeBatch = async (
   run: string,
   file: string,
   batch: TBatch,
-  engine: string | null = null,
+  engine: TEngineStamp | null = null,
 ): Promise<TUploadResult> => {
   return await postLines(fetchLike, `${apiBase(base)}/control/capture/trades`, token, run, file, batch, engine);
 };

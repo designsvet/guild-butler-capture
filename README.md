@@ -497,8 +497,27 @@ screen reader.
   bot that predates it reads the batch unchanged. The release build takes the engine's protocol18
   head with no pin, so `tools/prepare-engine-dist.mjs` — the step both platform jobs run — stamps
   the checkout's HEAD into the bundled engine as `ENGINE_REF`, and fails the build in CI when it
-  cannot (see Builds) — the engine's commit; the app's version names the patches applied over it. raid-bot ADR 0168's slice B reads it to keep pickups written by an engine
-  without the chest-window fixes out of a trade's count.
+  cannot (see Builds) — the engine's commit; the app's version names the patches applied over it.
+- **The engine's loot-rules level on every upload**: beside it, both line routes carry
+  `X-Capture-Loot-Rules: <n>` — the engine's `LOOT_RULES` from its own `src/loot-rules.js`, an
+  integer the engine bumps with every change to WHICH pickups it writes (a loot-correctness fix)
+  and with nothing else. Level 1 vouches for the pickups of protocol18 at 30124f1 — the first engine
+  with designsvet/ao-loot-logger#19 (a stack split or a player trade near a chest is not chest loot)
+  and #21 (an item keeps no chest from the last map), plus #13's bank-deposit fix. 30124f1 itself
+  has no `src/loot-rules.js`, so an app built over it stamps and sends no level; the engine commit
+  that adds the file is the first to declare 1. A log is stamped with the engine that WROTE it, not
+  the one running when it is sent: a Start re-sends the last session's log from a reset cursor, and
+  main records each log's stamp when its engine first names it (`stampForLootLog`).
+  raid-bot ADR 0168's slice B counts a run's pickups against a trade only at or above
+  its minimum level — one number the engine owns, in place of a list of engine commits the bot
+  kept by hand. The value is the integer in plain decimal (`1`: no sign, no leading zero), and the
+  header is **left out** — never empty, never `0`, never `unknown` — when the app cannot vouch for
+  a level: a bundled engine older than the level, or any engine that is not the bundled one (a
+  working tree may hold a pickup change its level does not count yet — why it is `dev`). The bot
+  reads a missing header as "counts nothing". `tools/prepare-engine-dist.mjs` requires the file
+  from the engine checkout and writes the integer into the bundle as `ENGINE_LOOT_RULES`; no file
+  in the engine, no stamp; a file that does not yield a non-negative integer fails the build in CI
+  (`src/main/engineRef.ts`, `test/engineRef.test.ts`, `test/tradeUpload.test.ts`).
 - **Behind it**, `src/app/store.ts` mirrors the bridge for React (`useSyncExternalStore`): the five
   `get*` calls, then the three `on*` subscriptions — a push that lands while a get is in flight wins
   — and the setup probed again on window focus. It also keeps the little the notices' buttons need
@@ -794,7 +813,17 @@ cannot (a local run over a folder that is not a git checkout warns and ships
 none; the app then says `unknown`); both jobs then assert the stamp is inside
 the packed app. The sha names the engine COMMIT: the patches above are applied
 on top and it does not say so — the app's version names that patch set, so read
-the two together. (Bundles built before
+the two together. Beside it the script writes the engine's loot-rules level
+(`LOOT_RULES` from the engine's `src/loot-rules.js`) as `engine/ENGINE_LOOT_RULES`
+— the value of every upload's `X-Capture-Loot-Rules` header. An engine without
+that file predates the level and gets no stamp; one whose file does not yield a
+non-negative integer fails the job in CI. Both jobs assert the level is inside
+the packed app too, so **a release cannot be cut over an engine ref older than
+the level** (a dispatch picking such a ref fails at that check). The level is
+read from the checkout AFTER the patches are applied, so a patch here that
+changes which pickups the engine writes must raise `LOOT_RULES` in the same
+patch — or the bundle would vouch for loot rules it does not follow (today's one
+patch changes none). (Bundles built before
 designsvet/ao-loot-logger#11 did write there: the engine put its loot log
 beside itself, inside the installed app.)
 
