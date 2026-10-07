@@ -6,7 +6,11 @@
  * uploaded as the member's, and its festivities line ("europe") would be posted for every guild on
  * that server. Nothing it says is true, so nothing it says leaves the machine: no upload loop, no
  * forwarded festivities, energy or engine health.
+ *
+ * The same for a `replay` engine (a recorded session played back): what it says happened, happened
+ * on another day — and a trade journal replayed as today's would move a debt twice. No loot, no
+ * trades (the trade loop starts inside the loot loop's guard), nothing forwarded.
  */
 export const talksToBot = (source: string | null | undefined): boolean => {
-  return source !== "mock";
+  return source !== "mock" && source !== "replay";
 };

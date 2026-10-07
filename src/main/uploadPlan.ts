@@ -92,8 +92,8 @@ export const newRunReason = (cursor: TUploadCursor | null, file: string, lineCou
  * anything past the cap is already damaged — the server will count the
  * truncated line as unparseable, which is the honest outcome.
  */
-export const clampLine = (line: string): string => {
-  return line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) : line;
+export const clampLine = (line: string, cap: number = MAX_LINE_LENGTH): string => {
+  return line.length > cap ? line.slice(0, cap) : line;
 };
 
 export type TBatch = { from: number; lines: string[] };
@@ -114,6 +114,8 @@ export const nextBatch = (
    * uploader is backing off from a refusal — see `uploader.ts`.
    */
   maxLines: number = MAX_BATCH_LINES,
+  /** Per-line cap: the loot route's `MAX_LINE_LENGTH`; the trade stream never reaches its own (tradeLines.ts). */
+  lineCap: number = MAX_LINE_LENGTH,
 ): TBatch | null => {
   if (sentThrough >= lines.length) {
     return null;
@@ -122,7 +124,7 @@ export const nextBatch = (
   const slice: string[] = [];
   let bytes = 0;
   for (const raw of lines.slice(sentThrough, sentThrough + ceiling)) {
-    const line = clampLine(raw);
+    const line = clampLine(raw, lineCap);
     const weight = Buffer.byteLength(line, "utf8");
     // Always send at least one line: a batch of nothing would stall the cursor
     // forever. A clamped line cannot exceed the budget on its own, so this
@@ -149,6 +151,71 @@ export const splitLines = (text: string): string[] => {
     lines.pop();
   }
   return lines;
+};
+
+/**
+ * Split a file's text into its FINISHED lines: those a newline has closed. What follows the last
+ * newline is a line the engine is still writing (or never finished), and is left for a later pass.
+ *
+ * The trade stream's split, not the loot log's (`splitLines` keeps an unclosed last line): a trade
+ * line is JSON, read whole — half of one fails the allow-list, and a line the app withholds is passed
+ * over for good, so reading one mid-write would lose that trade for the session. A blank line the
+ * engine closed is a line (and keeps its index); the engine writes none.
+ */
+export const completeLines = (text: string): string[] => {
+  const lines = text.split(/\r?\n/);
+  lines.pop();
+  return lines;
+};
+
+/**
+ * One line of a stream's file as a pass sees it: the text to send, or withheld — never sent, for a
+ * named reason, and still occupying its index, so every later line keeps the index the bot keys it
+ * by. The loot log withholds nothing; the trade journal withholds silver-only trades and anything
+ * off its allow-list (tradeLines.ts). `why` is for the app log: a key name or a parse error, never
+ * the line.
+ */
+export type TStreamLine = string | { withheld: string; why?: string };
+
+/**
+ * The next batch of a stream that may withhold lines: past every withheld line at the cursor (they
+ * are passed over for good — nothing at their index is ever sent), then a run of CONSECUTIVE
+ * sendable lines, because a batch is `{from, lines}` and its lines take the indices `from…`. A
+ * withheld line inside what would have been one batch ends it; the next pass steps over it and
+ * starts the next. Trades are a handful a session, so the extra round trip costs nothing, and the
+ * bot never learns that a withheld line was there at all.
+ *
+ * `skipTo` is where the cursor stands once the withheld lines are passed (`sentThrough` when there
+ * were none), `skipped` what was passed over, and `batch` null when nothing is left to send.
+ */
+export const nextStreamBatch = (
+  sentThrough: number,
+  lines: readonly TStreamLine[],
+  maxLines: number = MAX_BATCH_LINES,
+  lineCap: number = MAX_LINE_LENGTH,
+): { skipTo: number; skipped: Array<Exclude<TStreamLine, string>>; batch: TBatch | null } => {
+  const skipped: Array<Exclude<TStreamLine, string>> = [];
+  let start = Math.max(0, sentThrough);
+  while (start < lines.length) {
+    const line = lines[start];
+    if (line == null || typeof line === "string") {
+      break;
+    }
+    skipped.push(line);
+    start += 1;
+  }
+  // No more than one batch can carry — `nextBatch` packs it to the byte budget from here.
+  const ceiling = Math.max(1, Math.min(maxLines, MAX_BATCH_LINES));
+  const run: string[] = [];
+  for (let i = start; i < lines.length && run.length < ceiling; i += 1) {
+    const line = lines[i];
+    if (typeof line !== "string") {
+      break;
+    }
+    run.push(line);
+  }
+  const inner = nextBatch(0, run, maxLines, lineCap);
+  return { skipTo: start, skipped, batch: inner == null ? null : { from: start, lines: inner.lines } };
 };
 
 /**

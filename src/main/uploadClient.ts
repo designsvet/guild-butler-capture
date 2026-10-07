@@ -1,9 +1,11 @@
 /**
  * Talking to the bot's control server (ADR 0092 P2 slice 4).
  *
- * Two calls: trade a pairing code for a device token, and push a batch of
- * captured lines. Both take an injected `fetch` so the whole surface is
- * testable with no network and no Electron.
+ * Trade a pairing code for a device token, push a batch of captured lines (the
+ * loot log, and the trade journal), and post the snapshots the engine reads off
+ * the game. All take an injected `fetch` so the whole surface is testable with
+ * no network and no Electron. Every route the app calls is pinned by
+ * test/upstreamAllowList.test.ts.
  *
  * Every failure is a NAMED outcome rather than a thrown error. The renderer
  * shows a different sentence per reason, and "upload failed" is precisely the
@@ -11,6 +13,7 @@
  * permission fix, once for the Npcap install.
  */
 
+import type { TEngineStamp } from "./engineRef.js";
 import type { TBatch } from "./uploadPlan.js";
 
 /**
@@ -177,19 +180,63 @@ export const isRetryable = (outcome: EUploadOutcome): boolean => {
   );
 };
 
-export const uploadBatch = async (
+/**
+ * The request header naming the engine build that wrote the lines, on both line routes (`/upload`
+ * and `/trades`): the engine's git commit, stamped into the bundled engine at build time (see
+ * engineRef.ts), or `dev` for an engine that is not the bundled one, or `unknown` for a bundled one
+ * with no readable stamp. The bot keeps it per run to say which build wrote what. It no longer
+ * decides which pickups count against a trade (raid-bot ADR 0168 slice B): that is the loot-rules
+ * level beside it (`LOOT_RULES_HEADER`), which replaced a list of engine commits the bot kept by hand.
+ *
+ * A header rather than a body key on purpose: the bot's `/upload` validates its body field by field
+ * and ignores headers it does not read (Fastify, behind Caddy's plain `reverse_proxy`), so a bot
+ * that predates this reads today's batch unchanged.
+ */
+export const ENGINE_HEADER = "x-capture-engine";
+
+/**
+ * The request header naming the engine's LOOT-RULES LEVEL (engineRef.ts `engineLootRulesFor`), on
+ * the same two routes, beside `ENGINE_HEADER`: a non-negative integer in plain decimal (`1`), read
+ * from the bundled engine's `ENGINE_LOOT_RULES`. raid-bot ADR 0168's slice B counts a run's pickups
+ * against a trade only at or above its minimum level, so this is the one number that decides it.
+ *
+ * Left out — never sent empty, never `0`, never `unknown` — when the app cannot vouch for a level:
+ * an engine older than the level, or any engine that is not the bundled one. The bot reads a missing
+ * header as "counts nothing", which is the truth about such a run. A header for the reason
+ * `ENGINE_HEADER` is one: a bot that predates it reads the batch unchanged.
+ */
+export const LOOT_RULES_HEADER = "x-capture-loot-rules";
+
+/** The engine's headers for one batch: `ENGINE_HEADER` whenever an engine is named, the level when known. */
+export const engineHeaders = (engine: TEngineStamp | null): Record<string, string> => {
+  if (engine == null) {
+    return {};
+  }
+  return {
+    [ENGINE_HEADER]: engine.ref,
+    ...(engine.lootRules != null ? { [LOOT_RULES_HEADER]: String(engine.lootRules) } : {}),
+  };
+};
+
+/** A batch of a file's lines to one of the bot's two line routes. One shape, one outcome vocabulary. */
+const postLines = async (
   fetchLike: TFetchLike,
-  base: string,
+  url: string,
   token: string,
   run: string,
   file: string,
   batch: TBatch,
+  engine: TEngineStamp | null,
 ): Promise<TUploadResult> => {
   let res: Awaited<ReturnType<TFetchLike>>;
   try {
-    res = await fetchLike(`${apiBase(base)}/control/capture/upload`, {
+    res = await fetchLike(url, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+        ...engineHeaders(engine),
+      },
       body: JSON.stringify({ run, file, from: batch.from, lines: batch.lines }),
     });
   } catch (err) {
@@ -222,6 +269,38 @@ export const uploadBatch = async (
       nextFrom: typeof body?.nextFrom === "number" ? body.nextFrom : null,
     },
   };
+};
+
+/** A batch of the loot log (`loot-events-*.txt`). */
+export const uploadBatch = async (
+  fetchLike: TFetchLike,
+  base: string,
+  token: string,
+  run: string,
+  file: string,
+  batch: TBatch,
+  engine: TEngineStamp | null = null,
+): Promise<TUploadResult> => {
+  return await postLines(fetchLike, `${apiBase(base)}/control/capture/upload`, token, run, file, batch, engine);
+};
+
+/**
+ * A batch of the trade journal (`trade-events-*.jsonl`, raid-bot ADR 0168), in `/upload`'s shape:
+ * `{run, file, from, lines}`, each line the engine's record-v1 JSON exactly as written, `from` its
+ * index in the FILE. Lines the app withholds (tradeLines.ts: silver-only, or off the allow-list) are
+ * never in a batch — a batch is a run of consecutive sendable lines, so every line keeps its file
+ * index and the bot's `(run, line)` key never shifts. The bot's reply is read as `/upload`'s.
+ */
+export const uploadTradeBatch = async (
+  fetchLike: TFetchLike,
+  base: string,
+  token: string,
+  run: string,
+  file: string,
+  batch: TBatch,
+  engine: TEngineStamp | null = null,
+): Promise<TUploadResult> => {
+  return await postLines(fetchLike, `${apiBase(base)}/control/capture/trades`, token, run, file, batch, engine);
 };
 
 /**
