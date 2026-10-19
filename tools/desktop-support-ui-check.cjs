@@ -13,7 +13,7 @@ app.commandLine.appendSwitch("force-device-scale-factor", "1");
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const waitFor = async (win, expression) => { for (let i = 0; i < 100; i++) { if (await win.webContents.executeJavaScript(expression)) return; await sleep(50); } throw new Error(`Timed out: ${expression}`); };
 const press = async (win, label) => {
-  const found = await win.webContents.executeJavaScript(`(() => { const b = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(label)} && b.getClientRects().length && !b.disabled); if(!b) return false; b.scrollIntoView({block:'center'}); b.click(); return true; })()`);
+  const found = await win.webContents.executeJavaScript(`(() => { const b = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(label)} && b.getClientRects().length && !b.disabled); if(!b) return false; b.click(); return true; })()`);
   if (!found) throw new Error(`Missing enabled button ${label}`);
   await sleep(50);
 };
@@ -23,23 +23,48 @@ const run = async () => {
   mkdirSync(OUT, { recursive: true });
   session.defaultSession.webRequest.onBeforeRequest({ urls: ["http://*/*", "https://*/*"] }, (_d, cb) => cb({ cancel: true }));
   const results = [];
-  for (const renderer of ["renderer"]) for (const theme of ["obsidian", "parchment"]) for (const [width, height, lang] of (renderer === "app" ? [[768, 620, "en"], [1440, 900, "en"], [768, 620, "de"]] : [[660, 620, "en"], [660, 620, "uk"], [660, 620, "ru"], [660, 620, "de"], [660, 620, "fr"], [660, 620, "pt"]])) {
+  for (const renderer of ["renderer"]) for (const theme of ["obsidian", "parchment"]) for (const [width, height, lang] of (renderer === "app" ? [[768, 620, "en"], [1440, 900, "en"], [768, 620, "de"]] : [[660, 620, "en"], [660, 620, "uk"], [660, 620, "ru"], [660, 620, "de"], [660, 620, "fr"], [660, 620, "pt"], [660, 520, "en"], [660, 520, "de"], [390, 620, "en"], [390, 620, "de"]])) {
     const sc = { platform: "darwin", lang, theme, state: "idle", paired: false, support: true };
     const s = supportStrings(lang);
-    const label = `${renderer}-${theme}-${lang}-${width}`;
+    const label = `${renderer}-${theme}-${lang}-${width}x${height}`;
     const errors = [];
     const win = new BrowserWindow({ width, height, useContentSize: true, show: false, webPreferences: { preload: join(__dirname, "desktop-support-preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: false, backgroundThrottling: false, additionalArguments: [`--gbc-scenario=${Buffer.from(JSON.stringify(sc)).toString("base64")}`] } });
     win.webContents.on("console-message", (_e, level, message) => { if (level >= 3) errors.push(message); });
     await win.loadFile(join(ROOT, "dist/web", renderer, "index.html"));
     await waitFor(win, `document.body.innerText.includes(${JSON.stringify(s.decline)})`);
+    const layout = async (stage, requireFit = false) => {
+      const geometry = await win.webContents.executeJavaScript(`(() => {
+        const d = document.querySelector('dialog[open]'); const body = d.querySelector('.desktop-support-body');
+        const header = d.querySelector('.desktop-support-header').getBoundingClientRect(); const footer = d.querySelector('.desktop-support-footer').getBoundingClientRect(); const r = d.getBoundingClientRect();
+        return { top:r.top, bottom:r.bottom, height:innerHeight, left:r.left, right:r.right, width:innerWidth, headingTop:header.top, footerBottom:footer.bottom, footerTop:footer.top, dialogScroll:d.scrollHeight-d.clientHeight, bodyOverflow:body.scrollHeight-body.clientHeight, bodyScroll:body.scrollTop };
+      })()`);
+      if (geometry.top < -1 || geometry.bottom > height + 1 || geometry.left < -1 || geometry.right > width + 1 || geometry.headingTop < -1 || geometry.footerBottom > height + 1 || geometry.dialogScroll > 1 || (requireFit && (geometry.bodyOverflow > 1 || geometry.bodyScroll !== 0))) throw new Error(`${label} ${stage} clipped/scrolling: ${JSON.stringify(geometry)}`);
+      return geometry;
+    };
+    const consentGeometry = await layout('consent', width === 660 && height === 620);
+    const initial = await win.webContents.executeJavaScript(`(() => { const d=document.querySelector('dialog[open]'); const buttons=d.querySelectorAll('.desktop-support-actions button'); return {focus:document.activeElement.tagName, primary:buttons[1].classList.contains('gbtn-primary'), secondary:buttons[0].classList.contains('gbtn-outline'), fill:getComputedStyle(buttons[1]).backgroundImage, link:d.querySelector('a')?.getAttribute('href')}; })()`);
+    if (initial.focus !== 'H2' || !initial.primary || !initial.secondary || initial.fill === 'none' || !initial.link?.startsWith('https://guild-butler.com/legal/')) throw new Error(`Consent hierarchy/focus missing: ${JSON.stringify(initial)}`);
+    win.webContents.sendInputEvent({type:'keyDown',keyCode:'Enter'}); win.webContents.sendInputEvent({type:'keyUp',keyCode:'Enter'}); await sleep(30);
+    if (await win.webContents.executeJavaScript(`gbcStub.calls().some(c=>c.name==='desktopSupportConsent')`)) throw new Error('Initial Enter chose consent');
+    win.webContents.focus();
+    win.webContents.sendInputEvent({type:'keyDown',keyCode:'Tab'}); win.webContents.sendInputEvent({type:'keyUp',keyCode:'Tab'}); await sleep(20);
+    const keyboard = await win.webContents.executeJavaScript(`(() => ({tag:document.activeElement.tagName, outline:getComputedStyle(document.activeElement).outlineStyle, visible:document.activeElement.matches(':focus-visible'), focused:document.hasFocus(), token:getComputedStyle(document.activeElement).getPropertyValue('--gb-focus-width')}))()`);
+    if (keyboard.tag !== 'A' || keyboard.outline !== 'solid') throw new Error(`Keyboard focus is not visible: ${JSON.stringify(keyboard)}`);
+    await win.webContents.executeJavaScript(`document.querySelector('dialog[open] a').click()`);
+    if (!(await win.webContents.executeJavaScript(`gbcStub.calls().some(c=>c.name==='openPrivacy')`))) throw new Error('Privacy link bypassed safe bridge');
+    const auxiliary = await win.webContents.executeJavaScript(`(() => { const e=new MouseEvent('auxclick',{button:1,bubbles:true,cancelable:true}); document.querySelector('dialog a').dispatchEvent(e); return e.defaultPrevented && gbcStub.calls().filter(c=>c.name==='openPrivacy').length===2; })()`);
+    if (!auxiliary) throw new Error('Auxiliary privacy click escaped safe bridge');
+    await win.webContents.executeJavaScript(`document.querySelector('dialog h2').focus({preventScroll:true})`);
     await capture(win, label + "-consent");
     await press(win, s.decline);
     await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(renderer === "app" ? "[data-settings-gear]" : "#btn-settings")}).click()`);
     await sleep(350);
     if (renderer === "renderer") {
       const bounds = await win.webContents.executeJavaScript(`(() => { const p = document.querySelector('#settings-popover').getBoundingClientRect(); const button = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(s.report)}); const b = button.getBoundingClientRect(); return { top:p.top, bottom:p.bottom, buttonTop:b.top, buttonBottom:b.bottom, height:innerHeight }; })()`);
-      if (bounds.top < 0 || bounds.bottom > bounds.height || bounds.buttonTop < 0 || bounds.buttonBottom > bounds.height) throw new Error(`Settings support controls clipped: ${JSON.stringify(bounds)}`);
+      if ((width >= 660 && height >= 620 && (bounds.top < 0 || bounds.bottom > bounds.height)) || bounds.buttonTop < 0 || bounds.buttonBottom > bounds.height) throw new Error(`Settings support controls clipped: ${JSON.stringify(bounds)}`);
     }
+    const controls = await win.webContents.executeJavaScript(`(() => { const p=document.querySelector('.desktop-support-settings'); return {appearance:getComputedStyle(p.querySelector('input')).appearance, primary:getComputedStyle(p.querySelector('button')).backgroundImage}; })()`);
+    if (controls.appearance !== 'none' || controls.primary === 'none') throw new Error('Support controls are not using the design system');
     await capture(win, label + "-settings");
     await press(win, s.report);
     await waitFor(win, `document.querySelector(${JSON.stringify(renderer === "app" ? ".lb-support-form" : ".desktop-report-form")}) != null`);
@@ -51,6 +76,10 @@ const run = async () => {
       inputs.forEach((input, index) => { const proto = input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value').set.call(input, values[index]); input.dispatchEvent(new Event('input', {bubbles:true})); input.dispatchEvent(new Event('change', {bubbles:true})); });
     })()`);
     await sleep(80);
+    const formGeometry = await layout('form', width === 660 && height === 620);
+    const formFocus = await win.webContents.executeJavaScript(`document.activeElement.tagName`);
+    if (formFocus !== 'H2') throw new Error('Report did not start at its heading');
+    if (await win.webContents.executeJavaScript(`gbcStub.calls().some(c=>c.name==='desktopReportSubmit')`)) throw new Error('Report submitted before review');
     await capture(win, label + "-form");
     // User can omit diagnostics; review must carry that exact choice before sending.
     const diagnosticSelector = renderer === "app" ? '.lb-support-form button[role="switch"]' : '.desktop-report-form input[type="checkbox"]';
@@ -63,19 +92,32 @@ const run = async () => {
     await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(diagnosticSelector)}).click()`);
     await press(win, s.review);
     await waitFor(win, `document.body.innerText.includes(${JSON.stringify(s.preview)})`);
+    await layout('preview');
+    if (await win.webContents.executeJavaScript(`document.activeElement.tagName`) !== 'H3') throw new Error('Review initially focused a destructive/send action');
+    await win.webContents.executeJavaScript(`document.querySelector('dialog details').open=true`);
+    const expandedGeometry = await layout('expanded diagnostics');
+    await win.webContents.executeJavaScript(`document.querySelector('.desktop-support-body').scrollTop=10000`);
+    await layout('scrolled diagnostics');
+    await win.webContents.executeJavaScript(`document.querySelector('dialog details').open=false;document.querySelector('.desktop-support-body').scrollTop=0`);
     await capture(win, label + "-preview");
     await press(win, s.send);
+    win.webContents.sendInputEvent({type:'keyDown',keyCode:'Escape'}); win.webContents.sendInputEvent({type:'keyUp',keyCode:'Escape'});
+    await sleep(20);
+    if (!(await win.webContents.executeJavaScript(`!!document.querySelector('dialog[open]')`))) throw new Error('Escape discarded an in-flight report');
     await waitFor(win, `document.body.innerText.includes(${JSON.stringify(s.error)})`);
+    await layout("error");
     await press(win, s.send);
     await waitFor(win, `document.body.innerText.includes('#42')`);
     await capture(win, label + "-receipt");
+    await press(win, s.close);
+    if (await win.webContents.executeJavaScript(`document.activeElement.id`) !== 'btn-settings') throw new Error('Closing did not restore the visible opener');
     const proof = await win.webContents.executeJavaScript(`(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth, calls: gbcStub.calls(), csp: gbcCheck.refused() }))()`);
     if (proof.scrollWidth > proof.width) errors.push("Horizontal viewport overflow");
     if (proof.csp.length) errors.push(...proof.csp);
     const submissions = proof.calls.filter(c => c.name === "desktopReportSubmit");
     if (submissions.length !== 2 || submissions[0].args[0] !== submissions[1].args[0]) errors.push("Report retry lost stable identifier");
     if (proof.calls.some(c => c.name === "desktopSupportConsent" && c.args[0] !== false)) errors.push("Unexpected analytics opt-in");
-    results.push({ label, errors, reportAttempts: submissions.length });
+    results.push({ label, errors, reportAttempts: submissions.length, consentGeometry, formGeometry, expandedGeometry });
     win.destroy();
     if (errors.length) throw new Error(`${label}: ${errors.join('; ')}`);
     console.log(`PASS ${label}`);
@@ -83,4 +125,4 @@ const run = async () => {
   writeFileSync(join(OUT, "checks.json"), JSON.stringify({ network: "HTTP(S) denied", fixture: true, scenarios: results }, null, 2));
 };
 app.whenReady().then(run).then(() => app.exit(0)).catch((error) => { console.error(error); app.exit(1); });
-setTimeout(() => { console.error("Support UI timeout"); app.exit(1); }, 120000).unref();
+setTimeout(() => { console.error("Support UI timeout"); app.exit(1); }, 180000).unref();

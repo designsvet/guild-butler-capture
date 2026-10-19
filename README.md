@@ -1,6 +1,6 @@
 # Guild Butler Capture
 
-Public 0.8.10 maintenance candidate: [usage sharing, bug reports and release checks](docs/releases/0.8.10.md). Includes the [0.8.9 October compatibility fix](docs/releases/0.8.9.md).
+Public 0.8.11 maintenance candidate: [support dialog corrections and release checks](docs/releases/0.8.11.md). Includes [usage sharing and bug reports from 0.8.10](docs/releases/0.8.10.md). Includes the [0.8.9 October compatibility fix](docs/releases/0.8.9.md).
 
 Desktop app (macOS + Windows) that runs the Albion Online loot logger for
 ordinary guild members: a window with Start/Stop, live status, and the log
@@ -87,15 +87,15 @@ The screen itself is the Guild Butler design system, **installed, not copied**:
 exact version in `package.json`. The renderer is sandboxed with no bundler and
 a `style-src 'self'` CSP, so it cannot import from `node_modules`; instead
 `tools/build-static.mjs` copies the stylesheets that `index.html` links from
-`./ds/` — today `tokens.css`, then `surfaces.css` — out of the package and
+`./ds/` — today `tokens.css`, `surfaces.css`, then `controls.css` — out of the package and
 beside the page. `styles.css` loads after them and declares only what the
 package does not: the title bar, the ember Stop, the log rain, the motion
 timings. `test/designSystem.test.ts` fails if a package token is copied back
 into `styles.css`, if a retired one comes back, if the links fall out of order,
 or if the build stops shipping what the page links. Taking a new package
-version is a change to the pin, then `pnpm install` and `pnpm test`. (The
-package's `base.css` and `controls.css` are not linked yet — the app's own
-buttons and switches move to the kit's controls in a later step.)
+version is a change to the pin, then `pnpm install` and `pnpm test`. (The package's `base.css` reset stays unlinked. Support dialogs and their
+settings controls use the kit's buttons, fields and checkboxes; the existing
+capture controls retain their established styles.)
 
 Surfaces follow the package's five heights (ADR 0150): cards are `.gb-card`,
 readings and fields sit in wells, and the four things that open over the page

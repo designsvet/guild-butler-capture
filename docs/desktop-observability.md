@@ -1,6 +1,6 @@
 # Desktop usage, health and support
 
-Implemented alongside the server plan in Raid-Bot `docs/plans/2026-10-desktop-observability.md` (19 October 2026). This checkout is an isolated backport based on the public `release/0.8.x` hotfix merge `e060e1b` (v0.8.9), including the pinned October protocol fix. The tested main-branch development implementation remains in the adjacent capture-client tree; this backport contains no v5 renderer or unrelated main changes. The candidate version is 0.8.10 because 0.8.9 has already been published; no 0.8.10 release is published.
+Implemented alongside the server plan in Raid-Bot `docs/plans/2026-10-desktop-observability.md` (19 October 2026). This checkout is an isolated backport based on the public `release/0.8.x` hotfix merge `e060e1b` (v0.8.9), including the pinned October protocol fix. The tested main-branch development implementation remains in the adjacent capture-client tree; this backport contains no v5 renderer or unrelated main changes. Version 0.8.10 was published for manual production testing as `v0.8.10-test.1`; the stable feed remains 0.8.9. The owner-requested support UI corrections advance the candidate to 0.8.11 without replacing published bytes.
 
 ## Member experience
 
@@ -34,3 +34,22 @@ Ask members to **update/install the new version over their current app**, not un
 `pnpm typecheck`, `pnpm test` (281 assertions across 25 suites, including the public October-hotfix guards and actual legacy health-forwarding consent regressions), and `pnpm build` pass. The dedicated UI acceptance harness is `pnpm exec electron --no-sandbox tools/desktop-support-ui-check.cjs` after a build. It uses an isolated profile, denies HTTP(S), and exercises all six languages and both themes at the released 660×620 content size: visible consent, Settings bounds, diagnostics exclusion/review, failed submission and retry with the same report ID, and a receipt. Screenshots/check results are written under ignored `dist/qa/desktop-support/`.
 
 Hardware staging checks and a production release remain separate rollout steps. Version 0.8.10 allows the existing Windows updater to recognize a newer release than the published 0.8.9. The pinned repaired engine, package identity and updater destination are unchanged. See [the release checklist](releases/0.8.10.md).
+
+
+## Support UI correction — 19 October 2026
+
+The owner's three screenshots of 0.8.10 and explicit correction request are the visual authority for this iteration: neutral initial focus, primary sharing/report/review actions, a text privacy link, and a compact form built with the installed design system. The implementation reads the actual pinned `@guild-butler/design-system` 0.7.0 controls/surfaces instead of copying its palette or controls.
+
+| Element | Implementation and acceptance |
+| --- | --- |
+| Consent | Heading receives opening focus; outlined No thanks on the left, gold Share usage on the right; no consent is submitted automatically. |
+| Privacy | Real link uses the existing approved external-open bridge. |
+| Settings | Kit checkbox and primary Report a bug action; existing capture preferences remain unchanged. |
+| Report form | Category/summary and expected/contact share rows, description spans the form, diagnostics stays optional; heading and footer remain outside the scrollable content. |
+| Review/send | Gold primary action on the right; Back/Cancel remain secondary; exact preview and stable-ID retry contract retained. |
+| Compact sizing | Normal 660×620 form fits without scrolling; short/narrow windows and long report previews can scroll their content without hiding title/actions. |
+
+- Data/interaction: all four TypeScript configurations, 281 tests across 25 suites, the production build and 86 existing classic layout cases pass. The support harness passes 20 scenarios with HTTP(S) denied and an isolated profile. It verifies initial heading focus/Enter, actual keyboard focus rings, primary and auxiliary privacy-link activation, diagnostics omission, review, in-flight Escape protection, stable-ID retry and Close/opener restoration.
+- Visual: inspected the actual built consent, Settings, report and receipt surfaces against the owner's requested corrections in Obsidian/Parchment. All six languages at 660×620 fit the initial form without body scrolling. English/German at 660×520 and 390×620 keep title/actions visible while allowing content-only scrolling. The fixture screenshots show synthetic data and do not replace the installed app.
+- Delivery: required CI packaging and native Windows installer acceptance are separate gates for the exact release head. Engine, profile formats and updater identity are unchanged. The resulting installers remain a manual production-test release, leaving the stable feed on 0.8.9.
+- Live game: Albion pickup, chest and production-guild upload remain pending tester results; this renderer correction does not establish them.
