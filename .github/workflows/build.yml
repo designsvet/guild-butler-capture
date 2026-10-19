@@ -4,7 +4,7 @@
 # joined it and the old name stopped being true.)
 #
 # Two jobs: `build` produces the Windows installer AND owns every release
-# decision (tag, version bump, publish, retry); `macos` then attaches a DMG to
+# decision (tag, publish, retry); `macos` then attaches a DMG to
 # the release `build` just published.
 #
 # Why the mac work is a JOB here and not a workflow of its own: a release cut
@@ -22,38 +22,24 @@
 # licence) — testers install it from npcap.com; the app explains this.
 #
 # Triggers:
-# - workflow_dispatch (pick engine repo/ref) — available once this file is on
-#   the default branch.
+# - workflow_dispatch: build-only unless release_version is explicitly supplied
+#   on release/0.8.x after release approval.
 # - pull_request touching THIS file — so the pipeline can be exercised from
 #   the PR before it merges (runs with the defaults below).
 #
-# Default engine ref: designsvet/ao-loot-logger@protocol18 — the owner's
-# pushed engine (2026-08-20): the [status] heartbeat, the 11-field CSV
-# (server__region) the bot's parser expects, and his 20 local-patch commits.
-# The flush-on-sigint patch below is generated against THIS ref; other refs
-# picked via the dispatch inputs may need it regenerated (the patch step
-# fails loud when it neither applies nor is present).
+# Public 0.8.9 maintenance build: use the reviewed immutable engine in
+# resources/engine-lock.json. PR runs only create CI artifacts; publishing
+# remains an explicitly authorized release_version dispatch after review.
 
 name: capture-build
 
 on:
   workflow_dispatch:
     inputs:
-      engine_repo:
-        description: "Engine repo (owner/name)"
-        type: string
-        default: "designsvet/ao-loot-logger"
-      engine_ref:
-        description: "Engine branch / tag / sha"
-        type: string
-        default: "protocol18"
       release_version:
-        description: "Publish a release as v<this>, e.g. 0.2.0 (blank = just build)"
+        description: "Publish the reviewed package.json version (blank = build only)"
         type: string
         default: ""
-  push:
-    branches: [main]
-    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -62,13 +48,9 @@ permissions:
 jobs:
   build:
     outputs:
-      # The mac job needs all three: the tag to upload against, and the sha so
-      # it packages the version-bump commit rather than the commit that
-      # triggered the run (electron-builder reads package.json for the DMG's
-      # name and version).
+      # Maintenance releases build the reviewed version already in package.json.
       tag: ${{ steps.rel.outputs.tag }}
       version: ${{ steps.rel.outputs.version }}
-      sha: ${{ steps.bump.outputs.sha }}
     # This job needs a WINDOWS runner, so it cannot ride the self-hosted
     # `raid-bot` label; it gets its own kill-switch variable in the house
     # pattern (test/ciWorkflow.test.ts): set repo var CI_RUNS_ON_WINDOWS to
@@ -88,11 +70,15 @@ jobs:
       - name: Checkout app
         uses: actions/checkout@v5
 
+      - name: Read the reviewed engine lock
+        id: engine-lock
+        run: node tools/read-engine-lock.cjs >> "$GITHUB_OUTPUT"
+
       - name: Checkout engine
         uses: actions/checkout@v5
         with:
-          repository: ${{ inputs.engine_repo || 'designsvet/ao-loot-logger' }}
-          ref: ${{ inputs.engine_ref || 'protocol18' }}
+          repository: ${{ steps.engine-lock.outputs.repository }}
+          ref: ${{ steps.engine-lock.outputs.commit }}
           path: engine-src
 
       # House rule (test/ciWorkflow.test.ts): pnpm/action-setup BEFORE
@@ -107,70 +93,26 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      # One release path for two triggers: a dispatch with release_version
-      # (how a release is normally cut — no tag push needed, which this
-      # project's git proxy cannot do anyway) and a v* tag pushed by hand.
-      # Inputs arrive via env, never interpolated into the script.
+      # PRs are build-only. Only an explicit dispatch of the reviewed maintenance
+      # branch can publish; this workflow never bumps or pushes main.
       - name: Decide the release tag
         id: rel
         env:
           REQUESTED: ${{ inputs.release_version }}
           REF: ${{ github.ref }}
-          REF_NAME: ${{ github.ref_name }}
-          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
         run: |
           if [ -n "${REQUESTED:-}" ]; then
-            case "$REQUESTED" in
-              v*) echo "::error::release_version is the bare number (0.2.0), not v0.2.0"; exit 1 ;;
-              [0-9]*.[0-9]*.[0-9]*) ;;
-              *) echo "::error::release_version must look like 0.2.0"; exit 1 ;;
-            esac
-            echo "version=$REQUESTED" >> "$GITHUB_OUTPUT"
-            echo "tag=v$REQUESTED" >> "$GITHUB_OUTPUT"
-          elif [ "${REF#refs/tags/v}" != "$REF" ]; then
-            echo "version=${REF_NAME#v}" >> "$GITHUB_OUTPUT"
-            echo "tag=$REF_NAME" >> "$GITHUB_OUTPUT"
-          elif [ "$REF" = "refs/heads/main" ]; then
-            # Third path, and the one that makes releases automatable: a push
-            # to main whose package.json names a version with NO release yet
-            # cuts that release. It needs only push access — no tag push (this
-            # project's git proxy cannot) and no actions:write for dispatch —
-            # so a human or the agent can cut one the same way. Idempotent by
-            # construction: an existing release means build-only, so ordinary
-            # pushes and workflow re-runs never republish.
-            #
-            # "Existing" must mean PUBLISHED, so ask the REST tag endpoint,
-            # which 404s for drafts. `gh release view` resolves drafts by
-            # tag name too, so it read a cut severed mid-upload (whose
-            # debris is a tagless draft) as "already released" — and no
-            # push could ever re-cut it. v0.4.1's second attempt built and
-            # released nothing exactly that way; the sweep below is what
-            # deletes the debris itself.
-            V=$(node -p "require('./package.json').version")
-            if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$V" --silent >/dev/null 2>&1; then
-              echo "v$V is already released — building only"
-            else
-              echo "version=$V" >> "$GITHUB_OUTPUT"
-              echo "tag=v$V" >> "$GITHUB_OUTPUT"
+            if [ "$EVENT" != "workflow_dispatch" ] || [ "$REF" != "refs/heads/release/0.8.x" ]; then
+              echo "::error::publish only by explicit dispatch of release/0.8.x"; exit 1
             fi
+            VERSION=$(node -p "require('./package.json').version")
+            if [ "$REQUESTED" != "$VERSION" ]; then
+              echo "::error::release_version must match the reviewed package.json"; exit 1
+            fi
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           fi
-
-      # Bump BEFORE the build: electron-builder reads package.json for the
-      # installer's version and filename, so a release must carry the version
-      # it claims. Pushed by GITHUB_TOKEN, which deliberately does not
-      # re-trigger this workflow (no recursion).
-      - name: Record the version on main
-        id: bump
-        if: inputs.release_version != '' && github.ref == 'refs/heads/main'
-        env:
-          VERSION: ${{ steps.rel.outputs.version }}
-        run: |
-          npm pkg set "version=$VERSION"
-          git config user.name "designsvet"
-          git config user.email "development@designsvet.com"
-          git commit -am "chore: v$VERSION" || echo "package.json already at $VERSION"
-          git push origin HEAD:main
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Apply engine patches (idempotent — the owner's branch may already carry them)
         run: |
@@ -190,6 +132,9 @@ jobs:
       - name: Install engine deps (no compile — cap is built once, for Electron's ABI, below)
         run: cd engine-src && npm install --omit=dev --ignore-scripts
 
+      - name: Test the repaired engine
+        run: cd engine-src && node --test test/*.test.js
+
       - name: Install app deps
         run: pnpm install --frozen-lockfile
 
@@ -198,6 +143,9 @@ jobs:
 
       - name: Assemble engine-dist
         run: node tools/prepare-engine-dist.mjs engine-src engine-dist
+
+      - name: Verify the assembled decoder
+        run: node tools/verify-engine-protocol.cjs engine-dist
 
       - name: Build the installer (unsigned)
         env:
@@ -220,6 +168,11 @@ jobs:
           echo "::error::electron-builder failed three times — this is not a flaky download."
           exit 1
 
+      - name: Verify the packaged Windows engine and native binding
+        env:
+          ELECTRON_RUN_AS_NODE: "1"
+        run: '"release/win-unpacked/Guild Butler Capture.exe" tools/verify-engine-protocol.cjs release/win-unpacked/resources/engine --native'
+
       - name: Update manifest exists (electron-updater reads this from the release)
         # A hard gate, not a glob: upload-artifact's if-no-files-found only
         # fires when NOTHING matches, so a missing latest.yml beside a present
@@ -230,6 +183,7 @@ jobs:
         run: |
           test -f release/latest.yml
           cat release/latest.yml
+          node -e "const fs=require('fs'); const v=require('./package.json').version; if (!fs.readFileSync('release/latest.yml','utf8').split(/\r?\n/).includes('version: '+v)) throw Error('updater version mismatch')"
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
@@ -251,12 +205,8 @@ jobs:
       # assets → publish (publishing is what creates the tag). So a network
       # drop mid-upload fails the job with an invisible tagless DRAFT
       # stranded and nothing served to updaters — latest.yml can never point
-      # at a missing asset, an ordering we rely on. v0.4.1's first cut died
-      # exactly there ("other side closed" on the third asset, a ~96MB exe
-      # on one TCP connection). The debris blocks nothing — the Decide step
-      # counts only a PUBLISHED release, and the tag endpoint it asks 404s
-      # for drafts, so the next main push re-cuts — but it piles up on the
-      # releases page; sweep it before every cut.
+      # at a missing asset, an ordering we rely on. Remove draft debris before
+      # an explicitly requested retry. Published releases are never deleted.
       # Published releases are never touched — drafts only.
       - name: Drop stale draft releases of this tag
         if: steps.rel.outputs.tag != ''
@@ -282,7 +232,7 @@ jobs:
           # action-gh-release creates the tag itself at target_commitish, so
           # cutting a release never needs a tag push.
           tag_name: ${{ steps.rel.outputs.tag }}
-          target_commitish: ${{ steps.bump.outputs.sha || github.sha }}
+          target_commitish: ${{ github.sha }}
           files: |
             release/*.exe
             release/latest.yml
@@ -305,7 +255,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.rel.outputs.tag }}
-          target_commitish: ${{ steps.bump.outputs.sha || github.sha }}
+          target_commitish: ${{ github.sha }}
           files: |
             release/*.exe
             release/latest.yml
@@ -331,14 +281,18 @@ jobs:
       - name: Checkout app
         uses: actions/checkout@v5
         with:
-          # The bumped commit when `build` cut a release, else this run's own.
-          ref: ${{ needs.build.outputs.sha || github.sha }}
+          # Both platforms package the same reviewed app commit.
+          ref: ${{ github.sha }}
+
+      - name: Read the reviewed engine lock
+        id: engine-lock
+        run: node tools/read-engine-lock.cjs >> "$GITHUB_OUTPUT"
 
       - name: Checkout engine
         uses: actions/checkout@v5
         with:
-          repository: ${{ inputs.engine_repo || 'designsvet/ao-loot-logger' }}
-          ref: ${{ inputs.engine_ref || 'protocol18' }}
+          repository: ${{ steps.engine-lock.outputs.repository }}
+          ref: ${{ steps.engine-lock.outputs.commit }}
           path: engine-src
 
       - uses: pnpm/action-setup@v5
@@ -369,6 +323,9 @@ jobs:
       - name: Install engine deps (no compile — cap is built once, for Electron's ABI, below)
         run: cd engine-src && npm install --omit=dev --ignore-scripts
 
+      - name: Test the repaired engine
+        run: cd engine-src && node --test test/*.test.js
+
       - name: Install app deps
         run: pnpm install --frozen-lockfile
 
@@ -379,6 +336,9 @@ jobs:
 
       - name: Assemble engine-dist
         run: node tools/prepare-engine-dist.mjs engine-src engine-dist
+
+      - name: Verify the assembled decoder
+        run: node tools/verify-engine-protocol.cjs engine-dist
 
       # Decide, once, whether this build can be signed and notarized, and
       # write the credentials out as environment for the steps that follow.
@@ -495,6 +455,13 @@ jobs:
       # nothing at build time — the app would just fall back to "no engine
       # found" on a member's Mac. Assert it landed inside the .app, the way
       # the Windows job asserts latest.yml exists.
+      - name: Verify the packaged Mac engine and native binding
+        env:
+          ELECTRON_RUN_AS_NODE: "1"
+        run: |
+          APP=$(ls -d release/mac*/*.app | head -1)
+          "$APP/Contents/MacOS/Guild Butler Capture" tools/verify-engine-protocol.cjs "$APP/Contents/Resources/engine" --native
+
       - name: The engine is inside the bundle, and the bundle is signed
         # The signature check is here as well as inside the afterPack hook
         # because this is the assertion a reader of a red build sees. The

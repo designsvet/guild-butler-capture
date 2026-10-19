@@ -1,5 +1,7 @@
 # Guild Butler Capture
 
+Public 0.8.9 maintenance candidate: [compatibility scope, evidence and release procedure](docs/releases/0.8.9.md).
+
 Desktop app (macOS + Windows) that runs the Albion Online loot logger for
 ordinary guild members: a window with Start/Stop, live status, and the log
 file one click away — no terminal, no `sudo`, no Node install.
