@@ -478,3 +478,24 @@ export const sendEngineHealth = async (
     },
   };
 };
+// Desktop usage/support is a separate, explicitly opted-in channel. Pairing authentication,
+// when present, is supplementary: an unpaired person must still be able to report a bug.
+export type TDesktopRoute = "register" | "heartbeat" | "reports";
+export type TDesktopResponse = { ok: boolean; status: number; body: Record<string, unknown> | null };
+const DESKTOP_ROUTES: Record<TDesktopRoute, string> = {
+  register: "/control/desktop/register",
+  heartbeat: "/control/desktop/heartbeat",
+  reports: "/control/desktop/reports",
+};
+export const sendDesktopRequest = async (
+  fetchLike: (url: string, init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal }) => Promise<{ ok: boolean; status: number; text: () => Promise<string> }>,
+  base: string, route: TDesktopRoute, secret: string, captureToken: string | null, body: unknown,
+): Promise<TDesktopResponse> => {
+  try {
+    const response = await fetchLike(`${apiBase(base)}${DESKTOP_ROUTES[route]}`, {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}`, ...(captureToken ? { "x-capture-token": captureToken } : {}) },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(10_000),
+    });
+    return { ok: response.ok, status: response.status, body: parseJson(await response.text()) };
+  } catch { return { ok: false, status: 0, body: null }; }
+};

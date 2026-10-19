@@ -1,0 +1,52 @@
+import type { TLang } from "./i18n.js";
+
+/** Support UI copy in the app's six languages. Translations remain open to native review. */
+const rows = {
+  title: ["Help & support", "Допомога та підтримка", "Помощь и поддержка", "Hilfe & Support", "Aide et assistance", "Ajuda e suporte"],
+  consentTitle: ["Help us spot capture problems", "Допоможіть виявляти проблеми запису", "Помогите выявлять проблемы записи", "Hilf uns, Aufnahmeprobleme zu erkennen", "Aidez-nous à détecter les problèmes de capture", "Ajude a identificar problemas de captura"],
+  consentBody: [
+    "Optional usage and health sharing sends an installation ID, app version, OS, approximate country when available, running time and capture/upload status. If paired, it can be linked to your Discord account and server. No loot contents, chat, raw logs or file paths. You can change this in Settings.",
+    "Необов’язкове надсилання статистики передає ID інсталяції, версію програми, ОС, приблизну країну за наявності, час роботи та стан запису/надсилання. Після підключення її можна пов’язати з вашим обліковим записом і сервером Discord. Без вмісту здобичі, чату, сирих журналів і шляхів файлів. Змінити вибір можна в налаштуваннях.",
+    "Необязательная статистика передаёт ID установки, версию приложения, ОС, примерную страну при наличии, время работы и состояние записи/отправки. После подключения её можно связать с вашей учётной записью и сервером Discord. Без содержимого добычи, чата, сырых журналов и путей файлов. Выбор можно изменить в настройках.",
+    "Die freiwillige Freigabe sendet Installations-ID, App-Version, Betriebssystem, ungefähres Land falls verfügbar, Laufzeit sowie Aufnahme- und Uploadstatus. Bei einer Verknüpfung können diese Daten deinem Discord-Konto und Server zugeordnet werden. Keine Beuteinhalte, Chats, Rohprotokolle oder Dateipfade. Änderbar in den Einstellungen.",
+    "Le partage facultatif envoie un identifiant d’installation, la version, le système, le pays approximatif si disponible, la durée d’utilisation et l’état de capture/envoi. Après association, ces données peuvent être liées à votre compte et serveur Discord. Aucun contenu de butin, chat, journal brut ou chemin de fichier. Modifiable dans les paramètres.",
+    "O compartilhamento opcional envia ID de instalação, versão, sistema, país aproximado quando disponível, tempo de execução e estado da captura/envio. Após vincular, pode ser associado à sua conta e servidor Discord. Sem conteúdo de saque, chat, logs brutos ou caminhos de arquivos. Altere nas configurações.",
+  ],
+  accept: ["Share usage & health", "Надсилати статистику й стан", "Отправлять статистику и состояние", "Nutzung & Status teilen", "Partager utilisation et état", "Compartilhar uso e estado"],
+  decline: ["No thanks", "Ні, дякую", "Нет, спасибо", "Nein danke", "Non merci", "Não, obrigado"],
+  analytics: ["Share usage and capture health", "Надсилати статистику та стан запису", "Отправлять статистику и состояние записи", "Nutzung und Aufnahmestatus teilen", "Partager l’utilisation et l’état de capture", "Compartilhar uso e estado da captura"],
+  report: ["Report a bug", "Повідомити про помилку", "Сообщить об ошибке", "Fehler melden", "Signaler un bug", "Relatar um erro"],
+  reportIntro: ["You can report a bug without pairing or sharing usage. Please do not include passwords, pairing codes or private chat.", "Повідомити можна без підключення та статистики. Не додавайте паролі, коди підключення чи приватні повідомлення.", "Сообщить можно без подключения и статистики. Не добавляйте пароли, коды подключения или личные сообщения.", "Fehler melden geht auch ohne Verknüpfung oder Nutzungsfreigabe. Bitte keine Passwörter, Kopplungscodes oder privaten Chats eingeben.", "Vous pouvez signaler un bug sans association ni partage d’utilisation. N’incluez pas de mots de passe, codes d’association ou messages privés.", "Você pode relatar erros sem vincular ou compartilhar uso. Não inclua senhas, códigos de vinculação ou conversas privadas."],
+  category: ["Area", "Розділ", "Раздел", "Bereich", "Catégorie", "Área"],
+  capture: ["Capture", "Запис", "Запись", "Aufnahme", "Capture", "Captura"],
+  upload: ["Upload", "Надсилання", "Отправка", "Upload", "Envoi", "Envio"],
+  update: ["Updates", "Оновлення", "Обновления", "Updates", "Mises à jour", "Atualizações"],
+  pairing: ["Discord pairing", "Підключення Discord", "Подключение Discord", "Discord-Verknüpfung", "Association Discord", "Vinculação Discord"],
+  other: ["Other", "Інше", "Другое", "Sonstiges", "Autre", "Outro"],
+  summary: ["Short summary", "Короткий опис", "Краткое описание", "Kurze Zusammenfassung", "Résumé court", "Resumo curto"],
+  description: ["What happened?", "Що сталося?", "Что произошло?", "Was ist passiert?", "Que s’est-il passé ?", "O que aconteceu?"],
+  expected: ["What did you expect?", "Чого ви очікували?", "Чего вы ожидали?", "Was hast du erwartet?", "Qu’attendiez-vous ?", "O que você esperava?"],
+  contact: ["Contact (optional)", "Контакт (необов’язково)", "Контакт (необязательно)", "Kontakt (optional)", "Contact (facultatif)", "Contato (opcional)"],
+  diagnostics: ["Include diagnostic summary", "Додати діагностичний підсумок", "Добавить диагностическую сводку", "Diagnoseübersicht hinzufügen", "Inclure le résumé de diagnostic", "Incluir resumo de diagnóstico"],
+  diagnosticBody: ["Only status codes and running time. No log files, loot contents, player names or file paths. Review everything before sending.", "Лише коди стану та час роботи. Без журналів, вмісту здобичі, імен гравців і шляхів файлів. Перегляньте все перед надсиланням.", "Только коды состояния и время работы. Без журналов, содержимого добычи, имён игроков и путей файлов. Проверьте всё перед отправкой.", "Nur Statuscodes und Laufzeit. Keine Protokolle, Beuteinhalte, Spielernamen oder Dateipfade. Prüfe alles vor dem Senden.", "Uniquement les codes d’état et la durée. Aucun journal, contenu de butin, nom de joueur ou chemin de fichier. Vérifiez tout avant l’envoi.", "Apenas códigos de estado e tempo de execução. Sem logs, conteúdo de saque, nomes de jogadores ou caminhos. Revise tudo antes de enviar."],
+  review: ["Review report", "Переглянути звіт", "Проверить отчёт", "Bericht prüfen", "Vérifier le signalement", "Revisar relato"],
+  preview: ["This is what will be sent", "Буде надіслано саме це", "Будет отправлено именно это", "Das wird gesendet", "Voici ce qui sera envoyé", "Isto será enviado"],
+  identityNote: ["Your app/version and installation ID are sent with this report. A paired Discord account/server may be linked. Analytics remains your separate choice.", "Разом зі звітом надсилаються програма/версія та ID інсталяції. Можливий зв’язок із підключеним обліковим записом/сервером Discord. Статистика залишається окремим вибором.", "С отчётом передаются приложение/версия и ID установки. Возможна связь с подключённой учётной записью/сервером Discord. Статистика остаётся отдельным выбором.", "App/Version und Installations-ID werden mitgesendet. Verknüpftes Discord-Konto/Server können zugeordnet werden. Die Nutzungsfreigabe bleibt eine separate Entscheidung.", "L’application/version et l’identifiant d’installation sont envoyés. Un compte/serveur Discord associé peut être lié. Le partage d’utilisation reste un choix distinct.", "App/versão e ID da instalação são enviados. A conta/servidor Discord vinculado pode ser associado. O compartilhamento de uso continua separado."],
+  back: ["Back to edit", "Назад до редагування", "Вернуться к редактированию", "Zurück zum Bearbeiten", "Revenir à la modification", "Voltar à edição"],
+  cancel: ["Cancel", "Скасувати", "Отмена", "Abbrechen", "Annuler", "Cancelar"],
+  send: ["Send report", "Надіслати звіт", "Отправить отчёт", "Bericht senden", "Envoyer le signalement", "Enviar relato"],
+  sending: ["Sending…", "Надсилання…", "Отправка…", "Wird gesendet…", "Envoi…", "Enviando…"],
+  success: ["Report received", "Звіт отримано", "Отчёт получен", "Bericht erhalten", "Signalement reçu", "Relato recebido"],
+  error: ["Could not send. Your report is kept here; try again.", "Не вдалося надіслати. Звіт залишився тут; спробуйте знову.", "Не удалось отправить. Отчёт остался здесь; попробуйте снова.", "Senden fehlgeschlagen. Dein Bericht bleibt hier; versuche es erneut.", "Envoi impossible. Votre signalement reste ici ; réessayez.", "Não foi possível enviar. Seu relato está aqui; tente novamente."],
+  rateLimited: ["Too many reports. Please try again later.", "Забагато звітів. Спробуйте пізніше.", "Слишком много отчётов. Повторите позже.", "Zu viele Berichte. Bitte später erneut versuchen.", "Trop de signalements. Réessayez plus tard.", "Muitos relatos. Tente novamente mais tarde."],
+  invalid: ["Add a short summary and describe what happened.", "Додайте короткий опис і поясніть, що сталося.", "Добавьте краткое описание и поясните, что произошло.", "Ergänze eine kurze Zusammenfassung und beschreibe das Problem.", "Ajoutez un résumé court et décrivez le problème.", "Adicione um resumo curto e descreva o problema."],
+  unavailable: ["Support sharing is unavailable in this build or without secure credential storage.", "Надсилання підтримці недоступне в цій збірці або без безпечного сховища облікових даних.", "Отправка поддержке недоступна в этой сборке или без безопасного хранилища учётных данных.", "Support-Freigabe ist in dieser Version oder ohne sicheren Zugangsdaten-Speicher nicht verfügbar.", "Le partage est indisponible dans cette version ou sans stockage sécurisé des identifiants.", "O envio está indisponível nesta versão ou sem armazenamento seguro de credenciais."],
+  privacy: ["Privacy policy", "Політика конфіденційності", "Политика конфиденциальности", "Datenschutz", "Confidentialité", "Política de privacidade"],
+  settingsError: ["Could not save your choice. Try again.", "Не вдалося зберегти вибір. Спробуйте знову.", "Не удалось сохранить выбор. Повторите попытку.", "Auswahl konnte nicht gespeichert werden. Erneut versuchen.", "Impossible d’enregistrer votre choix. Réessayez.", "Não foi possível salvar sua escolha. Tente novamente."],
+} as const satisfies Record<string, readonly [string, string, string, string, string, string]>;
+
+export type TSupportStrings = { [K in keyof typeof rows]: string };
+const index: Record<TLang, number> = { en: 0, uk: 1, ru: 2, de: 3, fr: 4, pt: 5 };
+export const supportStrings = (lang: TLang): TSupportStrings => Object.fromEntries(
+  Object.entries(rows).map(([key, values]) => [key, values[index[lang]]]),
+) as TSupportStrings;

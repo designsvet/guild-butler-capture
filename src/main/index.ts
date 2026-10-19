@@ -9,7 +9,7 @@
  * mismatch is detected and explained by the AbiMismatch error path.
  */
 
-import { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, powerMonitor, safeStorage, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import {
@@ -71,6 +71,7 @@ import {
   sendEnergyReading,
   sendEngineHealth,
   sendFestivities,
+  sendDesktopRequest,
 } from "./uploadClient.js";
 import { newlyBroken } from "../shared/engineHealth.js";
 import electronUpdater from "electron-updater";
@@ -78,6 +79,11 @@ import electronUpdater from "electron-updater";
 import { createUpdateController, updaterEnabled, type TUpdateController } from "./updateController.js";
 import { createUploader, type TUploader } from "./uploader.js";
 import type { TEngineEvent } from "./engineAdapter.js";
+
+import { createDesktopSupport } from "./desktopSupport.js";
+import { desktopHealth } from "./desktopDiagnostics.js";
+import { loadOrCreateDesktopIdentity } from "./desktopIdentity.js";
+import { desktopReportingAllowed, USAGE_SAMPLE_MS } from "./desktopUsage.js";
 
 const APP_ROOT = app.getAppPath();
 const SETTINGS_FILE = settingsFilePath(app.getPath("userData"));
@@ -127,6 +133,7 @@ const stopTracker = (): void => {
 const dispatch = (ev: TSessionEvent): void => {
   const brokenBefore = state.engineBroken;
   state = reduceCaptureSession(state, ev);
+  updateDesktopActivity();
   const fresh = newlyBroken(brokenBefore, state.engineBroken);
   if (fresh.length > 0) {
     forwardEngineHealth(fresh);
@@ -340,6 +347,39 @@ const pairingStatus = (): TPairingStatus => {
           },
   };
 };
+
+// Usage/support cannot see raw logs or credentials through its snapshot function.
+const desktopSupport = createDesktopSupport({
+  allowed: () => desktopReportingAllowed(app.isPackaged, process.env, currentEngine?.source),
+  consent: () => {
+    const settings = loadSettings(SETTINGS_FILE);
+    return { enabled: settings.telemetryEnabled === true, chosen: settings.telemetryConsentChosen === true };
+  },
+  saveConsent: (enabled) => {
+    saveSettings(SETTINGS_FILE, { ...loadSettings(SETTINGS_FILE), telemetryEnabled: enabled, telemetryConsentChosen: true });
+  },
+  identity: () => loadOrCreateDesktopIdentity(join(app.getPath("userData"), "desktop-identity.json"), safeStorage),
+  metadata: {
+    app: "guild-butler-capture",
+    version: app.getVersion(),
+    platform: process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux",
+    arch: process.arch,
+    channel: "stable",
+  },
+  health: () => desktopHealth(state, pairingStatus(), Date.now()),
+  now: () => performance.now(),
+  uuid: randomUUID,
+  request: (route, identity, body) =>
+    sendDesktopRequest(fetch, loadSettings(SETTINGS_FILE).apiBase ?? "", route, identity.secret, storedToken(), body),
+});
+const updateDesktopActivity = (): void => {
+  desktopSupport.activity({
+    capture: state.status === ECaptureStatus.Waiting || state.status === ECaptureStatus.Capturing,
+    foreground: win?.isFocused() === true,
+  });
+};
+let desktopSampleTimer: ReturnType<typeof setInterval> | null = null;
+let desktopHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
 const pushPairing = (): void => {
   win?.webContents.send(IPC.pairingChanged, pairingStatus());
@@ -663,6 +703,17 @@ const createWindow = (): void => {
 // --- IPC ---------------------------------------------------------------------
 
 const registerIpc = (): void => {
+  const supportSender = (event: Electron.IpcMainInvokeEvent): boolean =>
+    win != null && !win.isDestroyed() && event.sender === win.webContents &&
+    event.senderFrame === win.webContents.mainFrame && event.senderFrame.url === win.webContents.getURL();
+  ipcMain.handle(IPC.desktopSupportGet, (event) => supportSender(event) ? desktopSupport.status() : { telemetryEnabled: false, consentChosen: true, available: false });
+  ipcMain.handle(IPC.desktopSupportConsent, (event, enabled: unknown) => {
+    if (!supportSender(event) || typeof enabled !== "boolean") return desktopSupport.status();
+    return desktopSupport.setConsent(enabled);
+  });
+  ipcMain.handle(IPC.desktopReportPreview, (event, draft: unknown) => supportSender(event) ? desktopSupport.preview(draft) : null);
+  ipcMain.handle(IPC.desktopReportSubmit, (event, reportId: unknown) => supportSender(event) && typeof reportId === "string" ? desktopSupport.submit(reportId) : { ok: false, reason: "invalid" });
+
   ipcMain.handle(IPC.captureStart, () => {
     startCapture();
   });
@@ -1013,6 +1064,15 @@ if (!gotLock) {
     registerIpc();
     createWindow();
     updates.start();
+    updateDesktopActivity();
+    desktopSampleTimer = setInterval(() => { updateDesktopActivity(); }, USAGE_SAMPLE_MS);
+    desktopHeartbeatTimer = setInterval(() => { void desktopSupport.heartbeat(); }, 60_000);
+    void desktopSupport.heartbeat();
+    powerMonitor.on("suspend", () => desktopSupport.suspend());
+    powerMonitor.on("resume", () => desktopSupport.resume());
+    app.on("browser-window-focus", updateDesktopActivity);
+    app.on("browser-window-blur", updateDesktopActivity);
+
     appLog(`app start v${app.getVersion()} (built ${BUILT_AT ?? "unstamped"}) on ${process.platform}`);
   });
 
@@ -1029,6 +1089,10 @@ if (!gotLock) {
   });
 
   app.on("before-quit", () => {
+    if (desktopSampleTimer) clearInterval(desktopSampleTimer);
+    if (desktopHeartbeatTimer) clearInterval(desktopHeartbeatTimer);
+    // Capture shutdown never waits for a telemetry request.
+    void desktopSupport.heartbeat();
     stopTracker();
     supervisor?.dispose();
   });

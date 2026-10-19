@@ -34,6 +34,8 @@ import {
   type TTheme,
   type TUpdateStatus,
 } from "../shared/captureTypes.js";
+import { mountDesktopSupport } from "./desktopSupport.js";
+import type { TGbc } from "../shared/bridge.js";
 import { asLang, detectLang, LANG_NAMES, SUPPORTED_LANGS, type TLang } from "../shared/i18n.js";
 import { PAIR_COMMAND } from "../shared/ipc.js";
 import { stringsFor } from "../shared/strings.js";
@@ -44,37 +46,10 @@ import { EHealthAction, EHealthLine, engineRunning, healthCard } from "../shared
 // binding keeps the name STR so every call site reads as it always did.
 let LANG: TLang = detectLang(navigator.language);
 let STR = stringsFor(LANG);
+let refreshDesktopSupport = (): void => {};
 document.documentElement.lang = LANG;
 
-type TGbc = {
-  platform: string;
-  start: () => Promise<void>;
-  stop: () => Promise<void>;
-  getState: () => Promise<TCaptureState>;
-  reveal: () => Promise<boolean>;
-  getSetup: () => Promise<TSetupStatus>;
-  fixMacPermissions: () => Promise<TPermissionFixResult>;
-  installNpcap: () => Promise<TNpcapFixResult>;
-  openNpcapPage: () => Promise<void>;
-  pickEnginePath: () => Promise<TSetupStatus>;
-  onState: (listener: (state: TCaptureState) => void) => () => void;
-  getPairing: () => Promise<TPairingStatus>;
-  pair: (code: string) => Promise<TPairAttempt>;
-  unpair: () => Promise<TPairingStatus>;
-  setUpload: (enabled: boolean) => Promise<TPairingStatus>;
-  openLoot: () => Promise<void>;
-  openPrivacy: () => Promise<void>;
-  onPairing: (listener: (status: TPairingStatus) => void) => () => void;
-  getUpdate: () => Promise<TUpdateStatus>;
-  updateRestart: () => Promise<TRestartResult>;
-  onUpdate: (listener: (status: TUpdateStatus) => void) => () => void;
-  getSettings: () => Promise<TAppSettings>;
-  setAutoCapture: (enabled: boolean) => Promise<TAppSettings>;
-  setLanguage: (lang: string | null) => Promise<TAppSettings>;
-  setTheme: (theme: string) => Promise<TAppSettings>;
-  updateCheckNow: () => Promise<TUpdateStatus>;
-  copyText: (text: string) => Promise<void>;
-};
+
 
 const gbc = (window as unknown as { gbc: TGbc }).gbc;
 
@@ -1015,6 +990,7 @@ const applyStatic = (): void => {
   ui.advCaption.textContent = STR.settings.advancedEngine;
   ui.credit.textContent = STR.footer.engineCredit;
   ui.privacyBtn.textContent = STR.footer.privacy;
+  refreshDesktopSupport();
   // The picker names each language in ITSELF; only "System" translates.
   rebuildLangMenu();
   ui.copyCmdBtn.setAttribute("aria-label", STR.pairing.copy);
@@ -1708,3 +1684,5 @@ window.addEventListener("focus", () => {
 
 // The 1-second clock for "seen Ns ago" and the waiting-hints threshold.
 setInterval(render, 1000);
+
+refreshDesktopSupport = mountDesktopSupport(gbc, () => LANG, () => setPopover(false));

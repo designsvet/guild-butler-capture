@@ -36,6 +36,10 @@ const CH = {
   settingsSetLanguage: "settings:set-language",
   settingsSetTheme: "settings:set-theme",
   updateCheck: "update:check",
+  desktopSupportGet: "desktop:support-get",
+  desktopSupportConsent: "desktop:support-consent",
+  desktopReportPreview: "desktop:report-preview",
+  desktopReportSubmit: "desktop:report-submit",
   appCopyText: "app:copy-text",
 } as const;
 
@@ -67,10 +71,18 @@ export type TGbcBridge = {
   setTheme: (theme: string) => Promise<unknown>;
   updateCheckNow: () => Promise<unknown>;
   copyText: (text: string) => Promise<void>;
+  desktopSupportGet: () => Promise<unknown>;
+  desktopSupportConsent: (enabled: boolean) => Promise<unknown>;
+  desktopReportPreview: (draft: unknown) => Promise<unknown>;
+  desktopReportSubmit: (reportId: string) => Promise<unknown>;
 };
 
 const bridge: TGbcBridge = {
   platform: process.platform,
+  desktopSupportGet: () => ipcRenderer.invoke(CH.desktopSupportGet),
+  desktopSupportConsent: (enabled) => ipcRenderer.invoke(CH.desktopSupportConsent, enabled),
+  desktopReportPreview: (draft) => ipcRenderer.invoke(CH.desktopReportPreview, draft),
+  desktopReportSubmit: (reportId) => ipcRenderer.invoke(CH.desktopReportSubmit, reportId),
   start: () => ipcRenderer.invoke(CH.captureStart) as Promise<void>,
   stop: () => ipcRenderer.invoke(CH.captureStop) as Promise<void>,
   getState: () => ipcRenderer.invoke(CH.captureGetState),

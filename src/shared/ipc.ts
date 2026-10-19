@@ -52,6 +52,14 @@ export const IPC = {
   settingsSetTheme: "settings:set-theme",
   /** invoke → TUpdateStatus. Manual "Check for updates"; where auto-update is off it opens the download page. */
   updateCheck: "update:check",
+  /** invoke → optional usage sharing status. No registration or network request. */
+  desktopSupportGet: "desktop:support-get",
+  /** invoke(enabled) → save the explicit analytics choice. */
+  desktopSupportConsent: "desktop:support-consent",
+  /** invoke(draft) → validate and hold an exact, local report preview. */
+  desktopReportPreview: "desktop:report-preview",
+  /** invoke(reportId) → submit/retry only that reviewed report. */
+  desktopReportSubmit: "desktop:report-submit",
   /** invoke(text) → void. Copy a short string to the OS clipboard (the /capture pair chip). */
   appCopyText: "app:copy-text",
   /** invoke → void. Open the privacy policy, at its capture-app section, in the system browser. */
