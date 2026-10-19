@@ -1,6 +1,6 @@
 {
   "repository": "designsvet/ao-loot-logger",
-  "commit": "09fb735dd0fb2fe8a8995f98f3721e02b08cc807",
+  "commit": "2381fc7383ab4df7c08d729f1ef1d984c31c8685",
   "sha256": {
     "src/config.js": "1d836eb4693e0bbe8cc1f9ae09a7d2d28042b3e678c5939eb8b8f1870a136ba5",
     "src/activity/activity.js": "5a2465478d5c92e8e71b074e49e857124483f533be5828d59ae325c6e5da78d1"
