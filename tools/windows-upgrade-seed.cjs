@@ -7,6 +7,7 @@ const assert = require("node:assert/strict");
 assert.equal(process.platform, "win32");
 assert.equal(process.env.GITHUB_ACTIONS, "true");
 const input = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+fs.mkdirSync(input.cryptoProfile, { recursive: true });
 app.setPath("userData", input.cryptoProfile);
 app.whenReady().then(() => {
   assert.ok(safeStorage.isEncryptionAvailable(), "Windows credential encryption is unavailable");
