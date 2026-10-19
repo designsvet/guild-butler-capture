@@ -29,6 +29,9 @@ export type TPairing = {
 };
 
 export type TSettings = {
+  /** Optional analytics is off until the member explicitly chooses it. */
+  telemetryEnabled?: boolean;
+  telemetryConsentChosen?: boolean;
   /** User-chosen engine folder (Advanced). Empty/absent = auto-discover. */
   enginePath?: string;
   /** Bot base URL override (Advanced) — staging points somewhere else. */
@@ -92,6 +95,8 @@ export const loadSettings = (file: string): TSettings => {
     }
     const raw = parsed as Record<string, unknown>;
     const out: TSettings = {};
+    if (typeof raw.telemetryEnabled === "boolean") out.telemetryEnabled = raw.telemetryEnabled;
+    if (typeof raw.telemetryConsentChosen === "boolean") out.telemetryConsentChosen = raw.telemetryConsentChosen;
     if (typeof raw.enginePath === "string" && raw.enginePath.trim().length > 0) {
       out.enginePath = raw.enginePath;
     }

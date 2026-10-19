@@ -27,7 +27,7 @@
 # - pull_request touching THIS file — so the pipeline can be exercised from
 #   the PR before it merges (runs with the defaults below).
 #
-# Public 0.8.9 maintenance build: use the reviewed immutable engine in
+# Public 0.8.x maintenance build: use the reviewed immutable engine in
 # resources/engine-lock.json. PR runs only create CI artifacts; publishing
 # remains an explicitly authorized release_version dispatch after review.
 

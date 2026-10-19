@@ -1,0 +1,91 @@
+# Installer acceptance only. No publishing permissions, tags, feeds, or real profiles.
+name: windows-upgrade-check
+
+on:
+  pull_request:
+    branches: [release/0.8.x]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: windows-upgrade-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-upgrade:
+    # Always disposable. Never inherit the product build's self-hosted override.
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Build the matching application source for byte comparisons
+        shell: pwsh
+        run: |
+          "CHECKOUT_SHA=$(git rev-parse HEAD)" >> $env:GITHUB_ENV
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --check tools/windows-upgrade-check.cjs
+          node --check tools/windows-upgrade-seed.cjs
+
+      - name: Obtain the same-head CI installer and released baseline
+        shell: pwsh
+        run: |
+          # A successful Windows build is sufficient: the Mac job may still run.
+          # Match the exact PR head, never the newest unrelated installer.
+          $deadline = (Get-Date).AddMinutes(25)
+          $candidateRun = $null
+          while ((Get-Date) -lt $deadline) {
+            $runs = gh api "repos/$env:GITHUB_REPOSITORY/actions/workflows/build.yml/runs?head_sha=$env:SOURCE_SHA&per_page=10" | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) { throw 'Could not read candidate build runs' }
+            foreach ($run in $runs.workflow_runs) {
+              if ($run.head_sha -ne $env:SOURCE_SHA) { continue }
+              $jobs = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$($run.id)/jobs" | ConvertFrom-Json
+              if ($LASTEXITCODE -ne 0) { throw 'Could not read candidate build jobs' }
+              $windows = $jobs.jobs | Where-Object { $_.name -eq 'build' }
+              if ($windows.conclusion -eq 'failure') { throw "Candidate Windows packaging failed in run $($run.id)" }
+              if ($windows.conclusion -eq 'success') { $candidateRun = $run.id; break }
+            }
+            if ($candidateRun) { break }
+            Start-Sleep -Seconds 20
+          }
+          if (-not $candidateRun) { throw 'No successful Windows installer build for this exact head within 25 minutes' }
+          "CANDIDATE_RUN_ID=$candidateRun" >> $env:GITHUB_ENV
+          gh run download $candidateRun --repo $env:GITHUB_REPOSITORY --name guild-butler-capture-windows --dir acceptance/candidate
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download candidate artifact' }
+          gh release download v0.8.9 --repo designsvet/guild-butler-capture --pattern GuildButlerCapture-Setup-0.8.9.exe --dir acceptance/baseline
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download released baseline' }
+
+      - name: Exercise native NSIS installs, DPAPI, and electron-updater
+        shell: pwsh
+        run: |
+          node tools/windows-upgrade-check.cjs --baseline acceptance/baseline/GuildButlerCapture-Setup-0.8.9.exe --candidate acceptance/candidate/GuildButlerCapture-Setup-0.8.10.exe --evidence acceptance/evidence/windows-upgrade-checks.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Save redacted native acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-upgrade-acceptance
+          path: acceptance/evidence/*.json
+          if-no-files-found: warn
+          retention-days: 14
+          # Only explicit evidence JSON. Never upload a profile or DPAPI input.
