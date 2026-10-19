@@ -2,7 +2,7 @@
 // Never imports src/index.js, starts capture, fetches items or contacts the bot.
 const assert = require("node:assert/strict");
 const { createHash } = require("node:crypto");
-const { readFileSync } = require("node:fs");
+const { readFileSync, statSync } = require("node:fs");
 const path = require("node:path");
 const lock = require("../resources/engine-lock.json");
 
@@ -12,8 +12,10 @@ for (const [relative, expected] of Object.entries(lock.sha256)) {
   assert.equal(createHash("sha256").update(readFileSync(path.join(root, relative))).digest("hex"), expected, relative);
 }
 const fromEngine = (relative) => require(path.join(root, relative));
+assert.ok(statSync(path.join(root, "node_modules/cap/build/Release/cap.node")).isFile(), "compiled capture binding must be bundled");
 if (process.argv.includes("--native")) {
   assert.equal(typeof fromEngine("node_modules/cap").Cap, "function", "packaged Electron must load cap's native binding");
+  console.log("Packaged native capture binding loaded successfully.");
 }
 const logger = fromEngine("src/utils/logger");
 logger.clear();

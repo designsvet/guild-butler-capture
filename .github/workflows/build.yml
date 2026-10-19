@@ -168,10 +168,24 @@ jobs:
           echo "::error::electron-builder failed three times — this is not a flaky download."
           exit 1
 
-      - name: Verify the packaged Windows engine and native binding
+      - name: Verify the packaged Windows engine
+        shell: pwsh
         env:
           ELECTRON_RUN_AS_NODE: "1"
-        run: '"release/win-unpacked/Guild Butler Capture.exe" tools/verify-engine-protocol.cjs release/win-unpacked/resources/engine --native'
+        run: |
+          # Npcap is a separately installed user prerequisite, absent on hosted
+          # runners. Never hide a load failure when its runtime IS installed.
+          $npcapDir = Join-Path $env:SystemRoot "System32\Npcap"
+          $compatDll = Join-Path $env:SystemRoot "System32\wpcap.dll"
+          $verifyArgs = @("tools/verify-engine-protocol.cjs", "release/win-unpacked/resources/engine")
+          if ((Test-Path "$npcapDir\wpcap.dll") -or (Test-Path $compatDll)) {
+            $env:Path = "$npcapDir;$env:Path"
+            $verifyArgs += "--native"
+          } else {
+            Write-Output "::warning::Npcap is absent: checking bundled cap.node presence and decoder behavior only. Windows capture acceptance is still required before release."
+          }
+          & "release/win-unpacked/Guild Butler Capture.exe" @verifyArgs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Update manifest exists (electron-updater reads this from the release)
         # A hard gate, not a glob: upload-artifact's if-no-files-found only
