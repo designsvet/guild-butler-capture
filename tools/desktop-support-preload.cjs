@@ -141,7 +141,7 @@ if (sc.support) {
     desktopSupportGet: () => ok(supportStatus),
     desktopSupportConsent: (enabled) => { supportStatus = { ...supportStatus, telemetryEnabled: enabled, consentChosen: true }; return ok(supportStatus); },
     desktopReportPreview: (draft) => ok({ reportId: "530f53ea-a997-4ca1-8844-688224f5b162", payload: { schemaVersion: 1, reportId: "530f53ea-a997-4ca1-8844-688224f5b162", ...draft, ...(draft.includeDiagnostics ? { diagnostics: { health, appSeconds: 900, captureSeconds: 700 } } : {}) } }),
-    desktopReportSubmit: (reportId) => ok(++attempts === 1 ? { ok: false, reason: "network" } : { ok: true, reportId, reportNumber: 42 }),
+    desktopReportSubmit: (reportId) => new Promise((resolve) => setTimeout(() => resolve(++attempts === 1 ? { ok: false, reason: "network" } : { ok: true, reportId, reportNumber: 42 }), 180)),
   });
 }
 

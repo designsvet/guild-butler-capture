@@ -77,7 +77,7 @@ jobs:
       - name: Exercise native NSIS installs, DPAPI, and electron-updater
         shell: pwsh
         run: |
-          node tools/windows-upgrade-check.cjs --baseline acceptance/baseline/GuildButlerCapture-Setup-0.8.9.exe --candidate acceptance/candidate/GuildButlerCapture-Setup-0.8.10.exe --evidence acceptance/evidence/windows-upgrade-checks.json
+          node tools/windows-upgrade-check.cjs --baseline acceptance/baseline/GuildButlerCapture-Setup-0.8.9.exe --candidate acceptance/candidate/GuildButlerCapture-Setup-0.8.11.exe --evidence acceptance/evidence/windows-upgrade-checks.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Save redacted native acceptance evidence

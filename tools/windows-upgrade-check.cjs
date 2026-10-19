@@ -21,7 +21,7 @@ const version = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"))).ver
 assert.equal(process.platform, "win32", "Requires native Windows, never emulation");
 assert.equal(process.env.GITHUB_ACTIONS, "true", "Only a disposable hosted runner may execute this installer test");
 assert.ok(process.env.RUNNER_TEMP && process.env.APPDATA);
-assert.equal(version, "0.8.10", "Review acceptance before advancing the candidate version");
+assert.equal(version, "0.8.11", "Review acceptance before advancing the candidate version");
 const scratch = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, "capture-upgrade-"));
 const installDirectory = path.join(scratch, "installed");
 const exe = path.join(installDirectory, "Guild Butler Capture.exe");
@@ -200,7 +200,7 @@ const main = async () => {
   assert.ok(afterUpdatePreview?.reportId);
   assert.equal((await reopened.evaluate(`window.gbc.desktopReportSubmit(${JSON.stringify(afterUpdatePreview.reportId)})`)).ok, true);
   assert.ok(feedRequests.some((r) => r.path === "/updates/latest.yml") && feedRequests.some((r) => r.path === "/updates/candidate.exe"));
-  assertPreserved(); await stopApp(); record("real-electron-updater-0.8.9-to-0.8.10-via-isolated-loopback-feed");
+  assertPreserved(); await stopApp(); record("real-electron-updater-0.8.9-to-0.8.11-via-isolated-loopback-feed");
   evidence.passed = true;
 };
 main().catch((error) => { evidence.passed = false; evidence.error = error.message; console.error(error.stack); process.exitCode = 1; }).finally(async () => {

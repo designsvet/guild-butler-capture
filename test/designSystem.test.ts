@@ -127,11 +127,12 @@ describe("design-system tokens", () => {
 describe("design-system stylesheets reach the page", () => {
   const linked = [...INDEX.matchAll(/href="\.\/ds\/([^"]+\.css)"/g)].flatMap((m) => m[1] ?? []);
 
-  it("index.html links ds/tokens.css, then ds/surfaces.css, before styles.css", () => {
+  it("index.html links tokens, surfaces and support controls before app styles", () => {
     const at = (href: string): number => INDEX.indexOf(`href="${href}"`);
     expect(at("./ds/tokens.css")).toBeGreaterThan(-1);
     expect(at("./ds/surfaces.css")).toBeGreaterThan(at("./ds/tokens.css"));
-    expect(at("./styles.css")).toBeGreaterThan(at("./ds/surfaces.css"));
+    expect(at("./ds/controls.css")).toBeGreaterThan(at("./ds/surfaces.css"));
+    expect(at("./styles.css")).toBeGreaterThan(at("./ds/controls.css"));
     for (const file of linked) {
       expect(at(`./ds/${file}`), `${file} must load before styles.css`).toBeLessThan(at("./styles.css"));
     }
