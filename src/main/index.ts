@@ -251,6 +251,10 @@ const forwardFestivities = (event: Extract<TEngineEvent, { kind: "festivities" }
 const forwardEngineHealth = (fresh: ReadonlyArray<{ handler: string; failures: number; calls: number }>): void => {
   appLog(`engine health: broken ${fresh.map((b) => `${b.handler} ${b.failures}/${b.calls}`).join(", ")}`);
   const settings = loadSettings(SETTINGS_FILE);
+  // Legacy paired health reports follow the same explicit choice as desktop heartbeats.
+  if (settings.telemetryEnabled !== true || !desktopReportingAllowed(app.isPackaged, process.env, currentEngine?.source)) {
+    return;
+  }
   const token = decryptToken(safeStorage, settings.pairing);
   if (token == null) {
     return;
