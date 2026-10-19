@@ -120,7 +120,8 @@ const main = async () => {
   delete seedEnv.ELECTRON_RUN_AS_NODE; // Presence alone selects Node mode, even when empty.
   command(require("electron"), [path.join(__dirname, "windows-upgrade-seed.cjs"), seedFile], { env: seedEnv });
   record("native-dpapi-fixtures-round-trip");
-  ps(`New-NetFirewallRule -DisplayName $env:ACCEPTANCE_RULE -Direction Outbound -Program $env:ACCEPTANCE_EXE -Action Block -RemoteAddress @('0.0.0.0-126.255.255.255','128.0.0.0-255.255.255.255','::/0') | Out-Null`, { ACCEPTANCE_RULE: ruleName, ACCEPTANCE_EXE: exe });
+  ps(`New-NetFirewallRule -DisplayName $env:ACCEPTANCE_RULE -Direction Outbound -Program $env:ACCEPTANCE_EXE -Action Block -RemoteAddress Internet | Out-Null`, { ACCEPTANCE_RULE: ruleName, ACCEPTANCE_EXE: exe });
+  record("installed-app-internet-blocked-by-scoped-firewall");
   install(baseline); await stopApp(); assert.ok(appVersion().startsWith("0.8.9"));
   const old = await launch(9231);
   assert.equal((await old.evaluate("window.gbc.getSetup()")).appVersion, "0.8.9");
