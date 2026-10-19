@@ -1,6 +1,6 @@
 # Desktop usage, health and support
 
-Implemented alongside the server plan in Raid-Bot `docs/plans/2026-10-desktop-observability.md` (19 October 2026). This checkout is an isolated backport based on the public `release/0.8.x` hotfix merge `e060e1b` (v0.8.9), including the pinned October protocol fix. The tested main-branch development implementation remains in the adjacent capture-client tree; this backport contains no v5 renderer or unrelated main changes. No installer is published and no version is bumped.
+Implemented alongside the server plan in Raid-Bot `docs/plans/2026-10-desktop-observability.md` (19 October 2026). This checkout is an isolated backport based on the public `release/0.8.x` hotfix merge `e060e1b` (v0.8.9), including the pinned October protocol fix. The tested main-branch development implementation remains in the adjacent capture-client tree; this backport contains no v5 renderer or unrelated main changes. The candidate version is 0.8.10 because 0.8.9 has already been published; no 0.8.10 release is published.
 
 ## Member experience
 
@@ -32,4 +32,4 @@ Ask members to **update/install the new version over their current app**, not un
 
 `pnpm typecheck`, `pnpm test` (268 assertions across 24 suites, including the public October-hotfix guards), and `pnpm build` pass. The dedicated UI acceptance harness is `pnpm exec electron --no-sandbox tools/desktop-support-ui-check.cjs` after a build. It uses an isolated profile, denies HTTP(S), and exercises all six languages and both themes at the released 660×620 content size: visible consent, Settings bounds, diagnostics exclusion/review, failed submission and retry with the same report ID, and a receipt. Screenshots/check results are written under ignored `dist/qa/desktop-support/`.
 
-Hardware staging checks and a production release remain separate rollout steps. The package version is still the base branch's 0.8.9; the pinned engine and release workflow are unchanged.
+Hardware staging checks and a production release remain separate rollout steps. Version 0.8.10 allows the existing Windows updater to recognize a newer release than the published 0.8.9. The pinned repaired engine, package identity and updater destination are unchanged. See [the release checklist](releases/0.8.10.md).
