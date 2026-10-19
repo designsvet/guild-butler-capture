@@ -30,6 +30,7 @@ for (const profile of profiles) assert.ok(!fs.existsSync(profile), "Never overwr
 const candidateBytes = fs.readFileSync(candidate);
 const fixture = { installationId: randomUUID(), installationSecret: randomBytes(32).toString("base64url"), captureToken: `fixture-${randomBytes(24).toString("hex")}` };
 const requests = [];
+const feedRequests = [];
 const evidence = { schemaVersion: 1, platform: "win32", arch: process.arch, sourceSha: process.env.SOURCE_SHA, checkoutSha: process.env.CHECKOUT_SHA, buildRun: process.env.CANDIDATE_RUN_ID, at: new Date().toISOString(), baseline: { version: "0.8.9", sha256: hash(fs.readFileSync(baseline)) }, candidate: { version, sha256: hash(candidateBytes), sha512: hash(candidateBytes, "sha512", "base64"), size: candidateBytes.length }, checks: [], limitations: ["No live Albion session or physical network capture; Npcap/game acceptance is separate.", "Auto-update is exercised through an isolated loopback feed override; the public stable feed is never changed."] };
 assert.equal(evidence.baseline.sha256, "e7e949bf1ee0e7bb977a7582352d8de2259af7556e5e0b682ae13577fa08d2b4", "Released baseline checksum changed");
 let server;
@@ -92,6 +93,7 @@ const appVersion = () => ps(`(Get-Item -LiteralPath $env:ACCEPTANCE_EXE).Version
 const main = async () => {
   server = http.createServer(async (req, res) => {
     const route = new URL(req.url, "http://127.0.0.1").pathname;
+    if (route.startsWith("/updates/")) feedRequests.push({ path: route, method: req.method });
     if (route === "/updates/latest.yml") {
       res.setHeader("Content-Type", "text/yaml");
       res.end(`version: ${version}\nfiles:\n  - url: candidate.exe\n    sha512: ${evidence.candidate.sha512}\n    size: ${candidateBytes.length}\npath: candidate.exe\nsha512: ${evidence.candidate.sha512}\nreleaseDate: '${new Date().toISOString()}'\n`); return;
@@ -155,15 +157,28 @@ const main = async () => {
   record("installed-engine-source-hashes-and-october-decoder-fixtures");
   const builder = createRequire(require.resolve("electron-builder")); const lib = createRequire(builder.resolve("app-builder-lib")); const asar = lib("@electron/asar");
   const archive = path.join(installDirectory, "resources/app.asar");
-  for (const file of ["dist/main/index.js", "dist/main/desktopSupport.js", "dist/preload/index.cjs", "dist/web/renderer/desktopSupport.js"]) assert.equal(hash(asar.extractFile(archive, file)), hash(fs.readFileSync(path.join(ROOT, file))), `Artifact/source mismatch ${file}`);
+  const builtFiles = (directory) => fs.readdirSync(path.join(ROOT, directory), { withFileTypes: true }).flatMap((entry) => {
+    const file = path.join(directory, entry.name);
+    return entry.isDirectory() ? builtFiles(file) : [file];
+  });
+  const manifest = builtFiles("dist").filter((file) => file !== path.join("dist", "buildstamp.json")).sort().map((file) => {
+    const expected = hash(fs.readFileSync(path.join(ROOT, file)));
+    // ASAR's directory walker splits on the native separator on Windows.
+    assert.equal(hash(asar.extractFile(archive, path.normalize(file))), expected, `Artifact/source mismatch ${file}`);
+    return { file: file.split(path.sep).join("/"), sha256: expected };
+  });
+  evidence.candidate.compiledFileCount = manifest.length;
+  evidence.candidate.compiledManifestSha256 = hash(JSON.stringify(manifest));
   evidence.candidate.asarSha256 = hash(fs.readFileSync(archive)); record("installed-app-matches-reviewed-source-build");
   install(candidate); await stopApp(); assertPreserved(); record("native-reinstall-preserves-existing-profile");
   // Real updater path: only this disposable baseline copy's provider is redirected.
   install(baseline); await stopApp();
+  assert.ok(appVersion().startsWith("0.8.9"), "Disposable baseline downgrade did not restore 0.8.9");
   const configFile = path.join(installDirectory, "resources/app-update.yml");
   evidence.updaterConfigOriginalSha256 = hash(fs.readFileSync(configFile));
   fs.writeFileSync(configFile, `provider: generic\nurl: ${base}/updates/\nupdaterCacheDirName: capture-acceptance-${path.basename(scratch)}\n`);
   const updating = await launch(9233, true);
+  assert.equal((await updating.evaluate("window.gbc.getSetup()")).appVersion, "0.8.9");
   await updating.evaluate("window.gbc.updateCheckNow()");
   await waitFor(async () => {
     const status = await updating.evaluate("window.gbc.getUpdate()");
@@ -181,6 +196,10 @@ const main = async () => {
   const reopened = await launch(9234);
   assert.equal((await reopened.evaluate("window.gbc.getSetup()")).appVersion, version);
   assert.equal((await reopened.evaluate("window.gbc.getPairing()")).guildId, "111111111111111111");
+  const afterUpdatePreview = await reopened.evaluate("window.gbc.desktopReportPreview({category:'update',summary:'Fixture after real update',description:'Synthetic acceptance report',expected:'Preserve encrypted credentials',includeDiagnostics:false})");
+  assert.ok(afterUpdatePreview?.reportId);
+  assert.equal((await reopened.evaluate(`window.gbc.desktopReportSubmit(${JSON.stringify(afterUpdatePreview.reportId)})`)).ok, true);
+  assert.ok(feedRequests.some((r) => r.path === "/updates/latest.yml") && feedRequests.some((r) => r.path === "/updates/candidate.exe"));
   assertPreserved(); await stopApp(); record("real-electron-updater-0.8.9-to-0.8.10-via-isolated-loopback-feed");
   evidence.passed = true;
 };
@@ -191,5 +210,6 @@ main().catch((error) => { evidence.passed = false; evidence.error = error.messag
   fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
   // Never serialize fixture tokens, request headers, profile files or the seed input.
   evidence.backendRequestPaths = requests.map((r) => r.path);
+  evidence.loopbackFeedRequests = feedRequests;
   fs.writeFileSync(evidencePath, JSON.stringify(evidence, null, 2) + "\n");
 });
