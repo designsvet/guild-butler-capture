@@ -7,13 +7,15 @@ const assert = require("node:assert/strict");
 assert.equal(process.platform, "win32");
 assert.equal(process.env.GITHUB_ACTIONS, "true");
 const input = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-fs.mkdirSync(input.cryptoProfile, { recursive: true });
-app.setPath("userData", input.cryptoProfile);
+const directory = process.argv[3];
+assert.ok(input.profiles.includes(directory), "Only the enumerated disposable profile may be seeded");
+fs.mkdirSync(directory, { recursive: true });
+app.setPath("userData", directory);
 app.whenReady().then(() => {
   assert.ok(safeStorage.isEncryptionAvailable(), "Windows credential encryption is unavailable");
   const encryptedPairing = safeStorage.encryptString(input.captureToken).toString("base64");
   const encryptedIdentity = safeStorage.encryptString(input.installationSecret).toString("base64");
-  for (const directory of input.profiles) {
+  {
     fs.mkdirSync(path.join(directory, "captures"), { recursive: true });
     fs.writeFileSync(path.join(directory, "settings.json"), JSON.stringify({
       apiBase: input.apiBase, autoCapture: false, uploadEnabled: true, language: "de", theme: "parchment",
@@ -26,5 +28,6 @@ app.whenReady().then(() => {
     assert.equal(safeStorage.decryptString(Buffer.from(encryptedIdentity, "base64")), input.installationSecret);
   }
   console.log("DPAPI fixtures encrypted and decrypted successfully.");
-  app.exit(0);
+  // Normal shutdown flushes Chromium Local State, including its DPAPI-protected key.
+  app.quit();
 }).catch((error) => { console.error(error.message); app.exit(1); });

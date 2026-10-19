@@ -115,10 +115,13 @@ const main = async () => {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   const seedFile = path.join(scratch, "seed-input.json");
-  fs.writeFileSync(seedFile, JSON.stringify({ ...fixture, profiles, apiBase: base, cryptoProfile: path.join(scratch, "crypto-profile") }));
+  fs.writeFileSync(seedFile, JSON.stringify({ ...fixture, profiles, apiBase: base }));
   const seedEnv = { ...process.env };
   delete seedEnv.ELECTRON_RUN_AS_NODE; // Presence alone selects Node mode, even when empty.
-  command(require("electron"), [path.join(__dirname, "windows-upgrade-seed.cjs"), seedFile], { env: seedEnv });
+  for (const profile of profiles) {
+    command(require("electron"), [path.join(__dirname, "windows-upgrade-seed.cjs"), seedFile, profile], { env: seedEnv });
+    assert.ok(fs.existsSync(path.join(profile, "Local State")), "Native encryption key state was not flushed");
+  }
   record("native-dpapi-fixtures-round-trip");
   ps(`New-NetFirewallRule -DisplayName $env:ACCEPTANCE_RULE -Direction Outbound -Program $env:ACCEPTANCE_EXE -Action Block -RemoteAddress Internet | Out-Null`, { ACCEPTANCE_RULE: ruleName, ACCEPTANCE_EXE: exe });
   record("installed-app-internet-blocked-by-scoped-firewall");
