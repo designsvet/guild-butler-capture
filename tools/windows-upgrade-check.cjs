@@ -116,7 +116,9 @@ const main = async () => {
   const base = `http://127.0.0.1:${server.address().port}`;
   const seedFile = path.join(scratch, "seed-input.json");
   fs.writeFileSync(seedFile, JSON.stringify({ ...fixture, profiles, apiBase: base, cryptoProfile: path.join(scratch, "crypto-profile") }));
-  command(require("electron"), [path.join(__dirname, "windows-upgrade-seed.cjs"), seedFile], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "" } });
+  const seedEnv = { ...process.env };
+  delete seedEnv.ELECTRON_RUN_AS_NODE; // Presence alone selects Node mode, even when empty.
+  command(require("electron"), [path.join(__dirname, "windows-upgrade-seed.cjs"), seedFile], { env: seedEnv });
   record("native-dpapi-fixtures-round-trip");
   ps(`New-NetFirewallRule -DisplayName $env:ACCEPTANCE_RULE -Direction Outbound -Program $env:ACCEPTANCE_EXE -Action Block -RemoteAddress @('0.0.0.0-126.255.255.255','128.0.0.0-255.255.255.255','::/0') | Out-Null`, { ACCEPTANCE_RULE: ruleName, ACCEPTANCE_EXE: exe });
   install(baseline); await stopApp(); assert.ok(appVersion().startsWith("0.8.9"));
