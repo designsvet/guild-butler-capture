@@ -15,6 +15,9 @@ Still open before handing this to anyone: the engine under Electron's Node
 (step 2), the macOS permission fix end-to-end (step 3), and the whole
 [Windows half](#hardware-verification-checklist).
 
+**Licence:** the code is GPL-3.0 (`LICENSE`). The Albion Butler name, logo and icons are not: see
+[`NOTICE.md`](NOTICE.md).
+
 ## How it fits together
 
 ```
